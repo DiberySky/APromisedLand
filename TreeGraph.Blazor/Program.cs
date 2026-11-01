@@ -57,7 +57,7 @@ builder.Services.AddDialogSourceTracker();
 #endif
 
 // ★ 泛型树组件读操作适配器（ITreeClientService<T>）：包装 TreeApiClient<T>，
-//   添加排序逻辑与 UI 属性，供 TreeEavSky.razor / TreeDialogPageSky.razor / TreeSelectDialogSky.razor 注入。
+//   添加排序逻辑与 UI 属性，供 TreeEavSky.razor / TreeDialogPageSky.razor / TreeNodePickDialog.razor 注入。
 builder.Services.AddScoped<ITreeClientService<UnitTree>, UnitTreeClientService>();
 builder.Services.AddScoped<ITreeClientService<CategoryTree>, CategoryTreeClientService>();
 builder.Services.AddScoped<ITreeClientService<KnowledgeTree>, KnowledgeTreeClientService>();

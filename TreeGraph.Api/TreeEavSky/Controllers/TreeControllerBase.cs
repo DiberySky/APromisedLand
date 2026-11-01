@@ -225,6 +225,11 @@ public abstract class TreeControllerBase<T>(
         if (string.IsNullOrWhiteSpace(nodeId))
             return BadRequest(new { error = "节点 ID 不能为空" });
 
+        // 禁止移至顶层：树模型为单根（前端 RootId / 后端 FirstOrDefault(ParentId==null) 都只认一个根），
+        // 置为无父节点会产生 UI 不可见的幽灵节点，故要求目标父节点必填。
+        if (string.IsNullOrEmpty(newParentId))
+            return BadRequest(new { error = "目标父节点不能为空（不支持移至顶层）" });
+
         if (!string.IsNullOrEmpty(newParentId))
         {
             try

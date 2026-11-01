@@ -39,16 +39,15 @@ public class TreeNodeDialogService<TItem>(
 
     public async Task<TItem?> ShowTreeSelectDialogAsync()
     {
-        var parameters = new DialogParameters<TreeSelectDialogSky<TItem>>
+        var parameters = new DialogParameters<TreeNodePickDialog<TItem>>
         {
-            { x => x.OriginalNode, null },
             { x => x.TitleToolBar, "请选择 =>" },
             { x => x.Title, "" },
         };
 
         var options = blazorService.DialogOptions;
 
-        var dialog = await dialogService.ShowExAsync<TreeSelectDialogSky<TItem>>("选择节点", parameters, options);
+        var dialog = await dialogService.ShowExAsync<TreeNodePickDialog<TItem>>("选择节点", parameters, options);
 
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not TItem actionResult)
@@ -171,18 +170,24 @@ public class TreeNodeDialogService<TItem>(
 
     #region 父节点选择对话框
 
+    /// <summary>
+    /// 选父节点（移动场景）。<paramref name="rootId"/> 限定候选范围为同一棵树根，
+    /// 避免 SpaceTree 等多根类型把节点移入别的空间/树。
+    /// </summary>
     public async Task<TItem?> ShowParentSelectDialogAsync(
-        TreeNodeItem<TItem>? node = null)
+        TreeNodeItem<TItem>? node = null,
+        string? rootId = null)
     {
-        var parameters = new DialogParameters<TreeSelectDialogSky<TItem>>
+        var parameters = new DialogParameters<TreeNodeParentSelectDialog<TItem>>
         {
-            { x => x.OriginalNode, node },
+            { x => x.Node, node },
+            { x => x.RootId, rootId },
             { x => x.TitleToolBar, node?.Value?.Parent?.Name + " =>" },
             { x => x.Title, node?.Value?.Name },
         };
 
         var options = blazorService.DialogOptions;
-        var dialog = await dialogService.ShowExAsync<TreeSelectDialogSky<TItem>>("选择上级节点", parameters, options);
+        var dialog = await dialogService.ShowExAsync<TreeNodeParentSelectDialog<TItem>>("选择上级节点", parameters, options);
 
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not TItem actionResult)
@@ -191,52 +196,6 @@ public class TreeNodeDialogService<TItem>(
         if (actionResult.Id == node?.Value?.ParentId) return null;
 
         return actionResult;
-    }
-
-    public async Task<ParentSelectResult<TItem>?> ShowParentSelectDialogAsync(
-        List<TItem> treeItems,
-        TItem? currentNode = null,
-        TItem? currentParent = null,
-        bool allowRoot = true,
-        Func<TItem, bool>? canSelectNode = null,
-        Func<TItem, IEnumerable<TItem>>? childrenAccessor = null,
-        DialogConfig? config = null)
-    {
-        var parameters = new DialogParameters
-        {
-            { "TreeItems", treeItems },
-            { "CurrentNode", currentNode },
-            { "CurrentParent", currentParent },
-            { "AllowRootSelection", allowRoot },
-            { "CanSelectNode", canSelectNode },
-            { "ChildrenAccessor", childrenAccessor }
-        };
-
-        var options = (config ?? new DialogConfig
-        {
-            MaxWidth = MaxWidth.Medium,
-            CloseButton = true
-        }).ToDialogOptions();
-
-        var dialog = await dialogService.ShowExAsync<TreeNodeParentSelectDialog<TItem>>(
-            "选择父节点", parameters, options);
-
-        var result = await dialog.Result;
-        if (result?.Canceled != false || result.Data is not ParentSelectResult<TItem> selectResult)
-            return null;
-
-        return selectResult;
-    }
-
-    public async Task<ParentSelectResult<TItem>?> ShowParentSelectDialogAsync(TreeEavSky<TItem> treeSky,
-        TItem? currentNode = null,
-        TItem? currentParent = null,
-        bool allowRoot = true,
-        DialogConfig? config = null)
-    {
-        var allItems = await treeSky.EnsureAllNodesLoadedAsync();
-        return await ShowParentSelectDialogAsync(
-            allItems, currentNode, currentParent, allowRoot, null, null, config);
     }
 
     #endregion

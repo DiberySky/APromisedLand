@@ -1,52 +1,75 @@
-@* TreeNodePickDialog.razor — 轻量目标父节点选择（移动到）：点击节点文本即返回其 Id。
-   与 TreeSelectDialogSky 的 SelectLeaf 语义无关，任何节点都可作为目标父节点；
-   目标是否允许子节点由后端 move 端点校验（400 透传）。 *@
+@* TreeNodePickDialog.razor — 纯节点选择（单选）：点击节点文本即返回该节点（TreeNodeItem 的 Value）。
+   由原 TreeSelectDialogSky 拆分而来（其 OriginalNode == null 分支），只做"选一个节点"，不含任何移动/改父语义。
+   叶子守卫：ClientService.SelectLeaf 为 true 时仅叶子节点可选（保持拆分前行为）。
+   已废弃能力：移至顶层（把节点置为无父根）—— 单根树模型下会产生 UI 不可见的幽灵节点，禁止。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
+@inject ITreeClientService<TItem> ClientService
+
 <DialogSky Title="@Title"
-           SubmitButtonVisible="false"
            CancelButtonVisible="true"
-           CancelButtonText="取消">
-    <DialogContent>
-        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">
-            点击目标节点名称，将当前节点移动到其下。
-        </MudText>
-        <TreeEavSky TItem="TItem"
-                    IsSelectDialog="true"
-                    RootId="@RootId"
-                    OnClickItemText="Pick" />
-    </DialogContent>
-    <DialogLeftActions>
-        @if (AllowRoot)
+           CancelButtonText="关闭">
+    <ToolBarContent>
+        @if (!string.IsNullOrEmpty(TitleToolBar))
         {
-            <MudButton Variant="Variant.Text"
-                       Color="Color.Warning"
-                       StartIcon="@Icons.Material.Outlined.VerticalAlignTop"
-                       OnClick="PickRoot">
-                移至顶层
-            </MudButton>
+            <MudText Typo="Typo.subtitle1" Class="text-info">@TitleToolBar</MudText>
         }
-    </DialogLeftActions>
+        @if (ToolBarLeftContent != null)
+        {
+            @ToolBarLeftContent
+        }
+        <MudSpacer/>
+        @if (ToolBarRightContent != null)
+        {
+            @ToolBarRightContent
+        }
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer MaxWidth="@MaxWidth">
+            <TreeEavSky TItem="@TItem"
+                        IsSelectDialog="true"
+                        RootId="@RootId"
+                        ClickNodeId="@ClickNodeId"
+                        OnClickItemText="Pick"/>
+        </MudContainer>
+    </DialogContent>
 </DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    [Parameter] public string Title { get; set; } = "选择目标父节点";
+    [Parameter] public string Title { get; set; } = "请选择节点";
+    [Parameter] public string? TitleToolBar { get; set; } = "请选择";
 
-    /// <summary>树的根节点 ID（限定可选范围；空 = 全部根）。</summary>
+    /// <summary>树的根节点 Id（限定选择范围；空 = 全部根）。</summary>
     [Parameter] public string? RootId { get; set; }
 
-    /// <summary>是否允许移动到顶层（成为根节点）。</summary>
-    [Parameter] public bool AllowRoot { get; set; } = true;
+    /// <summary>打开时自动定位并展开到的节点 Id。</summary>
+    [Parameter] public string? ClickNodeId { get; set; }
+
+    [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
+
+    [Parameter] public RenderFragment? ToolBarLeftContent { get; set; }
+    [Parameter] public RenderFragment? ToolBarRightContent { get; set; }
+
+    private bool _selectLeaf;
+
+    protected override void OnInitialized()
+    {
+        Title = string.IsNullOrEmpty(Title) ? ClientService.Title : Title;
+        _selectLeaf = ClientService.SelectLeaf;
+
+        base.OnInitialized();
+    }
 
     private void Pick(TreeNodeItem<TItem>? node)
     {
         if (node?.Value is null) return;
-        MudDialog?.Close(DialogResult.Ok(node.Value.Id));
-    }
 
-    /// <summary>移至顶层：返回空字符串表示目标为根（区别于取消）。</summary>
-    private void PickRoot() => MudDialog?.Close(DialogResult.Ok(string.Empty));
+        // 叶子守卫：SelectLeaf 时只有叶子节点可选；否则任意节点可选
+        if (_selectLeaf && node.Value.CanHaveChildren) return;
+
+        MudDialog?.Close(DialogResult.Ok(node.Value));
+    }
 }

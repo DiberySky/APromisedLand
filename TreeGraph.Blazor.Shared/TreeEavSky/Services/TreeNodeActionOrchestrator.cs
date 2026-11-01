@@ -38,6 +38,9 @@ public sealed class TreeNodeActionUi<TItem>
     /// <summary>编辑模板（创建/编辑对话框的内容区）。</summary>
     public RenderFragment<TItem>? EditTemplate { get; init; }
 
+    /// <summary>当前树的根节点 Id（父节点选择对话框据此限定同一棵树，避免跨根/跨空间移动）。</summary>
+    public string? RootId { get; init; }
+
     /// <summary>判定节点是否为当前树的根（宿主对话框据此隐藏删除/移动/编辑/属性）。</summary>
     public required Func<TItem, bool> IsRoot { get; init; }
 
@@ -294,7 +297,7 @@ public sealed class TreeNodeActionOrchestrator<TItem>(
     {
         if (node.Value == null) return TreeNodeActionExecResult.None;
 
-        var selectResult = await nodeDialogSvc.ShowParentSelectDialogAsync(node);
+        var selectResult = await nodeDialogSvc.ShowParentSelectDialogAsync(node, ui.RootId);
 
         if (selectResult == null) return TreeNodeActionExecResult.None;
 

@@ -53,6 +53,9 @@ public partial class TreeEavSky<TItem>
     // ========== 节点点击与导航 ==========
     private async Task ClickItemText(TreeNodeItem<TItem> node)
     {
+        // 选择模式下禁选的节点（自身/子树/谓词拒绝）不响应点击
+        if (!IsItemSelectable(node)) return;
+
         SelectedValue = node.Value;
         _ = SelectedValueChanged.InvokeAsync(node.Value);
 
@@ -273,6 +276,59 @@ public partial class TreeEavSky<TItem>
         }
 
         return result;
+    }
+
+    #endregion
+
+    #region 选择模式：可选判断
+
+    /// <summary>
+    /// 选择模式下该节点是否可选：ForbidNodeId（自身及整棵子树）与 CanSelectItem 谓词双重判定。
+    /// 非选择模式（浏览/编辑树）恒为 true，不影响既有行为。
+    /// </summary>
+    internal bool IsItemSelectable(TreeNodeItem<TItem> item)
+    {
+        if (!IsSelectDialog) return true;
+
+        if (CanSelectItem is not null && !CanSelectItem(item)) return false;
+
+        if (string.IsNullOrEmpty(ForbidNodeId)) return true;
+
+        // 仅在已加载节点中查找：禁选节点若未加载，其子树同样未渲染，无从点击
+        var forbidden = FindTreeNode(_items, ForbidNodeId);
+        if (forbidden is null) return true;
+
+        return !IsSameOrDescendant(forbidden, item.Value?.Id);
+    }
+
+    private static TreeNodeItem<TItem>? FindTreeNode(IEnumerable<ITreeItemData<TItem>>? nodes, string id)
+    {
+        if (nodes is null) return null;
+
+        foreach (var node in nodes)
+        {
+            if (string.Equals(node.Value?.Id, id, StringComparison.OrdinalIgnoreCase))
+                return node as TreeNodeItem<TItem>;
+
+            var found = FindTreeNode(node.Children, id);
+            if (found is not null) return found;
+        }
+
+        return null;
+    }
+
+    private static bool IsSameOrDescendant(ITreeItemData<TItem> root, string? id)
+    {
+        if (id is null) return false;
+        if (string.Equals(root.Value?.Id, id, StringComparison.OrdinalIgnoreCase)) return true;
+        if (root.Children is not { Count: > 0 }) return false;
+
+        foreach (var child in root.Children)
+        {
+            if (IsSameOrDescendant(child, id)) return true;
+        }
+
+        return false;
     }
 
     #endregion

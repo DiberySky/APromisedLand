@@ -13,6 +13,7 @@ public partial class TreeEavSky<TItem>
     private TreeNodeActionUi<TItem> BuildActionUi() => new()
     {
         EditTemplate = EditTemplate,
+        RootId = RootId,
         IsRoot = v => v.Id == RootId,
         GetParentNode = GetParentNode,
         FindLoadedNode = id => string.IsNullOrEmpty(id) ? null : _items?.FindTreeItem(id),

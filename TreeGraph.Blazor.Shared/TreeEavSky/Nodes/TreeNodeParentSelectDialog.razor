@@ -1,243 +1,76 @@
-@* TreeNodeParentSelectDialog.razor *@
+@* TreeNodeParentSelectDialog.razor — 选父节点（移动上下文）：点击任意节点即选为新父节点并返回其 Value。
+   由原 TreeSelectDialogSky 拆分而来（其 OriginalNode != null 分支），并吸收旧内存树版本的前端防环：
+     移动节点自身及其整棵子树禁选（TreeEavSky.ForbidNodeId），由祖先/子树判定，兼容懒加载；
+     后端 move 路由仍做最终校验（防环 + 目标是否允许子节点）。
+   已废弃能力：移至顶层（无父根）—— 单根树模型下会产生 UI 不可见的幽灵节点，禁止。
+   叶子规则：声明为叶子（CanHaveChildren=false）的节点不可作上级 —— 不禁选，点击时明确提示原因，后端 move 硬校验兜底。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>
-@implements IDisposable
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
- @* Title="选择父节点" *@
-<MudDialog>
+@inject ITreeClientService<TItem> ClientService
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@Title"
+           CancelButtonVisible="true"
+           CancelButtonText="关闭">
+    <ToolBarContent>
+        @if (!string.IsNullOrEmpty(TitleToolBar))
+        {
+            <MudText Typo="Typo.subtitle1" Class="text-info">@TitleToolBar</MudText>
+        }
+        <MudSpacer/>
+    </ToolBarContent>
     <DialogContent>
-        <MudContainer Class="py-2" Style="min-height: 300px; max-height: 500px; overflow-y: auto;">
-            <MudAlert Severity="Severity.Info"
-                      Dense="true"
-                      Class="mb-2"
-                      ShowCloseIcon="false">
-                当前选中: <strong>@SelectedName</strong>
-                @if (SelectedParent == null)
-                {
-                    <MudText Inline="true" Color="Color.Secondary">(根节点)</MudText>
-                }
-            </MudAlert>
-
-            <MudTextField T="string"
-                          @bind-Value="_searchText"
-                          Label="搜索节点"
-                          Variant="Variant.Outlined"
-                          Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Outlined.Search"
-                          Class="mb-2"
-                          Clearable="true"
-                          DebounceInterval="300"
-                          OnDebounceIntervalElapsed="OnSearchAsync" />
-
-            @if (_isLoading)
-            {
-                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-            }
-            else if (_filteredItems?.Any() != true && !string.IsNullOrEmpty(_searchText))
-            {
-                <MudText Align="Align.Center" Color="Color.Secondary" Class="my-4">
-                    未找到匹配的节点
-                </MudText>
-            }
-            else
-            {
-                <MudTreeView T="TItem"
-                             @bind-SelectedValue="_selectedValue"
-                             SelectionMode="SelectionMode.SingleSelection"
-                             ExpandOnClick="true">
-                    @RenderTreeItems(_filteredItems ?? _treeItems)
-                </MudTreeView>
-            }
+        <MudContainer MaxWidth="@MaxWidth">
+            <TreeEavSky TItem="@TItem"
+                        IsSelectDialog="true"
+                        RootId="@RootId"
+                        ClickNodeId="@ClickNodeId"
+                        ForbidNodeId="@ForbidNodeId"
+                        OnClickItemText="Pick"/>
         </MudContainer>
     </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="Close"
-                   Variant="Variant.Text"
-                   Color="Color.Default">
-            取消
-        </MudButton>
-        <MudButton OnClick="ConfirmSelection"
-                   Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   Disabled="!CanConfirm">
-            确认选择
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    [Parameter] public required List<TItem> TreeItems { get; set; }
-    [Parameter] public TItem? CurrentNode { get; set; }
-    [Parameter] public TItem? CurrentParent { get; set; }
-    [Parameter] public bool AllowRootSelection { get; set; } = true;
-    [Parameter] public Func<TItem, bool>? CanSelectNode { get; set; }
+    /// <summary>被移动的节点：其自身及整棵子树禁选（前端防环）。为 null 时不禁选。</summary>
+    [Parameter] public TreeNodeItem<TItem>? Node { get; set; }
 
-    private string _searchText = string.Empty;
-    private bool _isLoading = false;
+    [Parameter] public string Title { get; set; } = "请选择上级节点";
+    [Parameter] public string? TitleToolBar { get; set; }
 
-    private List<TItem> _treeItems = new();
-    private List<TItem>? _filteredItems;
-    private TItem? _selectedValue;
-    private TItem? SelectedParent => _selectedValue;
+    /// <summary>树的根节点 Id（限定选择范围；空 = 全部根）。</summary>
+    [Parameter] public string? RootId { get; set; }
 
-    private string SelectedName => SelectedParent?.Name ?? CurrentParent?.Name ?? "根节点";
-    private bool CanConfirm => _selectedValue != null || AllowRootSelection;
+    /// <summary>打开时自动定位并展开到的节点 Id。</summary>
+    [Parameter] public string? ClickNodeId { get; set; }
+
+    [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
+
+    private string? ForbidNodeId => Node?.Value?.Id;
 
     protected override void OnInitialized()
     {
-        _treeItems = TreeItems.ToList();
-        _selectedValue = CurrentParent;
+        Title = string.IsNullOrEmpty(Title) ? ClientService.Title : Title;
+
         base.OnInitialized();
     }
 
-    private RenderFragment RenderTreeItems(List<TItem> items)
+    private void Pick(TreeNodeItem<TItem>? node)
     {
-        return builder =>
+        if (node?.Value is null) return;
+
+        // 叶子节点声明为「不可含子项」，不能作为上级（后端 move 亦硬校验）。
+        // 此处不禁选、不关窗，而是明确告知原因，便于用户改选其它节点。
+        if (!node.Value.CanHaveChildren)
         {
-            foreach (var item in items)
-            {
-                var isDisabled = IsNodeDisabled(item);
-                var isSelected = item.Id == _selectedValue?.Id;
-
-                builder.OpenComponent<MudTreeViewItem<TItem>>(0);
-                builder.AddAttribute(1, "Value", item);
-                builder.AddAttribute(2, "Text", item.Name);
-                builder.AddAttribute(3, "Icon", GetNodeIcon(item, isSelected));
-                builder.AddAttribute(4, "IconColor", GetNodeColor(item, isSelected));
-                builder.AddAttribute(5, "Disabled", isDisabled);
-                builder.AddAttribute(6, "OnClick", EventCallback.Factory.Create<TItem>(this, OnNodeClick));
-
-                // 递归渲染子节点
-                var children = GetChildren(item);
-                if (children.Any())
-                {
-                    builder.AddAttribute(7, "ChildContent", RenderTreeItems(children));
-                }
-
-                builder.CloseComponent();
-            }
-        };
-    }
-
-    private void OnNodeClick(TItem node)
-    {
-        if (IsNodeDisabled(node)) return;
-        _selectedValue = node;
-        StateHasChanged();
-    }
-
-    private bool IsNodeDisabled(TItem node)
-    {
-        if (CurrentNode != null && IsDescendantOrSelf(node, CurrentNode))
-            return true;
-
-        if (CanSelectNode != null && !CanSelectNode(node))
-            return true;
-
-        return false;
-    }
-
-    private bool IsDescendantOrSelf(TItem node, TItem target)
-    {
-        if (node.Id == target.Id) return true;
-
-        var children = GetChildren(node);
-        if (!children.Any()) return false;
-
-        foreach (var child in children)
-        {
-            if (IsDescendantOrSelf(child, target))
-                return true;
-        }
-
-        return false;
-    }
-
-    private List<TItem> GetChildren(TItem node)
-    {
-        // 通过反射获取 Children 属性
-        var childrenProperty = node.GetType().GetProperty("Children");
-        if (childrenProperty == null) return new List<TItem>();
-
-        var children = childrenProperty.GetValue(node) as IEnumerable<object>;
-        if (children == null) return new List<TItem>();
-
-        return children.OfType<TItem>().ToList();
-    }
-
-    private string GetNodeIcon(TItem node, bool isSelected)
-    {
-        if (isSelected) return Icons.Material.Outlined.CheckCircle;
-        if (GetChildren(node).Any() || node.HasChildren) return Icons.Material.Outlined.Folder;
-        return Icons.Material.Outlined.InsertDriveFile;
-    }
-
-    private Color GetNodeColor(TItem node, bool isSelected)
-    {
-        if (isSelected) return Color.Primary;
-        if (IsNodeDisabled(node)) return Color.Default;
-        return Color.Inherit;
-    }
-
-    private async Task OnSearchAsync()
-    {
-        if (string.IsNullOrWhiteSpace(_searchText))
-        {
-            _filteredItems = null;
+            Snackbar.Add($"「{node.Text}」声明为叶子节点（不允许添加子节点），不能作为上级节点",
+                Severity.Warning);
             return;
         }
 
-        _isLoading = true;
-        StateHasChanged();
-
-        await Task.Delay(100);
-
-        var keyword = _searchText.ToLowerInvariant();
-        var matchedIds = _treeItems
-            .Where(n => (n.Name ?? string.Empty).ToLowerInvariant().Contains(keyword))
-            .Select(n => n.Id)
-            .ToHashSet();
-
-        var result = new HashSet<string>();
-        foreach (var id in matchedIds)
-        {
-            AddWithAncestors(id, result);
-        }
-
-        _filteredItems = _treeItems.Where(n => result.Contains(n.Id)).ToList();
-
-        _isLoading = false;
-        StateHasChanged();
-    }
-
-    private void AddWithAncestors(string nodeId, HashSet<string> result)
-    {
-        result.Add(nodeId);
-        var node = _treeItems.FirstOrDefault(n => n.Id == nodeId);
-        if (node?.ParentId != null)
-        {
-            AddWithAncestors(node.ParentId, result);
-        }
-    }
-
-    private void ConfirmSelection()
-    {
-        var result = new ParentSelectResult<TItem>
-        {
-            IsConfirmed = true,
-            SelectedParent = SelectedParent
-        };
-        MudDialog?.Close(DialogResult.Ok(result));
-    }
-
-    private void Close()
-    {
-        MudDialog?.Close(DialogResult.Cancel());
-    }
-
-    public void Dispose()
-    {
+        MudDialog?.Close(DialogResult.Ok(node.Value));
     }
 }

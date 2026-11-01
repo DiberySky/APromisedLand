@@ -194,39 +194,6 @@ public class TreeNodeDialogServiceTests
     }
 
     // ============================================================
-    // ShowParentSelectDialogAsync（List 版本）
-    // ============================================================
-
-    [Fact]
-    public async Task ShowParentSelectDialogAsync_ListVersion_ReturnsResult()
-    {
-        var expected = new ParentSelectResult<UnitTree>
-        {
-            IsConfirmed = true,
-            SelectedParent = MakeNode("parent-2"),
-            SelectedPath = ["parent-2"],
-        };
-        SetupExDialogResult<TreeNodeParentSelectDialog<UnitTree>>(DialogResult.Ok(expected));
-
-        var result = await _sut.ShowParentSelectDialogAsync(
-            [MakeNode("1")], currentNode: MakeNode("1"));
-
-        Assert.NotNull(result);
-        Assert.True(result.IsConfirmed);
-        Assert.Equal("parent-2", result.SelectedParent?.Id);
-    }
-
-    [Fact]
-    public async Task ShowParentSelectDialogAsync_ListVersion_Canceled_ReturnsNull()
-    {
-        SetupExDialogResult<TreeNodeParentSelectDialog<UnitTree>>(DialogResult.Cancel());
-
-        var result = await _sut.ShowParentSelectDialogAsync([MakeNode("1")]);
-
-        Assert.Null(result);
-    }
-
-    // ============================================================
     // ShowParentSelectDialogAsync（单节点版本，含同父校验）
     // ============================================================
 
@@ -244,7 +211,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowTreeSelectDialogAsync_Ok_ReturnsNode()
     {
-        SetupExDialogResult<TreeSelectDialogSky<UnitTree>>(
+        SetupExDialogResult<TreeNodePickDialog<UnitTree>>(
             DialogResult.Ok(MakeNode("pick-1")));
 
         var result = await _sut.ShowTreeSelectDialogAsync();
@@ -267,7 +234,7 @@ public class TreeNodeDialogServiceTests
             }
         };
         // 选中的节点 Id 与当前 ParentId 相同 → 无变化
-        SetupExDialogResult<TreeSelectDialogSky<UnitTree>>(
+        SetupExDialogResult<TreeNodeParentSelectDialog<UnitTree>>(
             DialogResult.Ok(MakeNode("parent-1")));
 
         var result = await _sut.ShowParentSelectDialogAsync(node);

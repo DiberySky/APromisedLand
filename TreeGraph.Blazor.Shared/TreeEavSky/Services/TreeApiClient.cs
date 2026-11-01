@@ -255,7 +255,8 @@ public class TreeApiClient<T>(HttpClient httpClient)
     }
 
     /// <summary>
-    /// 移动节点到新的父节点（null 表示移至根）。若节点或新父节点不存在返回 false，其他失败抛异常。
+    /// 移动节点到新的父节点。后端要求 <paramref name="newParentId"/> 必填（不支持移至顶层）。
+    /// 若节点或新父节点不存在返回 false，其他失败抛异常。
     /// </summary>
     public async Task<bool> MoveNodeAsync(
         string nodeId,

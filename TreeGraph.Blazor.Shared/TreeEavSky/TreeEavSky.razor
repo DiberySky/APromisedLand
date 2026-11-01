@@ -33,6 +33,7 @@ else
                         @* 点击挂 MudButton：MudTreeViewItem 内容区及原生元素的 onclick 在当前运行时不派发，button 元素正常 *@
                         <MudButton Variant="Variant.Text" Size="Size.Medium"
                                    Style="text-transform: none; padding: 0; min-width: 0; font-weight: inherit;"
+                                   Disabled="@(!IsItemSelectable((TreeNodeItem<TItem>)context))"
                                    OnClick="@(() => ClickItemText((TreeNodeItem<TItem>)context))">
                             <MudHighlighter Text="@(context.Text)"
                                             HighlightedText="@HighlightedText"
@@ -58,6 +59,12 @@ else
     // ========== 参数 ==========
     [Parameter] public string? RootId { get; set; }
     [Parameter] public string? ClickNodeId { get; set; }
+
+    /// <summary>选择模式下禁选的节点 Id：该节点自身及其整棵子树不可点选（用于移动父节点防环）。</summary>
+    [Parameter] public string? ForbidNodeId { get; set; }
+
+    /// <summary>选择模式下的额外可选谓词：返回 false 则该节点不可点选。</summary>
+    [Parameter] public Func<TreeNodeItem<TItem>, bool>? CanSelectItem { get; set; }
 
     [Parameter] public string? CurrentPage { get; set; }
     [Parameter] public EventCallback<string?> CurrentPageChanged { get; set; }

@@ -67,6 +67,20 @@ public class TreeMoveIntegrationTests : IntegrationTestBase
     [InlineData("/UnitTree")]
     [InlineData("/CategoryTree")]
     [InlineData("/SpaceTree")]
+    public async Task Move_WithoutNewParent_Returns400(string tree)
+    {
+        var node = await CreateNodeAsync(tree, $"N_{Guid.NewGuid():N}", null);
+
+        // 禁止移至顶层（目标父节点必填）：单根树模型下置为无父会产生 UI 不可见的幽灵节点
+        var resp = await Client.PostAsync($"{tree}/move?nodeId={node}", null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("/UnitTree")]
+    [InlineData("/CategoryTree")]
+    [InlineData("/SpaceTree")]
     public async Task Move_ToOwnDescendant_Returns400(string tree)
     {
         var parent = await CreateNodeAsync(tree, $"P_{Guid.NewGuid():N}", null);
