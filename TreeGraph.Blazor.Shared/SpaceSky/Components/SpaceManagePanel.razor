@@ -53,8 +53,8 @@ else
                                title="关系设置" />
             </MudTd>
             <MudTd DataLabel="线路设置" Style="white-space: nowrap; text-align: center;">
-                @* 线路图标：打开该空间的线路维护对话框（Line 为图空间级资源） *@
-                <MudIconButton Icon="@Icons.Material.Outlined.LinearScale"
+                @* 线路设置：line 统一使用 Route 图标（打开该空间的线路维护对话框，Line 为图空间级资源） *@
+                <MudIconButton Icon="@Icons.Material.Outlined.Route"
                                Color="Color.Tertiary"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenLinesAsync(context))"
