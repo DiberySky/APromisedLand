@@ -50,9 +50,6 @@
                         <MudTextField T="string"
                                       Value="@(string.IsNullOrEmpty(Node.PredecessorName) ? "无（首节点）" : Node.PredecessorName)"
                                       Label="前驱节点" Variant="Variant.Outlined" ReadOnly="true" />
-                        <MudTextField T="string"
-                                      Value="@(Node.CreatedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "-")"
-                                      Label="创建时间" Variant="Variant.Outlined" ReadOnly="true" />
 
                         @* 属性区：仅展示本节点已关注属性定义的属性（只读） *@
                         <NodeAttributeItemsSky NodeId="@Node.Id" ReadOnly="true" />
