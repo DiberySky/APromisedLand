@@ -6,6 +6,7 @@ using TreeGraph.Api.GraphSyncSky;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Shared.EdgeSky.Dtos;
 using TreeGraph.Shared.Messaging;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 using TreeGraph.Shared.NodeSky.Entities;
 
 namespace TreeGraph.Api.EdgeSky.Services;
@@ -267,16 +268,27 @@ public sealed class EdgeService
             .FirstOrDefaultAsync(ct);
         if (space is null) return null;
 
+        var hostType = await _db.Nodes.AsNoTracking()
+            .Where(n => n.Id == nodeId)
+            .Select(n => n.HostType)
+            .FirstOrDefaultAsync(ct);
+
         return new NodeSpaceDto
         {
             SpaceId = space.Id,
             SpaceName = space.Name,
-            SpaceType = space.Type.ToString()
+            SpaceType = space.Type.ToString(),
+            NodeHostType = hostType
         };
     }
 
-    /// <summary>按名称关键字搜索节点（对端节点选择用）；空关键字返回前 200 条。仅投影 Id/Name/HostType。</summary>
-    public async Task<List<NodeLookupDto>> SearchNodesAsync(string? search, CancellationToken ct)
+    /// <summary>
+    /// 按名称关键字搜索节点（对端节点选择用）；可按宿主类型过滤。仅投影 Id/Name/HostType。
+    /// 分页：pageSize > 0 时返回 PagedResult{Items,Total,Page,PageSize}；
+    ///       pageSize = 0（默认）时返回前 200 条 List（向后兼容既有调用方）。
+    /// </summary>
+    public async Task<object> SearchNodesAsync(
+        string? search, string? hostType, int page, int pageSize, CancellationToken ct)
     {
         var q = _db.Nodes.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(search))
@@ -284,9 +296,29 @@ public sealed class EdgeService
             var kw = search.Trim();
             q = q.Where(n => n.Name != null && n.Name.Contains(kw));
         }
-        return await q.OrderBy(n => n.Name).Take(200)
-            .Select(n => new NodeLookupDto { Id = n.Id, Name = n.Name, HostType = n.HostType })
-            .ToListAsync(ct);
+        if (!string.IsNullOrWhiteSpace(hostType))
+            q = q.Where(n => n.HostType == hostType);
+
+        var ordered = q.OrderBy(n => n.Name);
+        var projection = ordered.Select(n => new NodeLookupDto { Id = n.Id, Name = n.Name, HostType = n.HostType });
+
+        if (pageSize > 0)
+        {
+            var total = await ordered.CountAsync(ct);
+            var pageItems = await projection
+                .Skip(Math.Max(0, page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(ct);
+            return new PagedResult<NodeLookupDto>
+            {
+                Items = pageItems,
+                Total = total,
+                Page = page,
+                PageSize = pageSize
+            };
+        }
+
+        return await projection.Take(200).ToListAsync(ct);
     }
 
     /// <summary>

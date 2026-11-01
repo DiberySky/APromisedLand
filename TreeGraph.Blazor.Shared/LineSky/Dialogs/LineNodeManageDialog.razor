@@ -18,8 +18,8 @@
         <MudText Typo="Typo.subtitle1" Color="Color.Info">@LineName</MudText>
     </ToolBarContent>
     <ToolBarRightContent>
-        @* 仅当前线路的名称模糊搜索；防抖后回到第一页并刷新下方列表 *@
-        <LineSearchField Placeholder="搜索节点名称" Width="230px" @bind-Value="_query" OnSearch="OnSearchAsync" />
+        @* 仅当前线路的名称模糊搜索；触发后回到第一页并刷新下方列表 *@
+        <LineNodeSearchBar Placeholder="搜索节点名称" Width="230px" @bind-Value="_query" OnSearch="OnSearchAsync" />
     </ToolBarRightContent>
     <DialogContent>
         <MudTable T="LineNodeDto"
@@ -27,7 +27,7 @@
                   ServerData="LoadPageAsync"
                   Hover="true"
                   Elevation="0"
-                  RowsPerPage="10"
+                  RowsPerPage="30"
                   LoadingProgressColor="Color.Primary"
                   Style="max-height: 56vh; overflow-y: auto; background-color: #000000;">
             <HeaderContent>
@@ -63,7 +63,7 @@
                 </EmptyStateSky>
             </NoRecordsContent>
             <PagerContent>
-                <MudTablePager RowsPerPageString="每页：" HidePageNumber="true"
+                <MudTablePager RowsPerPageString="每页：" PageSizeOptions="@(new[] { 10, 30, 50, 100 })" HidePageNumber="true"
                                HorizontalAlignment="HorizontalAlignment.Center" />
             </PagerContent>
         </MudTable>
@@ -140,7 +140,8 @@
     {
         var parameters = new DialogParameters<LineNodeCreateDialog>
         {
-            { x => x.LineId, LineId }
+            { x => x.LineId, LineId },
+            { x => x.LineName, LineName }
         };
 
         var dialog = await DialogService.ShowExAsync<LineNodeCreateDialog>(

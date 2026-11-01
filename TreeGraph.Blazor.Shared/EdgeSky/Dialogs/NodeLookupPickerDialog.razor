@@ -1,0 +1,99 @@
+@* NodeLookupPickerDialog.razor — 节点选择器（名称模糊搜索 + 服务端分页，单选）
+   打开方式：IDialogService.ShowExAsync<NodeLookupPickerDialog>；
+   单击结果行即选中并确认，返回 DialogResult.Ok(NodeLookupDto)；取消返回 null。
+   HostType 非空时仅搜索该宿主类型的节点（按图空间类型限定顶点范围）。 *@
+@namespace TreeGraph.Blazor.Shared.EdgeSky.Dialogs
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.EdgeSky.Services
+@using TreeGraph.Blazor.Shared.LineSky.Components
+@using TreeGraph.Shared.EdgeSky.Dtos
+@inject EdgeApiClient Api
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@Title"
+           CancelButtonVisible="true">
+    <ToolBarContent>
+        @if (!string.IsNullOrEmpty(SpaceName))
+        {
+            @* 展示目标图空间名（对齐其他弹窗的上下文标签） *@
+            <MudText Typo="Typo.subtitle1" Color="Color.Info">@SpaceName</MudText>
+        }
+    </ToolBarContent>
+    <ToolBarRightContent>
+        @* 搜索栏：Enter 或点击按钮刷新服务端分页 *@
+        <LineNodeSearchBar Placeholder="搜索名称" Width="230px" @bind-Value="_query" OnSearch="OnSearchAsync" />
+    </ToolBarRightContent>
+    <DialogContent>
+        @* 结果表（服务端分页）：单击行即确认选择并关闭 *@
+        <MudTable T="NodeLookupDto"
+                  @ref="_table"
+                  ServerData="LoadPageAsync"
+                  OnRowClick="@(args => Confirm(args.Item))"
+                  RowStyle="cursor: pointer;"
+                  Hover="true"
+                  Elevation="0"
+                  RowsPerPage="30"
+                  LoadingProgressColor="Color.Primary"
+                  Style="max-height: 56vh; overflow-y: auto; background-color: #000000;">
+            <HeaderContent>
+                <MudTh>名称</MudTh>
+                <MudTh>宿主</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@(context.Name ?? context.Id)</MudTd>
+                <MudTd Class="mud-text-secondary">@context.HostType</MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Align="Align.Center" Color="Color.Secondary" Class="my-4">
+                    未找到匹配的节点
+                </MudText>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudTablePager RowsPerPageString="每页：" PageSizeOptions="@(new[] { 10, 30, 50, 100 })" HidePageNumber="true"
+                                HorizontalAlignment="HorizontalAlignment.Center" />
+            </PagerContent>
+        </MudTable>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>对话框标题。</summary>
+    [Parameter] public string Title { get; set; } = "选择节点";
+
+    /// <summary>目标图空间显示名（仅工具栏展示）。</summary>
+    [Parameter] public string? SpaceName { get; set; }
+
+    /// <summary>限定宿主类型（如 UnitTree / CategoryTree）；为空不限。</summary>
+    [Parameter] public string? HostType { get; set; }
+
+    private MudTable<NodeLookupDto>? _table;
+    private string? _query;
+
+    /// <summary>MudTable 服务端数据回调。</summary>
+    private async Task<TableData<NodeLookupDto>> LoadPageAsync(TableState state, CancellationToken ct)
+    {
+        try
+        {
+            var page = state.Page + 1; // MudTable 页码从 0 开始，后端从 1 开始
+            var result = await Api.SearchNodesPagedAsync(_query, HostType, page, state.PageSize, ct);
+            return new TableData<NodeLookupDto>
+            {
+                Items = result.Items,
+                TotalItems = result.Total
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
+            return new TableData<NodeLookupDto> { Items = [], TotalItems = 0 };
+        }
+    }
+
+    private Task OnSearchAsync() => _table?.ReloadServerData() ?? Task.CompletedTask;
+
+    /// <summary>点击结果行即选中并确认，直接关闭对话框返回该节点。</summary>
+    private void Confirm(NodeLookupDto node)
+        => MudDialog?.Close(DialogResult.Ok(node));
+}

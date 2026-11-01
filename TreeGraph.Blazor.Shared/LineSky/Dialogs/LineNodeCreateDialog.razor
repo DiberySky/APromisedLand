@@ -24,26 +24,24 @@
                           Variant="Variant.Outlined"
                           Lines="3"
                           Size="Size.Small" />
-            @* 前驱节点：改用搜索对话框选择（同线路过滤 + 分页） *@
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            @* 前驱节点：与「设置修改」同款——尾部放大镜打开选择器；行尾显式清除图标 *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                 <MudTextField T="string"
                               Value="@_predecessorLabel"
-                              Label="前驱（可选，选后接在该节点之后）"
+                              Label="前驱节点（可选，选后接在该节点之后）"
                               Variant="Variant.Outlined"
                               Size="Size.Small"
                               ReadOnly="true"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@Icons.Material.Outlined.Search"
+                              IconSize="Size.Small"
+                              OnAdornmentClick="OpenPickerAsync"
                               Style="flex: 1;" />
-                <MudButton Variant="Variant.Outlined"
-                           Color="Color.Primary"
-                           StartIcon="@Icons.Material.Outlined.Search"
-                           Size="Size.Small"
-                           OnClick="OpenPickerAsync">
-                    选择
-                </MudButton>
                 @if (!string.IsNullOrEmpty(_form.PredecessorId))
                 {
                     <MudIconButton Icon="@Icons.Material.Outlined.Clear"
-                                   Title="清除"
+                                   Color="Color.Warning"
+                                   Title="清除前驱"
                                    Size="Size.Small"
                                    OnClick="ClearPredecessor" />
                 }
@@ -57,6 +55,9 @@
 
     /// <summary>所属线路 ID（由一级弹窗传入）。</summary>
     [Parameter] public string LineId { get; set; } = string.Empty;
+
+    /// <summary>所属线路名称（透传给前驱选择器工具栏展示）。</summary>
+    [Parameter] public string? LineName { get; set; }
 
     /// <summary>前驱预置（可选）：从「设置修改」点击「添加下一个」时传入当前节点。</summary>
     [Parameter] public string? PredecessorId { get; set; }
@@ -82,7 +83,8 @@
     {
         var parameters = new DialogParameters<LineNodePickerDialog>
         {
-            { x => x.LineId, LineId }
+            { x => x.LineId, LineId },
+            { x => x.LineName, LineName }
         };
         var dialog = await DialogService.ShowExAsync<LineNodePickerDialog>(
             "选择前驱节点", parameters,

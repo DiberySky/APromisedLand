@@ -74,7 +74,7 @@ public class EdgeInstanceCreateDialogTests : BunitTestBase
             {
                 { x => x.SpaceId, "space-x" },
                 { x => x.SpaceName, "单位" },
-                { x => x.SpaceType, "Unit" },
+                { x => x.PeerHostType, "UnitTree" },
                 { x => x.NodeId, "node-self" },
                 { x => x.Types, new List<EdgeTypeDto> { LineSegment() } }
             },

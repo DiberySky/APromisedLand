@@ -1,0 +1,62 @@
+@* LineNodeSearchBar.razor — 线路节点搜索栏：Outlined 输入框 + 搜索按钮。
+   抽取自 LineNodePickerDialog（选择线路节点）的搜索功能：
+   Enter 键或点击「搜索」按钮触发 OnSearch，由调用方刷新服务端分页。 *@
+@namespace TreeGraph.Blazor.Shared.LineSky.Components
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Style="@ContainerStyle">
+    <MudTextField T="string"
+                  Value="Value"
+                  ValueChanged="OnValueChangedAsync"
+                  Label="@Label"
+                  Placeholder="@Placeholder"
+                  Variant="Variant.Filled"
+                  Margin="Margin.Dense"
+                  Typo="Typo.body2"
+                  Immediate="true"
+                  Clearable="true"
+                  OnClearButtonClick="OnClearAsync"
+                  OnKeyDown="OnKeyDownAsync"
+                  Style="flex: 1;" />
+    <MudIconButton Icon="@Icons.Material.Outlined.Search"
+                   Color="Color.Primary"
+                   Size="Size.Small"
+                   OnClick="InvokeSearchAsync"
+                   title="搜索" />
+</MudStack>
+
+@code {
+    /// <summary>当前搜索关键字（支持 @bind-Value）。</summary>
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    /// <summary>输入框标签；不传则不显示。</summary>
+    [Parameter] public string? Label { get; set; }
+
+    [Parameter] public string Placeholder { get; set; } = "输入关键词搜索...";
+
+    /// <summary>Enter 或点击「搜索」按钮时触发。</summary>
+    [Parameter] public EventCallback OnSearch { get; set; }
+
+    /// <summary>固定宽度（如 "230px"）；不传则占满父容器。</summary>
+    [Parameter] public string? Width { get; set; }
+
+    private string? ContainerStyle =>
+        string.IsNullOrWhiteSpace(Width) ? null : $"width: {Width};";
+
+    private async Task OnValueChangedAsync(string? value)
+    {
+        Value = value;
+        await ValueChanged.InvokeAsync(value);
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await OnSearch.InvokeAsync();
+    }
+
+    /// <summary>清空按钮：清空后立即触发搜索（回到未过滤列表）。</summary>
+    private Task OnClearAsync() => OnSearch.InvokeAsync();
+
+    private Task InvokeSearchAsync() => OnSearch.InvokeAsync();
+}

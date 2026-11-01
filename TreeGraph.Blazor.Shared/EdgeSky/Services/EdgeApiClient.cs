@@ -244,12 +244,17 @@ public class EdgeApiClient
     public async Task<NodeSpaceDto?> GetNodeSpaceAsync(string nodeId, CancellationToken ct = default)
         => await GetAsync<NodeSpaceDto>($"api/edge/node-space/{Uri.EscapeDataString(nodeId)}", ct);
 
-    /// <summary>按名称搜索节点（api/edge/nodes?search=），用于选择对端节点。</summary>
-    public async Task<List<NodeLookupDto>> SearchNodesAsync(string? search, CancellationToken ct = default)
+    /// <summary>按名称搜索节点（api/edge/nodes，服务端分页），用于选择对端节点；可按宿主类型过滤。</summary>
+    public async Task<PagedResult<NodeLookupDto>> SearchNodesPagedAsync(
+        string? search, string? hostType, int page, int pageSize, CancellationToken ct = default)
     {
-        var url = "api/edge/nodes";
-        if (!string.IsNullOrWhiteSpace(search)) url += $"?search={Uri.EscapeDataString(search)}";
-        return await GetAsync<List<NodeLookupDto>>(url, ct) ?? [];
+        var qs = new List<string> { $"page={page}", $"pageSize={pageSize}" };
+        if (!string.IsNullOrWhiteSpace(search))
+            qs.Add($"search={Uri.EscapeDataString(search)}");
+        if (!string.IsNullOrWhiteSpace(hostType))
+            qs.Add($"hostType={Uri.EscapeDataString(hostType)}");
+        var url = $"api/edge/nodes?{string.Join('&', qs)}";
+        return await GetAsync<PagedResult<NodeLookupDto>>(url, ct) ?? new PagedResult<NodeLookupDto>();
     }
 
     private static string EdgeUrl(string spaceId, string edgeType, string srcVid, long rank, string dstVid)

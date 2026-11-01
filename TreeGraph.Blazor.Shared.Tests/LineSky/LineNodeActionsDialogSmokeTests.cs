@@ -124,9 +124,7 @@ public class LineNodeActionsDialogSmokeTests : BunitTestBase
         Assert.Contains("测试节点", html);
         Assert.Contains("无（首节点）", html);
 
-        Assert.Contains("编辑", html);
-        Assert.Contains("属性", html);
-        Assert.Contains("删除", html);
+        Assert.Contains("设置修改", html);
         Assert.Contains("线路节点维护", html);
     }
 
@@ -136,7 +134,7 @@ public class LineNodeActionsDialogSmokeTests : BunitTestBase
         var (provider, _) = await OpenAsync(showLineManage: false);
 
         var html = provider.Find(".mud-dialog").InnerHtml;
-        Assert.Contains("编辑", html);
+        Assert.Contains("设置修改", html);
         Assert.DoesNotContain("线路节点维护", html);
     }
 
@@ -145,7 +143,7 @@ public class LineNodeActionsDialogSmokeTests : BunitTestBase
     {
         var (provider, reference) = await OpenAsync(showLineManage: true);
 
-        ClickButton(provider, "编辑");
+        ClickButton(provider, "设置修改");
 
         var result = await reference.Result.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.False(result.Canceled);
@@ -153,14 +151,14 @@ public class LineNodeActionsDialogSmokeTests : BunitTestBase
     }
 
     [Fact]
-    public async Task ClickDelete_ClosesWithDeleteAction()
+    public async Task ClickLineManage_ClosesWithLineManageAction()
     {
         var (provider, reference) = await OpenAsync(showLineManage: true);
 
-        ClickButton(provider, "删除");
+        ClickButton(provider, "线路节点维护");
 
         var result = await reference.Result.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.False(result.Canceled);
-        Assert.Equal(LineNodeHostAction.Delete, Assert.IsType<LineNodeHostAction>(result.Data));
+        Assert.Equal(LineNodeHostAction.LineManage, Assert.IsType<LineNodeHostAction>(result.Data));
     }
 }

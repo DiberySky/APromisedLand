@@ -72,12 +72,15 @@ public class EdgeNodeSpaceController(EdgeService svc) : ControllerBase
     }
 }
 
-/// <summary>对端节点候选搜索：GET /api/edge/nodes?search=。</summary>
+/// <summary>对端节点候选搜索：GET /api/edge/nodes?search=&hostType=&page=&pageSize=（pageSize>0 时分页）。</summary>
 [ApiController]
 [Route("api/edge/nodes")]
 public class EdgeNodeSearchController(EdgeService svc) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> Search([FromQuery] string? search, CancellationToken ct)
-        => Ok(await svc.SearchNodesAsync(search, ct));
+    public async Task<IActionResult> Search(
+        [FromQuery] string? search, [FromQuery] string? hostType,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 0,
+        CancellationToken ct = default)
+        => Ok(await svc.SearchNodesAsync(search, hostType, page, pageSize, ct));
 }

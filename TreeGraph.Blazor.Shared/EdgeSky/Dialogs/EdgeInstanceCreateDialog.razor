@@ -1,7 +1,7 @@
 @* EdgeInstanceCreateDialog.razor — 新建节点关系（边实例）。
-   打开参数 SpaceId/SpaceName/SpaceType/NodeId/Types：
-   选择边类型（空间内已定义）→ 方向（出边 = 本节点为起点 / 入边 = 本节点为终点）
-   → 对端节点（按名称搜索 nodes，并按空间类型限定宿主）→ rank → 属性。
+   打开参数 SpaceId/SpaceName/PeerHostType/NodeId/Types：
+   方向（出边 = 本节点为起点 / 入边 = 本节点为终点）→ 选择边类型（空间内已定义）
+   → 对端节点（选择对话框，候选限定与本节点同宿主类型）→ rank → 属性。
    属性区按所选边类型的 Schema 动态渲染：STRING→文本框，INT/DOUBLE→NumberInputField，
    BOOL→BoolFieldSky，DATE→日期选择，TIMESTAMP→文本框（epoch 或 ISO 8601）。
    提交返回 CreatedEdgeInstance，由调用方执行 PUT 覆盖式 UPSERT（对齐 INSERT EDGE）。 *@
@@ -9,21 +9,37 @@
 
 @using System.Text.Json
 @using TreeGraph.Blazor.Shared.Common
-@using TreeGraph.Blazor.Shared.EdgeSky.Services
 @using TreeGraph.Shared.EdgeSky
 @using TreeGraph.Shared.EdgeSky.Dtos
 
 @inject ISnackbar Snackbar
-@inject EdgeApiClient Api
+@inject IDialogService DialogService
 
 <DialogSky Title="新建关系"
            SubmitButtonVisible="true"
            SubmitButtonText="创建"
            OnSubmitClick="Submit">
+    <ToolBarContent>
+        @* 显示目标图空间名（只读上下文，与其他弹窗工具栏一致） *@
+        @if (!string.IsNullOrWhiteSpace(SpaceName))
+        {
+            <MudText Typo="Typo.subtitle1" Color="Color.Info">@SpaceName</MudText>
+        }
+        <MudSpacer/>
+    </ToolBarContent>
     <DialogContent>
         <MudStack Spacing="2">
-            <MudTextField Value="@SpaceName" Label="所属空间" Variant="Variant.Outlined"
-                          Margin="Margin.Dense" ReadOnly="true" Size="Size.Small" />
+            <MudSelect T="string" @bind-Value="_direction"
+                       Label="方向" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Size="Size.Small"
+                       HelperText="出向：本节点 → 对端；入向：对端 → 本节点">
+                <MudSelectItem T="string" Value="@("out")">
+                    出向（本节点为起点）<MudIcon Icon="@Icons.Material.Outlined.ArrowRightAlt" Size="Size.Small" Class="ms-2" />
+                </MudSelectItem>
+                <MudSelectItem T="string" Value="@("in")">
+                    <MudIcon Icon="@Icons.Material.Outlined.ArrowRightAlt" Size="Size.Small" Class="me-2" />入向（本节点为终点）
+                </MudSelectItem>
+            </MudSelect>
 
             <MudSelect T="EdgeTypeDto" Value="_edgeType"
                        ValueChanged="OnEdgeTypeChanged"
@@ -37,78 +53,19 @@
                 }
             </MudSelect>
 
-            <MudSelect T="string" @bind-Value="_direction"
-                       Label="方向" Variant="Variant.Outlined" Margin="Margin.Dense"
-                       Size="Size.Small"
-                       HelperText="出向：本节点 → 对端；入向：对端 → 本节点">
-                <MudSelectItem T="string" Value="@("out")">
-                    出向（本节点为起点）<MudIcon Icon="@Icons.Material.Outlined.ArrowRightAlt" Size="Size.Small" Class="ms-2" />
-                </MudSelectItem>
-                <MudSelectItem T="string" Value="@("in")">
-                    <MudIcon Icon="@Icons.Material.Outlined.ArrowRightAlt" Size="Size.Small" Class="me-2" />入向（本节点为终点）
-                </MudSelectItem>
-            </MudSelect>
-
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="flex-nowrap">
-                <MudTextField @bind-Value="_peerQuery" Label="对端节点" Variant="Variant.Outlined"
-                              Margin="Margin.Dense" Immediate="true"
-                              Placeholder="按名称搜索（留空列出前 50 个）"
-                              Adornment="Adornment.End"
-                              AdornmentIcon="@Icons.Material.Outlined.Search"
-                              Size="Size.Small"
-                              OnKeyDown="OnPeerKeyDown"
-                              Class="flex-grow" />
-                <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                           Size="Size.Small"
-                           OnClick="SearchPeersAsync" Disabled="_searching">
-                    搜索
-                </MudButton>
-            </MudStack>
-
-            @if (_peer is not null)
-            {
-                <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true">
-                    已选对端：<strong>@(_peer.Name ?? _peer.Id)</strong>
-                </MudAlert>
-            }
-
-            @if (_searching)
-            {
-                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-            }
-            else if (_candidates.Count > 0)
-            {
-                <div style="max-height: 24vh; overflow-y: auto;">
-                    <MudSimpleTable Dense="true" Bordered="true" Hover="true">
-                        <thead>
-                            <tr>
-                                <th>名称</th>
-                                <th>宿主</th>
-                                <th style="width: 1%;"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var n in _candidates)
-                            {
-                                <tr>
-                                    <td>@(n.Name ?? n.Id)</td>
-                                    <td><MudChip T="string" Size="Size.Small" Color="Color.Default">@n.HostType</MudChip></td>
-                                    <td style="text-align: right;">
-                                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
-                                                   OnClick="@(() => _peer = n)">
-                                            @(n.Id == _peer?.Id ? "已选" : "选择")
-                                        </MudButton>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </MudSimpleTable>
-                </div>
-            }
-            else if (_searched)
-            {
-                <MudText Typo="Typo.caption" Color="Color.Default">未找到匹配的节点</MudText>
-            }
+            @* 对端节点：选择对话框（复用语义搜索 NodePickerDialog），尾部放大镜打开 *@
+            <MudTextField T="string"
+                          Value="@(_peer?.Name ?? _peer?.Id)"
+                          Label="对端节点"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Size="Size.Small"
+                          ReadOnly="true"
+                          Placeholder="点击右侧放大镜选择节点"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Outlined.Search"
+                          IconSize="Size.Small"
+                          OnAdornmentClick="OpenPeerPickerAsync" />
 
             <NumberInputField T="long?" Value="_rank" ValueChanged="@(v => OnRankChanged(v))"
                               Label="等级 (rank)" Min="0" Margin="Margin.Dense"
@@ -189,8 +146,8 @@
     /// <summary>打开参数：目标图空间显示名（仅展示）。</summary>
     [Parameter] public string? SpaceName { get; set; }
 
-    /// <summary>打开参数：目标图空间类型（Dynamic/Type/Unit/Knowledge，用于限定对端宿主）。</summary>
-    [Parameter] public string? SpaceType { get; set; }
+    /// <summary>打开参数：对端候选宿主类型（与当前节点同宿主；为空不限）。</summary>
+    [Parameter] public string? PeerHostType { get; set; }
 
     /// <summary>打开参数：本节点 Id。</summary>
     [Parameter] public string NodeId { get; set; } = string.Empty;
@@ -202,11 +159,6 @@
     private string _direction = "out";
     private long _rank;
     private NodeLookupDto? _peer;
-
-    private string _peerQuery = string.Empty;
-    private List<NodeLookupDto> _candidates = [];
-    private bool _searching;
-    private bool _searched;
 
     private readonly Dictionary<string, string> _texts = new();
     private readonly Dictionary<string, long?> _longs = new();
@@ -290,44 +242,28 @@
 
     // ---------- 对端节点选择 ----------
 
-    private void OnPeerKeyDown(KeyboardEventArgs e)
+    /// <summary>打开节点选择器（名称模糊搜索 + 服务端分页，单选），确认后写入对端。</summary>
+    private async Task OpenPeerPickerAsync()
     {
-        if (e.Key == "Enter") _ = SearchPeersAsync();
+        var parameters = new DialogParameters<NodeLookupPickerDialog>
+        {
+            { x => x.Title, "选择对端节点" },
+            { x => x.SpaceName, SpaceName },
+            { x => x.HostType, PeerHostType }
+        };
+        var dialog = await DialogService.ShowExAsync<NodeLookupPickerDialog>(
+            "选择对端节点", parameters,
+            new DialogOptionsEx
+            {
+                MaxWidth = MaxWidth.Small,
+                FullWidth = true,
+                BackdropClick = false,
+                Position = DialogPosition.TopCenter
+            });
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: NodeLookupDto picked })
+            _peer = picked;
     }
-
-    /// <summary>按名称搜索节点；按空间类型限定候选宿主，避免跨图空间引用。</summary>
-    private async Task SearchPeersAsync()
-    {
-        _searching = true;
-        try
-        {
-            var nodes = await Api.SearchNodesAsync(_peerQuery);
-            var hosts = AllowedHostTypes();
-            _candidates = nodes
-                .Where(n => hosts is null || hosts.Contains(n.HostType))
-                .Take(50)
-                .ToList();
-            _searched = true;
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"搜索节点失败：{ex.Message}", Severity.Error);
-        }
-        finally
-        {
-            _searching = false;
-        }
-    }
-
-    /// <summary>空间类型 → 允许的宿主类型（与图空间顶点范围一致）；Dynamic 不限。</summary>
-    private HashSet<string>? AllowedHostTypes() => SpaceType switch
-    {
-        "Unit" => new HashSet<string> { "UnitTree" },
-        "Type" => new HashSet<string> { "CategoryTree" },
-        "Knowledge" => new HashSet<string> { "KnowledgeTree" },
-        "Dynamic" => new HashSet<string> { "SpaceTree" },
-        _ => null
-    };
 
     // ---------- 属性字段读写 ----------
 

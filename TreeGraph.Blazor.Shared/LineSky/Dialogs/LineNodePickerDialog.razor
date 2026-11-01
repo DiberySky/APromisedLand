@@ -3,6 +3,7 @@
    单击结果行即选中并确认，返回 DialogResult.Ok(LineNodeDto)；取消返回 null。
    LineId 非空时仅搜索该线路节点（前驱选择场景）；为空时跨线路搜索。 *@
 @using TreeGraph.Blazor.Shared.LineSky
+@using TreeGraph.Blazor.Shared.LineSky.Components
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Shared.NodeEavSky.Dtos
@@ -12,66 +13,53 @@
 
 <DialogSky Title="@Title"
            CancelButtonVisible="true">
+    <ToolBarContent>
+        @if (!string.IsNullOrEmpty(LineName))
+        {
+            @* 限定线路模式：展示所属线路名（由调用方传入，对齐线路节点维护/设置修改等弹窗） *@
+            <MudText Typo="Typo.subtitle1" Color="Color.Info">@LineName</MudText>
+        }
+    </ToolBarContent>
+    <ToolBarRightContent>
+        @* 搜索栏：Enter 或点击按钮刷新服务端分页 *@
+        <LineNodeSearchBar Placeholder="搜索名称" Width="230px" @bind-Value="_query" OnSearch="OnSearchAsync" />
+    </ToolBarRightContent>
     <DialogContent>
-        <MudStack Spacing="2">
-            @* 搜索栏 *@
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                <MudTextField T="string"
-                              @bind-Value="_query"
-                              Label="搜索名称"
-                              Placeholder="输入关键词搜索..."
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Outlined.Search"
-                              Immediate="true"
-                              OnKeyDown="OnKeyDown"
-                              Style="flex: 1;" />
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           StartIcon="@Icons.Material.Outlined.Search"
-                           Size="Size.Small"
-                           OnClick="@(() => _table?.ReloadServerData())">
-                    搜索
-                </MudButton>
-            </MudStack>
-
-            @* 结果表（服务端分页）：单击行即确认选择并关闭 *@
-            <MudTable T="LineNodeDto"
-                      @ref="_table"
-                      ServerData="LoadPageAsync"
-                      OnRowClick="@(args => Confirm(args.Item))"
-                      RowStyle="cursor: pointer;"
-                      Hover="true"
-                      Elevation="0"
-                      RowsPerPage="10"
-                      LoadingProgressColor="Color.Primary"
-                      Style="max-height: 56vh; overflow-y: auto; background-color: #000000;">
-                <HeaderContent>
-                    <MudTh>名称</MudTh>
-                    @if (LineId is null)
-                    {
-                        <MudTh>线路</MudTh>
-                    }
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd>@context.Name</MudTd>
-                    @if (LineId is null)
-                    {
-                        <MudTd Class="mud-text-secondary">@LineLabel(context.LineId)</MudTd>
-                    }
-                </RowTemplate>
-                <NoRecordsContent>
-                    <MudText Align="Align.Center" Color="Color.Secondary" Class="my-4">
-                        未找到匹配的线路节点
-                    </MudText>
-                </NoRecordsContent>
-                <PagerContent>
-                    <MudTablePager RowsPerPageString="每页：" HidePageNumber="true"
-                                    HorizontalAlignment="HorizontalAlignment.Center" />
-                </PagerContent>
-            </MudTable>
-        </MudStack>
+        @* 结果表（服务端分页）：单击行即确认选择并关闭 *@
+        <MudTable T="LineNodeDto"
+                  @ref="_table"
+                  ServerData="LoadPageAsync"
+                  OnRowClick="@(args => Confirm(args.Item))"
+                  RowStyle="cursor: pointer;"
+                  Hover="true"
+                  Elevation="0"
+                  RowsPerPage="30"
+                  LoadingProgressColor="Color.Primary"
+                  Style="max-height: 56vh; overflow-y: auto; background-color: #000000;">
+            <HeaderContent>
+                <MudTh>名称</MudTh>
+                @if (LineId is null)
+                {
+                    <MudTh>线路</MudTh>
+                }
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Name</MudTd>
+                @if (LineId is null)
+                {
+                    <MudTd Class="mud-text-secondary">@LineLabel(context.LineId)</MudTd>
+                }
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Align="Align.Center" Color="Color.Secondary" Class="my-4">
+                    未找到匹配的线路节点
+                </MudText>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudTablePager RowsPerPageString="每页：" PageSizeOptions="@(new[] { 10, 30, 50, 100 })" HidePageNumber="true"
+                                HorizontalAlignment="HorizontalAlignment.Center" />
+            </PagerContent>
+        </MudTable>
     </DialogContent>
 </DialogSky>
 
@@ -84,18 +72,21 @@
     /// <summary>限定线路 ID（前驱选择场景）；为空则跨线路搜索。</summary>
     [Parameter] public string? LineId { get; set; }
 
+    /// <summary>所属线路名称（限定线路模式下展示于工具栏，由调用方传入）。</summary>
+    [Parameter] public string? LineName { get; set; }
+
     /// <summary>需排除的节点 Id（如当前编辑节点自身，避免选自己作为前驱）。</summary>
     [Parameter] public string? ExcludeNodeId { get; set; }
 
     private MudTable<LineNodeDto>? _table;
-    private string _query = string.Empty;
+    private string? _query;
     private Dictionary<string, string> _lineNames = new();
 
     protected override async Task OnInitializedAsync()
     {
-        // 跨线路模式下预加载线路名称，用于结果行展示
         if (LineId is null)
         {
+            // 跨线路模式下预加载线路名称，用于结果行展示
             try
             {
                 var lines = await LineApi.GetAllAsync();
@@ -135,11 +126,7 @@
         }
     }
 
-    private async Task OnKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-            await _table!.ReloadServerData();
-    }
+    private Task OnSearchAsync() => _table?.ReloadServerData() ?? Task.CompletedTask;
 
     /// <summary>点击结果行即选中并确认，直接关闭对话框返回该节点。</summary>
     private void Confirm(LineNodeDto node)

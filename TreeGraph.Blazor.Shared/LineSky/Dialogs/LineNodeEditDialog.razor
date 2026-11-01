@@ -5,7 +5,10 @@
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @using TreeGraph.Blazor.Shared.EdgeSky.Components
+@using TreeGraph.Blazor.Shared.EdgeSky.Services
+@using TreeGraph.Shared.EdgeSky.Dtos
 @inject LineNodeManageApiClient Api
+@inject EdgeApiClient EdgeApi
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
@@ -39,7 +42,7 @@
                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                             <MudTextField T="string"
                                           Value="@_predecessorLabel"
-                                          Label="前驱节点（改接段边）"
+                                          Label="前驱节点（清空并保存 = 断开连接）"
                                           Variant="Variant.Outlined"
                                           Size="Size.Small"
                                           ReadOnly="true"
@@ -52,11 +55,26 @@
                             {
                                 <MudIconButton Icon="@Icons.Material.Outlined.Clear"
                                                Color="Color.Warning"
-                                               Title="清除前驱（不改连接）"
+                                               Title="清除前驱（保存后断开连接）"
                                                Size="Size.Small"
                                                OnClick="ConfirmClearPredecessor" />
                             }
                         </MudStack>
+                        @* 段边类型：仅在更换前驱时显示（为新连接指定，已移除默认边类型，后端强制必填）。
+                           日常维护既有连接的边类型走「关系绑定」。 *@
+                        @if (PredecessorChanged)
+                        {
+                            <MudSelect T="string"
+                                       @bind-Value="_selectedEdgeType"
+                                       Label="关系类型（边）"
+                                       Variant="Variant.Outlined"
+                                       Size="Size.Small">
+                                @foreach (var t in _edgeTypes)
+                                {
+                                    <MudSelectItem Value="@t.Name">@(t.DisplayName ?? t.Name)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
                     </MudStack>
                 </MudTabPanel>
 
@@ -115,6 +133,16 @@
     /// <summary>前驱节点展示名（只读文本框）。</summary>
     private string _predecessorLabel = string.Empty;
 
+    /// <summary>当前空间的边类型列表（段边类型下拉数据源）。</summary>
+    private List<EdgeTypeDto> _edgeTypes = [];
+
+    /// <summary>段边类型选择（更换前驱时为新连接指定；隐藏时保留原值随请求透传）。</summary>
+    private string? _selectedEdgeType;
+
+    /// <summary>前驱已被更换（与原值不同且非空）——此时显示段边类型下拉。</summary>
+    private bool PredecessorChanged =>
+        !string.IsNullOrEmpty(_form.PredecessorId) && _form.PredecessorId != Node?.PredecessorId;
+
     protected override void OnParametersSet()
     {
         if (Node is not null)
@@ -124,8 +152,19 @@
             _form.Description = Node.Description;
             // 前驱初始值：留空表示「不改连接」
             _form.PredecessorId = Node.PredecessorId;
+            _form.DisconnectPredecessor = false;
             _predecessorLabel = Node.PredecessorName ?? string.Empty;
+            _selectedEdgeType = Node.PredecessorEdgeType;
         }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 边类型列表加载失败不阻塞基本信息编辑（下拉为空，保存时再校验）
+        if (Node is null) return;
+        var space = await EdgeApi.GetNodeSpaceAsync(Node.Id);
+        if (space is not null)
+            _edgeTypes = await EdgeApi.ListEdgeTypesAsync(space.SpaceId) ?? [];
     }
 
     /// <summary>打开线路节点搜索选择器，确认后写入 _form.PredecessorId 与展示名。</summary>
@@ -134,6 +173,7 @@
         var parameters = new DialogParameters<LineNodePickerDialog>
         {
             { x => x.LineId, Node?.LineId },
+            { x => x.LineName, LineName },
             { x => x.ExcludeNodeId, Node?.Id }
         };
         var dialog = await DialogService.ShowExAsync<LineNodePickerDialog>(
@@ -149,11 +189,15 @@
         if (result is { Canceled: false, Data: LineNodeDto picked })
         {
             _form.PredecessorId = picked.Id;
+            _form.DisconnectPredecessor = false; // 改选新前驱 = 重接，取消断开标记
             _predecessorLabel = picked.Name;
+            // 换了新前驱：新连接必须显式选关系类型（已移除默认边）；
+            // 选回原前驱：恢复原边类型（视为未更换，透传原值不触发重写）
+            _selectedEdgeType = picked.Id == Node?.PredecessorId ? Node?.PredecessorEdgeType : null;
         }
     }
 
-    /// <summary>清除前驱选择前先确认（留空 = 不改连接，但仍需防误触）。</summary>
+    /// <summary>清除前驱选择前先确认（保存后显式断开：删入边，节点变回首节点）。</summary>
     private async Task ConfirmClearPredecessor()
     {
         var confirm = await DialogService.ShowMessageBoxAsync(
@@ -163,6 +207,7 @@
         if (confirm == true)
         {
             _form.PredecessorId = null;
+            _form.DisconnectPredecessor = true;
             _predecessorLabel = string.Empty;
         }
     }
@@ -176,6 +221,15 @@
             Snackbar.Add("请填写名称", Severity.Warning);
             return;
         }
+
+        // 段边类型：仅在更换前驱时必填（隐藏时透传原值，后端见同前驱同类型会跳过重写）。
+        // 日常维护既有连接的边类型走「关系绑定」页签。
+        if (PredecessorChanged && string.IsNullOrWhiteSpace(_selectedEdgeType))
+        {
+            Snackbar.Add("更换前驱后，请选择新连接的关系类型（边）", Severity.Warning);
+            return;
+        }
+        _form.PredecessorEdgeType = _selectedEdgeType;
 
         // 先保存属性（任一类型失败时不关闭对话框，用户可重试）
         if (_attrItems != null && !await _attrItems.SubmitUpdateNodeAttributesAsync())

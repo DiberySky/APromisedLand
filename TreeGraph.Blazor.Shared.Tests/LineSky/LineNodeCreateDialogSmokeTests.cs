@@ -15,8 +15,8 @@ namespace TreeGraph.Blazor.Shared.Tests.LineSky;
 
 /// <summary>
 /// LineNodeCreateDialog 冒烟测试（R7：创建时可选择「前驱」，选后自动建立 前驱 → 新节点 段边）。
-/// 覆盖：前驱下拉渲染与候选加载、创建请求携带/归一化 PredecessorId。
-/// 模式对齐 LineStructureDialogSmokeTests：真实 MudDialogProvider + 桩 HttpClient。
+/// 覆盖：前驱选择器入口渲染（只读框 + 尾部放大镜）、创建请求携带/归一化 PredecessorId。
+/// 模式对齐其它冒烟测试：真实 MudDialogProvider + 桩 HttpClient。
 /// </summary>
 public class LineNodeCreateDialogSmokeTests : BunitTestBase
 {
@@ -35,7 +35,7 @@ public class LineNodeCreateDialogSmokeTests : BunitTestBase
     }
 
     // ============================================================
-    // 桩 HttpClient：GET 回两个候选节点；POST 捕获请求体
+    // 桩 HttpClient：POST 捕获请求体（前驱候选改由 LineNodePickerDialog 加载，本弹窗不发 GET）
     // ============================================================
 
     private static readonly JsonSerializerOptions WebJson = new(JsonSerializerDefaults.Web);
@@ -51,15 +51,6 @@ public class LineNodeCreateDialogSmokeTests : BunitTestBase
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri?.AbsolutePath ?? "";
-
-            if (request.Method == HttpMethod.Get && path.EndsWith("/api/LineNode"))
-            {
-                return Json(Envelope(new[]
-                {
-                    new LineNodeDto { Id = "n1", LineId = TestLineId, Name = "牵引所A" },
-                    new LineNodeDto { Id = "n2", LineId = TestLineId, Name = "分区所" }
-                }));
-            }
 
             if (request.Method == HttpMethod.Post && path.EndsWith("/api/LineNode"))
             {
@@ -91,13 +82,6 @@ public class LineNodeCreateDialogSmokeTests : BunitTestBase
             new DialogParameters { { nameof(LineNodeCreateDialog.LineId), TestLineId } },
             new DialogOptions());
         provider.Render();
-
-        // 等候选节点加载完成（OnInitializedAsync → GET api/LineNode?lineId=...）
-        for (var i = 0; i < 10; i++)
-        {
-            await Task.Delay(50);
-            provider.Render();
-        }
         return provider;
     }
 
@@ -116,20 +100,14 @@ public class LineNodeCreateDialogSmokeTests : BunitTestBase
     // ============================================================
 
     [Fact]
-    public async Task Renders_PredecessorSelect_AndLoadsCandidates()
+    public async Task Renders_PredecessorPickerEntry()
     {
         var provider = await OpenAsync();
 
         var html = provider.Find(".mud-dialog").InnerHtml;
         Assert.Contains("新建线路节点", html);
-        // 前驱下拉 label（选项在 MudPopover 内，bUnit 不展开）
-        Assert.Contains("前驱（可选，选后接在该节点之后）", html);
-
-        // 候选已加载（同线已有节点）
-        var dialog = provider.FindComponent<LineNodeCreateDialog>();
-        var nodes = (IReadOnlyList<LineNodeDto>)Field(dialog, "_existingNodes")!;
-        Assert.Equal(2, nodes.Count);
-        Assert.Contains(nodes, n => n.Id == "n1");
+        // 前驱选择器入口 label（候选由 LineNodePickerDialog 搜索加载）
+        Assert.Contains("前驱节点（可选，选后接在该节点之后）", html);
     }
 
     [Fact]

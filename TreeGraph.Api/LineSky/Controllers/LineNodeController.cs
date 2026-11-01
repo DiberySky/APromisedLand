@@ -71,8 +71,11 @@ public class LineNodeController : ControllerBase
             var nameMap = pageItems.ToDictionary(n => n.Id, n => n.Name ?? "");
             var dtos = pageItems.Select(n =>
             {
-                var hasPred = predMap.TryGetValue(n.Id, out var predId);
-                return ToDto(n, hasPred ? predId : null, hasPred ? nameMap.GetValueOrDefault(predId!) : null);
+                var hasPred = predMap.TryGetValue(n.Id, out var pred);
+                return ToDto(n,
+                    hasPred ? pred.PredId : null,
+                    hasPred ? nameMap.GetValueOrDefault(pred.PredId!) : null,
+                    hasPred ? pred.EdgeType : null);
             }).ToList();
             return Ok(new PagedResult<object>
             {
@@ -88,8 +91,11 @@ public class LineNodeController : ControllerBase
         var nMap = items.ToDictionary(n => n.Id, n => n.Name ?? "");
         return Ok(items.Select(n =>
         {
-            var hasPred = pMap.TryGetValue(n.Id, out var predId);
-            return ToDto(n, hasPred ? predId : null, hasPred ? nMap.GetValueOrDefault(predId!) : null);
+            var hasPred = pMap.TryGetValue(n.Id, out var pred);
+            return ToDto(n,
+                hasPred ? pred.PredId : null,
+                hasPred ? nMap.GetValueOrDefault(pred.PredId!) : null,
+                hasPred ? pred.EdgeType : null);
         }).ToList());
     }
 
@@ -103,14 +109,17 @@ public class LineNodeController : ControllerBase
 
         var predMap = await GetPredecessorMapAsync(new[] { id }, ct);
         string? predName = null;
-        if (predMap.TryGetValue(id, out var predId))
+        if (predMap.TryGetValue(id, out var pred))
         {
             predName = await _db.Nodes.AsNoTracking()
-                .Where(n => n.Id == predId)
+                .Where(n => n.Id == pred.PredId)
                 .Select(n => n.Name)
                 .FirstOrDefaultAsync(ct);
         }
-        return Ok(ToDto(node, predMap.GetValueOrDefault(id), predName));
+        return Ok(ToDto(node,
+            predMap.TryGetValue(id, out var p2) ? p2.PredId : null,
+            predName,
+            predMap.TryGetValue(id, out var p3) ? p3.EdgeType : null));
     }
 
     /// <summary>
@@ -174,7 +183,7 @@ public class LineNodeController : ControllerBase
             var edgeEvents = new List<EdgeChangedEvent>();
             if (!string.IsNullOrWhiteSpace(req.PredecessorId))
             {
-                UpsertSegmentEdge(spaceId, req.PredecessorId!, id, edgeEvents);
+                UpsertSegmentEdge(spaceId, SegmentEdgeType, req.PredecessorId!, id, edgeEvents);
                 await _db.SaveChangesAsync(ct);
             }
 
@@ -191,6 +200,7 @@ public class LineNodeController : ControllerBase
     /// <summary>
     /// 更新 LineNode：改 name/description；
     /// 提供了 PredecessorId 时重接段边（删旧前驱→本节点的 line_segment 边 + 写新前驱→本节点）；
+    /// DisconnectPredecessor = true 时显式断开（删当前入边，变回首节点）；
     /// 换线路 = 改 line_id（连带校验段边两端仍同线，否则 400）。
     /// </summary>
     [HttpPut("{id}")]
@@ -217,14 +227,15 @@ public class LineNodeController : ControllerBase
                 return BadRequest(new { error = $"线路缺少所属空间（lines 行缺失）: {newLineId}" });
 
             // 连带校验：段边两端仍同线（入边起点、出边终点都必须属于新线路）
+            // 段边识别：任意类型、另一端为 LineNode 的边（不再限定内置 line_segment）；
             // 注：段边在旧线路空间内，此处不按空间过滤（节点 id 全局唯一，跨空间无碰撞）
             var endpointIds = await _db.Edges
-                .Where(e => e.EdgeType == SegmentEdgeType
-                         && (e.SrcVid == id || e.DstVid == id))
+                .Where(e => e.SrcVid == id || e.DstVid == id)
                 .Select(e => e.SrcVid == id ? e.DstVid : e.SrcVid)
                 .ToListAsync(ct);
             var alienCount = await _db.Nodes
-                .CountAsync(n => endpointIds.Contains(n.Id) && n.LineId != newLineId, ct);
+                .CountAsync(n => endpointIds.Contains(n.Id)
+                    && n.HostType == "LineNode" && n.LineId != newLineId, ct);
             if (alienCount > 0)
                 return BadRequest(new
                 {
@@ -257,18 +268,44 @@ public class LineNodeController : ControllerBase
         {
             if (spaceId is null)
                 return BadRequest(new { error = $"线路缺少所属空间（lines 行缺失）: {newLineId}" });
+            if (string.IsNullOrWhiteSpace(req.PredecessorEdgeType))
+                return BadRequest(new { error = "更换/重接前驱时必须指定段边类型（已移除默认边类型）" });
 
-            // 当前入边前驱（若已是该前驱则无需重接；段边在本线路空间内）
+            // 当前入边前驱：段边 = 指向本节点、起点为同线 LineNode 的入边（任意类型）
+            var lineNodeIds = await _db.Nodes
+                .Where(n => n.LineId == newLineId && n.HostType == "LineNode")
+                .Select(n => n.Id)
+                .ToListAsync(ct);
             var currentPred = await _db.Edges
                 .FirstOrDefaultAsync(e => e.SpaceId == spaceId
-                    && e.EdgeType == SegmentEdgeType && e.DstVid == id, ct);
+                    && e.DstVid == id && lineNodeIds.Contains(e.SrcVid), ct);
 
-            if (currentPred?.SrcVid != req.PredecessorId)
+            // 前驱与类型都未变则无需重写；仅换类型也会删旧写新
+            if (currentPred?.SrcVid != req.PredecessorId || currentPred.EdgeType != req.PredecessorEdgeType)
             {
                 // 删旧边（旧前驱 → 本节点），写新边（新前驱 → 自身）
                 if (currentPred is not null)
                     DeleteSegmentEdge(currentPred, edgeEvents);
-                UpsertSegmentEdge(spaceId, req.PredecessorId!, id, edgeEvents);
+                UpsertSegmentEdge(spaceId, req.PredecessorEdgeType!, req.PredecessorId!, id, edgeEvents);
+                await _db.SaveChangesAsync(ct);
+            }
+        }
+        else if (req.DisconnectPredecessor)
+        {
+            // 显式断开：删当前入边（旧前驱 → 本节点），节点变回首节点；本已无边则幂等
+            if (spaceId is null)
+                return BadRequest(new { error = $"线路缺少所属空间（lines 行缺失）: {newLineId}" });
+
+            var lineNodeIds = await _db.Nodes
+                .Where(n => n.LineId == newLineId && n.HostType == "LineNode")
+                .Select(n => n.Id)
+                .ToListAsync(ct);
+            var currentPred = await _db.Edges
+                .FirstOrDefaultAsync(e => e.SpaceId == spaceId
+                    && e.DstVid == id && lineNodeIds.Contains(e.SrcVid), ct);
+            if (currentPred is not null)
+            {
+                DeleteSegmentEdge(currentPred, edgeEvents);
                 await _db.SaveChangesAsync(ct);
             }
         }
@@ -339,7 +376,7 @@ public class LineNodeController : ControllerBase
     // 内部辅助
     // ============================================================
 
-    private static object ToDto(Node n, string? predecessorId = null, string? predecessorName = null) => new
+    private static object ToDto(Node n, string? predecessorId = null, string? predecessorName = null, string? predecessorEdgeType = null) => new
     {
         Id = n.Id,
         LineId = n.LineId ?? "",
@@ -347,19 +384,33 @@ public class LineNodeController : ControllerBase
         Description = n.Description,
         PredecessorId = predecessorId,
         PredecessorName = predecessorName,
+        PredecessorEdgeType = predecessorEdgeType,
         CreatedAt = n.CreatedAt
     };
 
-    /// <summary>批量取前驱映射：LineNode id → 前驱节点 id（line_segment 边：from=前驱、to=自身）。</summary>
-    private async Task<Dictionary<string, string>> GetPredecessorMapAsync(
+    /// <summary>
+    /// 批量取前驱映射：LineNode id → (前驱节点 id, 段边类型)。
+    /// 段边识别：任意边类型、两端为同线 LineNode 的入边（不再限定内置 line_segment）。
+    /// 注意同线判定走 join（不能依赖传入 id 集合——GetById 只传单 id，前驱不在集合内）。
+    /// </summary>
+    private async Task<Dictionary<string, (string PredId, string EdgeType)>> GetPredecessorMapAsync(
         IReadOnlyCollection<string> nodeIds, CancellationToken ct)
     {
         if (nodeIds.Count == 0)
-            return new Dictionary<string, string>();
+            return new Dictionary<string, (string, string)>();
 
-        return await _db.Edges
-            .Where(e => e.EdgeType == SegmentEdgeType && nodeIds.Contains(e.DstVid))
-            .ToDictionaryAsync(e => e.DstVid, e => e.SrcVid, ct);
+        var edges = await (
+                from e in _db.Edges
+                join src in _db.Nodes on e.SrcVid equals src.Id
+                join dst in _db.Nodes on e.DstVid equals dst.Id
+                where nodeIds.Contains(e.DstVid)
+                    && src.HostType == "LineNode"
+                    && src.LineId == dst.LineId
+                select new { e.DstVid, e.SrcVid, e.EdgeType })
+            .ToListAsync(ct);
+        return edges
+            .GroupBy(e => e.DstVid)
+            .ToDictionary(g => g.Key, g => (g.First().SrcVid, g.First().EdgeType));
     }
 
     /// <summary>解析线路所属空间（lines.space_id）；lines 行缺失返回 null（调用方按上下文处置）。</summary>
@@ -369,16 +420,16 @@ public class LineNodeController : ControllerBase
             .Select(l => (string?)l.SpaceId)
             .FirstOrDefaultAsync(ct);
 
-    /// <summary>upsert 一条 line_segment 段边（rank 恒 0，无 props；写入线路所属空间）。</summary>
-    private void UpsertSegmentEdge(string spaceId, string fromId, string toId, List<EdgeChangedEvent> events)
+    /// <summary>upsert 一条指定类型的段边（rank 恒 0，无 props；写入线路所属空间）。</summary>
+    private void UpsertSegmentEdge(string spaceId, string edgeType, string fromId, string toId, List<EdgeChangedEvent> events)
     {
         _db.Edges.Add(new Edge
         {
-            SpaceId = spaceId, EdgeType = SegmentEdgeType, SrcVid = fromId, Rank = 0, DstVid = toId
+            SpaceId = spaceId, EdgeType = edgeType, SrcVid = fromId, Rank = 0, DstVid = toId
         });
         events.Add(new EdgeChangedEvent
         {
-            SpaceId = spaceId, EdgeType = SegmentEdgeType, SrcVid = fromId, Rank = 0, DstVid = toId,
+            SpaceId = spaceId, EdgeType = edgeType, SrcVid = fromId, Rank = 0, DstVid = toId,
             Kind = EdgeChangeKind.Upsert
         });
     }
@@ -429,4 +480,10 @@ public class LineNodeUpdateRequest
 
     /// <summary>重接前驱（空 = 不变）；会删旧前驱的 next 边并写新边。</summary>
     public string? PredecessorId { get; set; }
+
+    /// <summary>新段边的边类型（更换/重接前驱时必填；已移除默认边类型）。</summary>
+    public string? PredecessorEdgeType { get; set; }
+
+    /// <summary>显式断开前驱（true 且 PredecessorId 为空 = 删当前入边，节点变回首节点）；PredecessorId 非空时忽略。</summary>
+    public bool DisconnectPredecessor { get; set; }
 }

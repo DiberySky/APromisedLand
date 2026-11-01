@@ -53,28 +53,28 @@
                 </MudTd>
                 <MudTd>
                     <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
-                                   Size="Size.Medium"
+                                   Size="Size.Small"
                                    OnClick="@(async () => await MoveUpAsync(context))"
                                    title="上移" />
                     <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
-                                   Size="Size.Medium"
+                                   Size="Size.Small"
                                    OnClick="@(async () => await MoveDownAsync(context))"
                                    title="下移" />
                     @if (!context.IsDefault)
                     {
                         <MudIconButton Icon="@Icons.Material.Outlined.StarBorder"
-                                       Size="Size.Medium"
+                                       Size="Size.Small"
                                        Color="Color.Warning"
                                        OnClick="@(async () => await SetDefaultAsync(context))"
                                        title="设为默认" />
                     }
                     <MudIconButton Icon="@Icons.Material.Outlined.Edit"
-                                   Size="Size.Medium"
+                                   Size="Size.Small"
                                    Color="Color.Primary"
                                    OnClick="@(async () => await OpenEditItemAsync(context))"
                                    title="编辑" />
                     <MudIconButton Icon="@Icons.Material.Outlined.Delete"
-                                   Size="Size.Medium"
+                                   Size="Size.Small"
                                    Color="Color.Error"
                                    OnClick="@(async () => await DeleteItemAsync(context))"
                                    title="删除" />

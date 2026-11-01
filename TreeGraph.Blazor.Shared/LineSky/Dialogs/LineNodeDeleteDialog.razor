@@ -1,17 +1,43 @@
 @* LineNodeDeleteDialog.razor — 删除线路节点确认（二级弹窗，危险色提交按钮） *@
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Services
+@using TreeGraph.Blazor.Shared.EdgeSky.Services
 @inject LineNodeManageApiClient Api
+@inject EdgeApiClient EdgeApi
 @inject ISnackbar Snackbar
 
 <DialogSky Title="删除线路节点"
            SubmitButtonVisible="true"
            SubmitButtonText="@(_submitting ? "删除中..." : "确认删除")"
            SubmitButtonColor="Color.Error"
-           SubmitButtonDisabled="@_submitting"
+           SubmitButtonDisabled="@(_submitting || _prechecking || HasBlockers)"
            OnSubmitClick="DeleteAsync">
     <DialogContent>
         <MudText>确定要删除线路节点 <strong>"@Node?.Name"</strong> 吗？此操作不可撤销。</MudText>
+
+        @if (_prechecking)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Info" Class="mt-2" />
+        }
+        else if (HasBlockers)
+        {
+            @* 删除预检：后端为守卫式删除（有边即 409），这里提前列出阻塞项并禁用提交 *@
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                该节点仍有连接，删除前请先处理：
+                @if (!string.IsNullOrEmpty(Node?.PredecessorId))
+                {
+                    <div>· 前驱节点「@(Node.PredecessorName ?? Node.PredecessorId)」——在「设置修改」中清除前驱（保存后断开）</div>
+                }
+                @foreach (var name in _successorNames)
+                {
+                    <div>· 后继节点「@name」——在该节点的「设置修改」中改接或断开其前驱</div>
+                }
+                @if (_relationCount > 0)
+                {
+                    <div>· 关系边 @_relationCount 条——在「节点操作 → 关系绑定」中移除</div>
+                }
+            </MudAlert>
+        }
     </DialogContent>
 </DialogSky>
 
@@ -21,6 +47,53 @@
     [Parameter] public LineNodeDto? Node { get; set; }
 
     private bool _submitting;
+    private bool _prechecking = true;
+
+    /// <summary>后继节点名（同线内前驱指向本节点的节点；单出边语义下至多 1 个）。</summary>
+    private List<string> _successorNames = [];
+
+    /// <summary>关系边数（排除段边的出入边合计）。</summary>
+    private int _relationCount;
+
+    private bool HasBlockers =>
+        !string.IsNullOrEmpty(Node?.PredecessorId) || _successorNames.Count > 0 || _relationCount > 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 预检仅为提示性增强：失败静默降级（不显示阻塞项），后端 409 仍是最终防线
+        try
+        {
+            if (Node is null) return;
+
+            // 后继：同线节点中前驱为本节点者
+            var nodes = await Api.GetByLineAsync(Node.LineId);
+            _successorNames = nodes
+                .Where(n => n.PredecessorId == Node.Id)
+                .Select(n => n.Name)
+                .ToList();
+
+            // 关系边：本节点出入边中排除段边
+            // 段边识别（对齐后端）：任意类型、另一端为同线 LineNode 的边
+            var space = await EdgeApi.GetNodeSpaceAsync(Node.Id);
+            if (space is not null)
+            {
+                var lineNodeIds = nodes.Select(n => n.Id).ToHashSet();
+                var outEdges = await EdgeApi.QueryEdgesAsync(space.SpaceId, nodeId: Node.Id, direction: "out");
+                var inEdges = await EdgeApi.QueryEdgesAsync(space.SpaceId, nodeId: Node.Id, direction: "in");
+                _relationCount =
+                    (outEdges?.Count(e => !lineNodeIds.Contains(e.DstVid)) ?? 0) +
+                    (inEdges?.Count(e => !lineNodeIds.Contains(e.SrcVid)) ?? 0);
+            }
+        }
+        catch
+        {
+            // 忽略：保持 HasBlockers = false，由后端守卫兜底
+        }
+        finally
+        {
+            _prechecking = false;
+        }
+    }
 
     private async Task DeleteAsync()
     {

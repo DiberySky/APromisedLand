@@ -3,18 +3,26 @@
    列表 + 新建/编辑/删除 + 线路节点/线路结构/向量刷新入口。 *@
 @namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky
+@using TreeGraph.Blazor.Shared.LineSky.Components
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
 @inject LineManageApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<DialogSky Title="@($"线路管理：{SpaceName ?? SpaceId}")"
+<DialogSky Title="线路管理"
            SubmitButtonVisible="false">
+    <ToolBarContent>
+        <MudText Typo="Typo.subtitle1" Color="Color.Info">@(SpaceName ?? SpaceId)</MudText>
+    </ToolBarContent>
+    <ToolBarRightContent>
+        @* 名称模糊搜索（客户端过滤） *@
+        <LineSearchField Placeholder="搜索线路名称" Width="230px" @bind-Value="_query" OnSearch="OnSearchAsync" />
+    </ToolBarRightContent>
     <DialogContent>
         @* 表格始终渲染：空态走 NoRecordsContent（EmptyStateSky），
            表头操作列的新建 + 按钮在空态时同样可用 *@
-        <MudTable Items="_lines ?? (IReadOnlyList<LineDto>)[]" Hover="true" Bordered="true" Dense="true"
+        <MudTable Items="FilteredLines" Hover="true" Bordered="true" Dense="true"
                   Loading="@_loading" LoadingProgressColor="Color.Primary">
             <HeaderContent>
                 <MudTh>名称</MudTh>
@@ -38,12 +46,6 @@
                                    Size="Size.Small"
                                    OnClick="@(async () => await OpenLineNodesAsync(context))"
                                    title="线路节点设置" />
-                    @* 线路结构：有序节点 → 自动建边（线路型边类型） *@
-                    <MudIconButton Icon="@Icons.Material.Outlined.Timeline"
-                                   Color="Color.Primary"
-                                   Size="Size.Small"
-                                   OnClick="@(async () => await OpenStructureAsync(context))"
-                                   title="线路结构" />
                 </MudTd>
                 <MudTd>@context.Description</MudTd>
                 <MudTd Style="white-space: nowrap; text-align: center;">
@@ -90,6 +92,22 @@
 
     private IReadOnlyList<LineDto>? _lines;
     private bool _loading;
+
+    /// <summary>搜索关键字（按线路名称模糊匹配，客户端过滤）。</summary>
+    private string? _query;
+
+    /// <summary>按名称模糊过滤后的线路列表。</summary>
+    private IReadOnlyList<LineDto> FilteredLines =>
+        _lines is null ? [] :
+        string.IsNullOrWhiteSpace(_query) ? _lines :
+        _lines.Where(l => l.Name.Contains(_query, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    /// <summary>搜索防抖结束：客户端过滤只需触发重渲染。</summary>
+    private Task OnSearchAsync()
+    {
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
 
     /// <summary>CRUD 子对话框选项（与 SpaceManagePanel 一致：小宽度全宽）。</summary>
     private static readonly DialogOptions DialogOptions = new()
@@ -186,29 +204,6 @@
 
         await DialogService.ShowExAsync<LineNodeManageDialog>(
             "线路节点", parameters, options);
-    }
-
-    /// <summary>
-    /// 打开线路结构图编辑器：维护段与端子（拓扑模式 Linear/Radial/Network）。
-    /// </summary>
-    private async Task OpenStructureAsync(LineDto line)
-    {
-        var parameters = new DialogParameters<LineStructureDialog>
-        {
-            { x => x.LineId, line.Id },
-            { x => x.LineName, line.Name }
-        };
-        var options = new DialogOptionsEx
-        {
-            MaxWidth = MaxWidth.Medium,
-            FullWidth = true,
-            Position = DialogPosition.TopCenter,
-            MaximizeButton = true,
-            BackdropClick = false
-        };
-
-        await DialogService.ShowExAsync<LineStructureDialog>(
-            "线路结构", parameters, options);
     }
 
     /// <summary>

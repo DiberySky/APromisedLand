@@ -34,6 +34,9 @@ public class NodeSpaceDto
 
     /// <summary>空间类型（Dynamic/Type/Unit/Knowledge，与后端 SpaceType 枚举同名）。</summary>
     public string SpaceType { get; set; } = string.Empty;
+
+    /// <summary>被解析节点的宿主类型（对端候选按同宿主过滤：LineNode↔LineNode、SpaceTree↔SpaceTree）。</summary>
+    public string? NodeHostType { get; set; }
 }
 
 /// <summary>
