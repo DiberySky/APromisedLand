@@ -60,22 +60,18 @@
                 </MudTabPanel>
             </MudTabs>
 
-            @* ===== 关系绑定（可展开，只读；无关系时隐藏） ===== *@
-            @if (_hasRelations)
-            {
-                <MudExpansionPanel Class="lna-expansion">
-                    <TitleContent>
-                        <MudStack Row AlignItems="AlignItems.Center">
-                            <MudIcon Icon="@Icons.Material.Outlined.Share" Size="Size.Small" />
-                            <MudText Typo="Typo.subtitle2">关系绑定</MudText>
-                        </MudStack>
-                    </TitleContent>
-                    <ChildContent>
-                        <NodeRelationBindingsSky NodeId="@Node.Id" AllowManage="false"
-                                                 OnHasRelationsChanged="@(v => _hasRelations = v)" />
-                    </ChildContent>
-                </MudExpansionPanel>
-            }
+            @* ===== 关系绑定（可展开，只读；始终显示，无关系时由组件内部给空态提示） ===== *@
+            <MudExpansionPanel Class="lna-expansion">
+                <TitleContent>
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Outlined.Share" Size="Size.Small" />
+                        <MudText Typo="Typo.subtitle2">关系绑定</MudText>
+                    </MudStack>
+                </TitleContent>
+                <ChildContent>
+                    <NodeRelationBindingsSky NodeId="@Node.Id" AllowManage="false" />
+                </ChildContent>
+            </MudExpansionPanel>
         </MudContainer>
     </DialogContent>
     <DialogLeftActions>
@@ -113,9 +109,6 @@
 
     /// <summary>是否显示「线路节点维护」跳转项（在线路管理对话框内为 false）。</summary>
     [Parameter] public bool ShowLineManage { get; set; }
-
-    /// <summary>该节点是否存在关系（出/入边），由 NodeRelationBindingsSky 加载后回调；无关系则隐藏「关系绑定」面板。</summary>
-    private bool _hasRelations;
 
     private void OnEdit() => CloseWithAction(LineNodeHostAction.Edit);
     private void OnLineManage() => CloseWithAction(LineNodeHostAction.LineManage);

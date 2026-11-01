@@ -196,6 +196,13 @@
                         OnDataDeleted="@OnEntityDataDeletedAsync" />
 }
 
+@* 只读查看页（如「节点操作」）：无绑定时也给出空态占位，不再“仅有值才显示” *@
+@if (ReadOnly && _bindings.Count == 0 && !_loading)
+{
+    <EmptyStateSky Icon="@Icons.Material.Outlined.Link"
+                   Title="该节点尚无属性绑定" />
+}
+
 @code {
     /// <summary>宿主节点 ID（= iNode Id = 树节点 / 线路 / 线路节点 Id）。</summary>
     [Parameter, EditorRequired] public string NodeId { get; set; } = default!;

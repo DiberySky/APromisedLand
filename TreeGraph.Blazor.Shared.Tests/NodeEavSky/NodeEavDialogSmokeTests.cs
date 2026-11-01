@@ -35,6 +35,7 @@ public class NodeEavDialogSmokeTests : BunitTestBase
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddLogging();
         Services.AddSingleton<IPlatformContext>(new FakePlatformContext());
         // 真实 EavApiClient + 桩 HttpClient（提交才会触发 API，渲染阶段不调用）
         Services.AddSingleton(new HttpClient(new StubHttpMessageHandler())
@@ -50,6 +51,9 @@ public class NodeEavDialogSmokeTests : BunitTestBase
             typeof(TreeGraph.Blazor.Shared.TreeEavSky.Dialogs.TreeNodeDialogService<>));
         // NodeAttributeItemsSky（TreeNodeActionsDialog 属性区）依赖 MessageService
         Services.AddScoped<TreeGraph.Blazor.Shared.TreeEavSky.Dialogs.MessageService>();
+        // NodeRelationBindingsSky（TreeNodeActionsDialog 关系绑定面板，始终渲染）依赖 EdgeApiClient；
+        // 桩 HttpClient 回 200 空体 → 客户端 GetAsync 返回 null，面板显示提示
+        Services.AddSingleton<TreeGraph.Blazor.Shared.EdgeSky.Services.EdgeApiClient>();
     }
 
     private async Task<IRenderedComponent<MudDialogProvider>> OpenAsync<TDialog>(

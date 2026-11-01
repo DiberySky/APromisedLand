@@ -5,6 +5,7 @@ using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
 using MudBlazor.Services;
+using TreeGraph.Blazor.Shared.EdgeSky.Services;
 using TreeGraph.Blazor.Shared.LineSky;
 using TreeGraph.Blazor.Shared.LineSky.Components;
 using TreeGraph.Blazor.Shared.LineSky.Dialogs;
@@ -46,6 +47,9 @@ public class LineNodeActionsDialogSmokeTests : BunitTestBase
         // NodeAttributeItemsSky 依赖：EavApiClient + MessageService
         Services.AddSingleton<EavApiClient>();
         Services.AddScoped<MessageService>();
+        // NodeRelationBindingsSky（关系绑定面板，始终渲染）依赖 EdgeApiClient；
+        // 桩 HttpClient 对其端点回 404/空体 → 客户端返回 null，面板显示"不属于任何图空间"提示
+        Services.AddSingleton<EdgeApiClient>();
     }
 
     // ============================================================
