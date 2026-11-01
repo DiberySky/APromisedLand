@@ -1,5 +1,5 @@
 @* LineNodeActionsDialog.razor — 线路节点宿主操作对话框（对齐 TreeNodeActionsDialog 模式）：
-   基本信息 Tab（只读）+ 关系绑定折叠面板；操作按钮平铺（编辑/属性/删除/线路节点维护）。
+   基本信息 Tab（只读）+ 关系绑定折叠面板；「设置修改」入口在工具栏右侧，「线路节点维护」在底部右侧。
    按钮不直接执行，仅携带 LineNodeHostAction 关窗，由 LineNodeActions.OperateAsync 编排执行并循环重开。 *@
 @namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky
@@ -35,8 +35,15 @@
     <ToolBarContent>
         @* 静态内容：所属线路名（ToolBarContent 不支持动态更新） *@
         <MudText Typo="Typo.subtitle1" Color="Color.Info">@LineName</MudText>
-        <MudSpacer/>
     </ToolBarContent>
+    <ToolBarRightContent>
+        @* 设置修改入口（工具栏右侧，对齐 TreeNodeActionsDialog） *@
+        <MudIconButton Icon="@Icons.Material.Outlined.EditNote"
+                       Size="Size.Small"
+                       Color="Color.Primary"
+                       title="设置修改"
+                       OnClick="OnEdit" />
+    </ToolBarRightContent>
     <DialogContent>
         <MudContainer Class="pt-0 pb-4" MaxWidth="MaxWidth.Medium">
             <MudTabs Elevation="0" Rounded="true" Class="lna-tabs">
@@ -71,16 +78,6 @@
             </MudExpansionPanel>
         </MudContainer>
     </DialogContent>
-    <DialogLeftActions>
-        @* 对齐 Tree 节点操作（只读宿主）：删除已迁入「设置修改」 *@
-        <MudButton OnClick="OnEdit"
-                   Variant="Variant.Text"
-                   Color="Color.Primary"
-                   Size="Size.Small"
-                   StartIcon="@Icons.Material.Outlined.Edit">
-            设置修改
-        </MudButton>
-    </DialogLeftActions>
     <DialogRightActions>
         @if (ShowLineManage && !string.IsNullOrEmpty(Node.LineId))
         {

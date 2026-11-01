@@ -37,8 +37,18 @@
             @* 懒加载：Value.Parent 可能未装载，用编排器注入的 ParentNode 兜底 *@
             <MudText Color="Color.Info">@(NodeTemplate.Node.Value!.Parent?.Name ?? ParentNode?.Name)</MudText>
         }
-        <MudSpacer/>
     </ToolBarContent>
+    <ToolBarRightContent>
+        @* 设置修改入口上移至工具栏右侧（仅非根节点；IsBoot 为开窗参数，工具栏区内容保持静态） *@
+        @if (!IsBoot)
+        {
+            <MudIconButton Icon="@Icons.Material.Outlined.EditNote"
+                           Size="Size.Small"
+                           Color="Color.Primary"
+                           title="设置修改"
+                           OnClick="OnEdit" />
+        }
+    </ToolBarRightContent>
     <DialogContent>
         <MudContainer Class="pt-0 pb-4" MaxWidth="MaxWidth.Medium">
             <MudTabs Elevation="0" Rounded="true" Class="tna-tabs">
@@ -92,7 +102,7 @@
         </MudContainer>
     </DialogContent>
     <DialogLeftActions>
-        @* 底部动作统一靠左：根节点放创建子项/子项排序；非根节点放「设置修改」 *@
+        @* 底部动作统一靠左：根节点放创建子项/子项排序；非根节点的「设置修改」已上移至工具栏右侧 *@
         @if (IsBoot)
         {
             <MudButton OnClick="OnAddChild"
@@ -111,16 +121,6 @@
                     子项排序
                 </MudButton>
             }
-        }
-        else
-        {
-            @* 本对话框只读：管理功能（移动/创建子项/子项排序/删除）已迁移至「设置修改」页，便于权限控制 *@
-            <MudButton OnClick="OnEdit"
-                       Variant="Variant.Text"
-                       Color="Color.Primary"
-                       StartIcon="@Icons.Material.Outlined.Edit">
-                设置修改
-            </MudButton>
         }
     </DialogLeftActions>
 </DialogSky>

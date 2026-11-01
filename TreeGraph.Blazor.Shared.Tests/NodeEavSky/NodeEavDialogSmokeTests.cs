@@ -327,7 +327,8 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         Assert.Contains("测试单位", html);
         Assert.Contains("上级单位", html);
         Assert.Contains("是否允许添加子节点", html);
-        // 只读对话框：移动/创建子项/子项排序/删除已迁至「设置修改」页，非根节点仅保留该入口
+        // 只读对话框：移动/创建子项/子项排序/删除已迁至「设置修改」页，
+        // 非根节点仅保留该入口（工具栏右侧图标按钮，label 在 title 属性上）
         Assert.Contains("设置修改", html);
         Assert.DoesNotContain("创建子项", html);
         Assert.DoesNotContain("子项排序", html);

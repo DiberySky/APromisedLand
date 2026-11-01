@@ -107,8 +107,10 @@ public class LineNodeActionsDialogSmokeTests : BunitTestBase
 
     private static void ClickButton(IRenderedComponent<MudDialogProvider> provider, string text)
     {
+        // 文本按钮按 TextContent 匹配；图标按钮（如工具栏「设置修改」）label 在 title 属性上
         var btn = provider.FindAll("button")
-            .First(b => b.TextContent.Trim().Contains(text, StringComparison.Ordinal));
+            .First(b => b.TextContent.Trim().Contains(text, StringComparison.Ordinal)
+                     || (b.GetAttribute("title")?.Contains(text, StringComparison.Ordinal) ?? false));
         btn.Click();
     }
 
