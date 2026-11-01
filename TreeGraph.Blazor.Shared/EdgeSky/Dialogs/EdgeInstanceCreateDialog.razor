@@ -1,7 +1,9 @@
 @* EdgeInstanceCreateDialog.razor — 新建节点关系（边实例）。
-   打开参数 SpaceId/SpaceName/PeerHostType/NodeId/Types：
+   打开参数 SpaceId/SpaceName/SpaceType/NodeId/Types：
    方向（出边 = 本节点为起点 / 入边 = 本节点为终点）→ 选择边类型（空间内已定义）
-   → 对端节点（选择对话框，候选限定与本节点同宿主类型）→ rank → 属性。
+   → 对端节点（同空间约束：候选必须与边同属一个空间；空间内可跨类型，如 Dynamic 空间
+     同时存在空间树节点与线路/线路节点，故「树搜索」「线路」两个入口按空间能力并行提供）
+   → rank → 属性。
    属性区按所选边类型的 Schema 动态渲染：STRING→文本框，INT/DOUBLE→NumberInputField，
    BOOL→BoolFieldSky，DATE→日期选择，TIMESTAMP→文本框（epoch 或 ISO 8601）。
    提交返回 CreatedEdgeInstance，由调用方执行 PUT 覆盖式 UPSERT（对齐 INSERT EDGE）。 *@
@@ -9,11 +11,19 @@
 
 @using System.Text.Json
 @using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.LineSky
+@using TreeGraph.Blazor.Shared.LineSky.Dialogs
+@using TreeGraph.Blazor.Shared.LineSky.Services
+@using TreeGraph.Blazor.Shared.TreeEavSky.Services
 @using TreeGraph.Shared.EdgeSky
 @using TreeGraph.Shared.EdgeSky.Dtos
+@using TreeGraph.Shared.TreeEavSky.Abstractions
+@using TreeGraph.Shared.TreeEavSky.Entities
 
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject LineManageApiClient LineApi
+@inject IServiceProvider Services
 
 <DialogSky Title="新建关系"
            SubmitButtonVisible="true"
@@ -29,6 +39,39 @@
     </ToolBarContent>
     <DialogContent>
         <MudStack Spacing="2">
+            @* 对端节点（首行）：只读展示，右侧提供「树搜索」与「线路」两个入口，
+               按当前空间是否具备该类节点启用（同空间跨类型：线空间含 Line/LineNode，树空间含对应树实体） *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <MudTextField T="string"
+                              Value="@(_peer?.Name ?? _peer?.Id)"
+                              Label="对端节点"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Size="Size.Small"
+                              ReadOnly="true"
+                              Placeholder="点击右侧树搜索或线路按钮选择节点"
+                              HelperText="@(_peerHelperText ?? string.Empty)"
+                              Style="flex: 1;" />
+                <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                               Color="Color.Warning"
+                               Size="Size.Small"
+                               Disabled="@(_peer is null)"
+                               title="清除对端节点"
+                               OnClick="ClearPeer" />
+                <MudIconButton Icon="@Icons.Material.Outlined.AccountTree"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Disabled="@(!TreePickerAvailable)"
+                               title="@(TreePickerAvailable ? "树搜索" : "当前空间无可用树结构，无法从树选择")"
+                               OnClick="OpenPeerTreePickerAsync" />
+                <MudIconButton Icon="@Icons.Material.Outlined.Route"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               Disabled="@(!LinePickerAvailable)"
+                               title="@(LinePickerAvailable ? "线路" : "当前空间无线路，无法从线路选择")"
+                               OnClick="OpenPeerLinePickerAsync" />
+            </MudStack>
+
             <MudSelect T="string" @bind-Value="_direction"
                        Label="方向" Variant="Variant.Outlined" Margin="Margin.Dense"
                        Size="Size.Small"
@@ -53,37 +96,17 @@
                 }
             </MudSelect>
 
-            @* 对端节点：选择对话框（复用语义搜索 NodePickerDialog），尾部放大镜打开 *@
-            <MudTextField T="string"
-                          Value="@(_peer?.Name ?? _peer?.Id)"
-                          Label="对端节点"
-                          Variant="Variant.Outlined"
-                          Margin="Margin.Dense"
-                          Size="Size.Small"
-                          ReadOnly="true"
-                          Placeholder="点击右侧放大镜选择节点"
-                          Adornment="Adornment.End"
-                          AdornmentIcon="@Icons.Material.Outlined.Search"
-                          IconSize="Size.Small"
-                          OnAdornmentClick="OpenPeerPickerAsync" />
-
             <NumberInputField T="long?" Value="_rank" ValueChanged="@(v => OnRankChanged(v))"
                               Label="等级 (rank)" Min="0" Margin="Margin.Dense"
                               HelperText="同起点/终点/类型的多条关系以 rank 区分，默认 0" />
 
-            @if (_edgeType is null)
-            {
-                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
-                    请先选择关系类型，属性区将按其 Schema 生成。
-                </MudAlert>
-            }
-            else if (_edgeType.Props.Count == 0)
+            @if (_edgeType is { Props.Count: 0 })
             {
                 <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
                     该关系类型无属性，可直接创建。
                 </MudAlert>
             }
-            else
+            else if (_edgeType is not null)
             {
                 <MudText Typo="Typo.subtitle2" Class="mt-1">属性</MudText>
                 @foreach (var p in _edgeType.Props.OrderBy(p => p.DisplayOrder))
@@ -146,8 +169,8 @@
     /// <summary>打开参数：目标图空间显示名（仅展示）。</summary>
     [Parameter] public string? SpaceName { get; set; }
 
-    /// <summary>打开参数：对端候选宿主类型（与当前节点同宿主；为空不限）。</summary>
-    [Parameter] public string? PeerHostType { get; set; }
+    /// <summary>打开参数：空间类型（Dynamic/Type/Unit/Knowledge），决定树搜索对应的树实体。</summary>
+    [Parameter] public string? SpaceType { get; set; }
 
     /// <summary>打开参数：本节点 Id。</summary>
     [Parameter] public string NodeId { get; set; } = string.Empty;
@@ -159,6 +182,15 @@
     private string _direction = "out";
     private long _rank;
     private NodeLookupDto? _peer;
+
+    /// <summary>
+    /// 对端节点的来源说明（HelperText）：树选择时为祖先路径（根 &gt; 父 &gt; 当前），
+    /// 线路选择时为所属线路名。
+    /// </summary>
+    private string? _peerHelperText;
+
+    /// <summary>当前空间内的线路（打开时预加载；决定「线路」入口是否可用）。</summary>
+    private IReadOnlyList<LineDto> _spaceLines = [];
 
     private readonly Dictionary<string, string> _texts = new();
     private readonly Dictionary<string, long?> _longs = new();
@@ -183,6 +215,21 @@
         {
             _edgeType = Types[0];
             InitPropValues(Types[0]);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 预加载本空间线路：决定「线路」入口是否可用（空间内可能同时存在树与线路节点）
+        if (string.IsNullOrEmpty(SpaceId)) return;
+        try
+        {
+            _spaceLines = await LineApi.GetAllAsync(SpaceId);
+        }
+        catch (Exception ex)
+        {
+            _spaceLines = [];
+            Snackbar.Add($"加载线路失败：{ex.Message}", Severity.Error);
         }
     }
 
@@ -242,17 +289,54 @@
 
     // ---------- 对端节点选择 ----------
 
-    /// <summary>打开节点选择器（名称模糊搜索 + 服务端分页，单选），确认后写入对端。</summary>
-    private async Task OpenPeerPickerAsync()
+    /// <summary>清除已选对端节点（同时清空 HelperText 中的路径/线路名）。</summary>
+    private void ClearPeer()
     {
-        var parameters = new DialogParameters<NodeLookupPickerDialog>
+        _peer = null;
+        _peerHelperText = null;
+    }
+
+    /// <summary>空间类型是否支持树选择（Dynamic 对应空间树，其余对应各自的树实体）。</summary>
+    private bool TreePickerAvailable => SpaceType
+        is "Unit" or "Type" or "Knowledge" or "Dynamic";
+
+    /// <summary>按空间类型实例化对应的树选择器；Dynamic 空间用空间树（根即该空间）。</summary>
+    private async Task OpenPeerTreePickerAsync()
+    {
+        switch (SpaceType)
+        {
+            case "Unit":
+                await PickPeerFromTreeAsync<UnitTree>();
+                break;
+            case "Type":
+                await PickPeerFromTreeAsync<CategoryTree>();
+                break;
+            case "Knowledge":
+                await PickPeerFromTreeAsync<KnowledgeTree>();
+                break;
+            case "Dynamic":
+                // 空间树多根：根 Id 即 Space.Id，限定到当前空间
+                await PickPeerFromTreeAsync<SpaceTree>(SpaceId);
+                break;
+            default:
+                Snackbar.Add("当前空间没有可用的树结构，无法从树选择", Severity.Info);
+                break;
+        }
+    }
+
+    /// <summary>以树视图选节点；边关系对端可为任意节点，故放开叶子限制（SelectLeaf=false）。</summary>
+    private async Task PickPeerFromTreeAsync<TItem>(string? rootId = null)
+        where TItem : class, ITreeNodeBase<TItem>, new()
+    {
+        var parameters = new DialogParameters<TreeNodePickDialog<TItem>>
         {
             { x => x.Title, "选择对端节点" },
-            { x => x.SpaceName, SpaceName },
-            { x => x.HostType, PeerHostType }
+            { x => x.TitleToolBar, SpaceName },
+            { x => x.RootId, rootId },
+            { x => x.SelectLeaf, false }
         };
-        var dialog = await DialogService.ShowExAsync<NodeLookupPickerDialog>(
-            "选择对端节点", parameters,
+        var dialog = await DialogService.ShowExAsync<TreeNodePickDialog<TItem>>(
+            "树搜索", parameters,
             new DialogOptionsEx
             {
                 MaxWidth = MaxWidth.Small,
@@ -261,8 +345,93 @@
                 Position = DialogPosition.TopCenter
             });
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: NodeLookupDto picked })
-            _peer = picked;
+        if (result is { Canceled: false, Data: TItem picked })
+        {
+            // 对端类型取自实际所选节点（同空间跨类型，不沿用当前节点类型）
+            _peer = new NodeLookupDto
+            {
+                Id = picked.Id,
+                Name = picked.Name,
+                HostType = typeof(TItem).Name
+            };
+            _peerHelperText = await DescribeTreePathAsync<TItem>(picked);
+        }
+    }
+
+    /// <summary>
+    /// 拼出所选树节点的祖先路径（根 &gt; 父 &gt; 当前），用于 HelperText 展示节点位置。
+    /// 选择器只回传节点值（无父链），故借 TreeApiClient 逐级回溯 ParentId 取各层显示名；
+    /// 客户端不可用或回溯失败时退回节点名，保证 HelperText 仍可读。
+    /// </summary>
+    private async Task<string?> DescribeTreePathAsync<TItem>(TItem picked)
+        where TItem : class, ITreeNodeBase<TItem>, new()
+    {
+        var current = picked.Name ?? picked.Id;
+
+        var api = Services.GetService(typeof(TreeApiClient<TItem>)) as TreeApiClient<TItem>;
+        if (api is null) return current;
+
+        try
+        {
+            var parts = new List<string> { current };
+            var node = await api.GetNodeByIdAsync(picked.Id);
+            var parentId = node?.ParentId;
+            while (!string.IsNullOrEmpty(parentId))
+            {
+                var parent = await api.GetNodeByIdAsync(parentId);
+                if (parent is null) break;
+                parts.Insert(0, parent.Text ?? parent.Id);
+                parentId = parent.ParentId;
+            }
+
+            return string.Join(" > ", parts);
+        }
+        catch (Exception)
+        {
+            // 路径仅为展示辅助信息，失败不影响选择结果
+            return current;
+        }
+    }
+
+    /// <summary>当前空间是否有线路（有则可从线路节点选对端；与树并存时两个入口都可用）。</summary>
+    private bool LinePickerAvailable => _spaceLines.Count > 0;
+
+    /// <summary>打开线路节点选择器（LineNodePickerDialog），确认后写入对端。</summary>
+    private async Task OpenPeerLinePickerAsync()
+    {
+        if (_spaceLines.Count == 0)
+        {
+            Snackbar.Add("当前空间暂无线路", Severity.Warning);
+            return;
+        }
+
+        var parameters = new DialogParameters<LineNodePickerDialog>
+        {
+            { x => x.Title, "选择对端节点" },
+            { x => x.Lines, _spaceLines }
+        };
+        var dialog = await DialogService.ShowExAsync<LineNodePickerDialog>(
+            "线路", parameters,
+            new DialogOptionsEx
+            {
+                MaxWidth = MaxWidth.Small,
+                FullWidth = true,
+                BackdropClick = false,
+                Position = DialogPosition.TopCenter
+            });
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: LineNodeDto picked })
+        {
+            // 线路入口选出的就是线路节点，宿主类型固定为 LineNode（当前节点可能是 Line）
+            _peer = new NodeLookupDto
+            {
+                Id = picked.Id,
+                Name = picked.Name,
+                HostType = "LineNode"
+            };
+            // HelperText 显示该线路节点所属线路名（LineNodeDto 只带 LineId）
+            _peerHelperText = _spaceLines.FirstOrDefault(l => l.Id == picked.LineId)?.Name;
+        }
     }
 
     // ---------- 属性字段读写 ----------

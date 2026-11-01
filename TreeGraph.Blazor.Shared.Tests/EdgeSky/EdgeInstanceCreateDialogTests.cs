@@ -7,6 +7,7 @@ using MudBlazor;
 using MudBlazor.Services;
 using TreeGraph.Blazor.Shared.EdgeSky.Dialogs;
 using TreeGraph.Blazor.Shared.EdgeSky.Services;
+using TreeGraph.Blazor.Shared.LineSky.Services;
 using TreeGraph.Shared.EdgeSky;
 using TreeGraph.Shared.EdgeSky.Dtos;
 using Xunit;
@@ -30,6 +31,8 @@ public class EdgeInstanceCreateDialogTests : BunitTestBase
             BaseAddress = new Uri("http://localhost/")
         });
         Services.AddSingleton<EdgeApiClient>();
+        // 对端「线路」入口注入的线路客户端（FakeHandler 返回空列表，点击时走"暂无线路"提示）
+        Services.AddSingleton<LineManageApiClient>();
     }
 
     private sealed class FakeHandler : HttpMessageHandler
@@ -74,7 +77,7 @@ public class EdgeInstanceCreateDialogTests : BunitTestBase
             {
                 { x => x.SpaceId, "space-x" },
                 { x => x.SpaceName, "单位" },
-                { x => x.PeerHostType, "UnitTree" },
+                { x => x.SpaceType, "Unit" },
                 { x => x.NodeId, "node-self" },
                 { x => x.Types, new List<EdgeTypeDto> { LineSegment() } }
             },
