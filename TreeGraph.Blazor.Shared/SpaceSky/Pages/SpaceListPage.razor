@@ -1,9 +1,12 @@
-@* SpaceListPage.razor — 空间管理页（Tab 集成）：「空间」只读列表（Tree 图标打开空间树对话框）+「空间维护」CRUD 面板。 *@
+@* SpaceListPage.razor — 空间管理页（Tab 集成）：「空间」只读列表（行展开二级列表：树 + 线路）+「空间维护」CRUD 面板。 *@
 @page "/spaces"
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Blazor.Shared.SpaceSky
 @using TreeGraph.Blazor.Shared.SpaceSky.Components
 @using TreeGraph.Blazor.Shared.SpaceSky.Services
+@using TreeGraph.Blazor.Shared.LineSky
+@using TreeGraph.Blazor.Shared.LineSky.Dialogs
+@using TreeGraph.Blazor.Shared.LineSky.Services
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
 @using TreeGraph.Blazor.Shared.NodeEavSky.Pages.Metadata
 @using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Space
@@ -14,6 +17,7 @@
 @using TreeGraph.Shared.TreeEavSky.Entities
 @using TreeGraph.Shared.TreeEavSky.Models
 @inject SpaceApiClient Api
+@inject LineManageApiClient LineApi
 @inject TreeApiClient<SpaceTree> TreeApi
 @inject BlazorService BlazorService
 @inject ISnackbar Snackbar
@@ -54,9 +58,7 @@
                 }
                 else
                 {
-                    @* 表格底色纯黑，与页面底色拉开对比 *@
-                    <MudTable Items="_spaces" Hover="true"
-                              Style="background-color: #000;">
+                    <MudTable Items="_spaces" Hover="true">
                         <HeaderContent>
                             <MudTh>名称</MudTh>
                             <MudTh>描述</MudTh>
@@ -66,14 +68,62 @@
                             <MudTd>@context.Name</MudTd>
                             <MudTd>@context.Description</MudTd>
                             <MudTd>
-                                @* 打开该空间对应的空间树（TreeDialogPageSky，RootId = Space.Id） *@
-                                <MudIconButton Icon="@Icons.Material.Outlined.AccountTree"
+                                @* 展开/收起二级列表（该空间的树与线路） *@
+                                <MudIconButton Icon="@(_expandedIds.Contains(context.Id)
+                                                        ? Icons.Material.Outlined.ExpandLess
+                                                        : Icons.Material.Outlined.ExpandMore)"
                                                Color="Color.Info"
                                                Size="Size.Small"
-                                               OnClick="@(async () => await OpenTreeAsync(context))"
-                                               title="空间树" />
+                                               OnClick="@(() => ToggleExpand(context.Id))"
+                                               title="树与线路" />
                             </MudTd>
                         </RowTemplate>
+                        <ChildRowContent>
+                            @if (_expandedIds.Contains(context.Id))
+                            {
+                                <MudTr>
+                                    <td colspan="3" style="padding: 0; background-color: #000;">
+                                        @* 二级列表：两列（项目名称/操作）；操作列用类型图标（树=AccountTree，线路=Route） *@
+                                        <MudSimpleTable Dense="true" Hover="true"
+                                                        Style="background-color: #000; width: 320px; margin-left: auto; margin-right: 64px;">
+                                            <thead>
+                                                <tr>
+                                                    <th>项目</th>
+                                                    <th style="width: 1%; white-space: nowrap; text-align: right;">操作</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>@TreeLabel(context.Type)</td>
+                                                    <td style="white-space: nowrap; text-align: right;">
+                                                        @* 打开该空间对应的树（沿用行级 OpenTreeAsync 逻辑） *@
+                                                        <MudIconButton Icon="@Icons.Material.Outlined.AccountTree"
+                                                                       Color="Color.Info"
+                                                                       Size="Size.Small"
+                                                                       OnClick="@(async () => await OpenTreeAsync(context))"
+                                                                       title="打开树" />
+                                                    </td>
+                                                </tr>
+                                                @foreach (var line in LinesOf(context.Id))
+                                                {
+                                                    <tr>
+                                                        <td>线路</td>
+                                                        <td style="white-space: nowrap; text-align: right;">
+                                                            @* 打开该空间的线路维护对话框（与空间维护 → 线路设置 同一入口） *@
+                                                            <MudIconButton Icon="@Icons.Material.Outlined.Route"
+                                                                           Color="Color.Success"
+                                                                           Size="Size.Small"
+                                                                           OnClick="@(async () => await OpenLinesAsync(context))"
+                                                                           title="线路" />
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </MudSimpleTable>
+                                    </td>
+                                </MudTr>
+                            }
+                        </ChildRowContent>
                     </MudTable>
                 }
             </MudTabPanel>
@@ -104,8 +154,12 @@
 
 @code {
     private IReadOnlyList<SpaceDto>? _spaces;
+    private IReadOnlyList<LineDto>? _lines;
     private bool _loading;
     private bool _initialized;
+
+    /// <summary>已展开二级列表的空间 Id。</summary>
+    private readonly HashSet<string> _expandedIds = [];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -132,6 +186,53 @@
         {
             _loading = false;
         }
+
+        // 二级列表的线路数据源：加载失败不阻断空间列表，仅线路行为空
+        try
+        {
+            _lines = await LineApi.GetAllAsync();
+        }
+        catch
+        {
+            _lines = [];
+        }
+    }
+
+    /// <summary>展开/收起该空间的二级列表（树 + 线路）。</summary>
+    private void ToggleExpand(string spaceId)
+    {
+        if (!_expandedIds.Remove(spaceId))
+            _expandedIds.Add(spaceId);
+    }
+
+    /// <summary>该空间下的线路（按 SpaceId 过滤；未加载到时为空）。</summary>
+    private IEnumerable<LineDto> LinesOf(string spaceId)
+        => _lines?.Where(l => l.SpaceId == spaceId) ?? [];
+
+    /// <summary>二级列表树行项目名称：空间类型对应的树标签（空间树/单位树/类型树/知识树）。</summary>
+    private static string TreeLabel(string? type)
+        => SpaceManagePanel.SpaceTypeOptions.FirstOrDefault(o => o.Value == type).Label
+           ?? "空间树";
+
+    /// <summary>打开该空间的线路维护对话框（LinesDialog，与空间维护 → 线路设置 同一入口）。</summary>
+    private async Task OpenLinesAsync(SpaceDto space)
+    {
+        var parameters = new DialogParameters<LinesDialog>
+        {
+            { x => x.SpaceId, space.Id },
+            { x => x.SpaceName, space.Name }
+        };
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true,
+            // Extensions 的遮罩点击在打开时按初始 options 注册，
+            // DialogSky 运行时 SetOptionsAsync 对其无效，必须在打开点显式关闭。
+            BackdropClick = false
+        };
+        await DialogService.ShowExAsync<LinesDialog>("线路", parameters, options);
     }
 
     /// <summary>
