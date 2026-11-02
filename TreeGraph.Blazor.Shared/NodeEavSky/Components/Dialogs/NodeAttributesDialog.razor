@@ -1,15 +1,44 @@
 @* NodeAttributesDialog.razor — 节点属性对话框：内嵌「属性定义」列表（EntityTypes，对话框模式）。
+   工具栏右侧提供「组合 / 表格 / 选项集」三个入口，分别打开对应管理对话框。
    入口：空间管理 → 空间列表 → 行展开二级列表 → 节点属性。 *@
 @namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
 
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Blazor.Shared.NodeEavSky.Pages.Metadata
+@using MudBlazor.Extensions.Options
+
+@inject IDialogService DialogService
 
 <DialogSky Title="节点属性"
            SubmitButtonVisible="false"
            CancelButtonVisible="true"
            CancelButtonText="关闭"
            OnCanceledClick="@Close">
+    <ToolBarRightContent>
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Warning"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Outlined.TableChart"
+                   OnClick="OpenCustomTablesAsync">
+            表格
+        </MudButton>
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Info"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Outlined.AccountTree"
+                   Class="ml-2"
+                   OnClick="OpenCompositeTypesAsync">
+            组合
+        </MudButton>
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Primary"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Outlined.FormatListBulleted"
+                   Class="ml-2"
+                   OnClick="OpenOptionSetsAsync">
+            选项集
+        </MudButton>
+    </ToolBarRightContent>
     <DialogContent>
         <EntityTypes IsDialogMode="true" />
     </DialogContent>
@@ -21,5 +50,33 @@
     private void Close()
     {
         MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    /// <summary>管理对话框通用打开参数：顶部居中、小尺寸、可最大化。</summary>
+    private static readonly DialogOptionsEx ManageOptions = new()
+    {
+        Position = DialogPosition.TopCenter,
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        MaximizeButton = true,
+        BackdropClick = false
+    };
+
+    private async Task OpenCompositeTypesAsync()
+    {
+        var dialog = await DialogService.ShowExAsync<CompositeTypeManageDialog>(string.Empty, ManageOptions);
+        await dialog.Result;
+    }
+
+    private async Task OpenCustomTablesAsync()
+    {
+        var dialog = await DialogService.ShowExAsync<CustomTableManageDialog>(string.Empty, ManageOptions);
+        await dialog.Result;
+    }
+
+    private async Task OpenOptionSetsAsync()
+    {
+        var dialog = await DialogService.ShowExAsync<OptionSetManageDialog>(string.Empty, ManageOptions);
+        await dialog.Result;
     }
 }

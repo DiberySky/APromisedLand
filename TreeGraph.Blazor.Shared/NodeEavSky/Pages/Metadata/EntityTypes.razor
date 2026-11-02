@@ -45,7 +45,7 @@ else
     <HeaderContent>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">排序</MudTh>
         <MudTh>名称</MudTh>
-        <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">属性定义</MudTh>
+        <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">属性</MudTh>
         <MudTh>说明</MudTh>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
             @if (IsDialogMode)
@@ -54,7 +54,7 @@ else
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="OpenCreateAsync"
-                               title="新建属性定义" />
+                               title="新建属性" />
             }
             else
             {
@@ -82,16 +82,16 @@ else
             @* 只显示 DisplayName（中文），不显示 et_xxx 内部标识 *@
             <MudText Typo="Typo.body1">@context.DisplayName</MudText>
         </MudTd>
-        <MudTd DataLabel="属性定义" Style="white-space: nowrap; text-align: center;">
+        <MudTd DataLabel="属性" Style="white-space: nowrap; text-align: center;">
             @* 图标入口：点击打开独立属性定义对话框并锁定该类型；
                属性数量以徽标叠加在图标右上角 *@
             <MudBadge Content="@context.AttributeCount" Color="Color.Info"
                       Overlap="true" Bordered="true" Max="99">
-                <MudIconButton Icon="@Icons.Material.Outlined.Settings"
+                <MudIconButton Icon="@Icons.Material.Outlined.Tune"
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenAttributesAsync(context))"
-                               title="管理属性定义" />
+                               title="管理属性" />
             </MudBadge>
         </MudTd>
         <MudTd DataLabel="说明">
@@ -133,7 +133,7 @@ else
                             var attrs = GetAttrs(context.EntityTypeId);
                             if (attrs.Count == 0)
                             {
-                                <MudAlert Severity="Severity.Info" Dense="true">该属性定义暂无属性</MudAlert>
+                                <MudAlert Severity="Severity.Info" Dense="true">该类型暂无属性</MudAlert>
                             }
                             else
                             {
@@ -188,8 +188,8 @@ else
         }
     </ChildRowContent>
     <NoRecordsContent>
-        <EmptyStateSky Icon="@Icons.Material.Outlined.Category"
-                       Title="暂无属性定义">
+        <EmptyStateSky Icon="@Icons.Material.Outlined.Tune"
+                       Title="暂无属性">
             <Description>
                 <text>点击右上角 + 创建第一个</text>
             </Description>
