@@ -639,6 +639,14 @@ public class EavApiClient
         => PostNoBodyAsync<GraphCategorySyncResultDto>(
             $"api/graph-sync/category/{Uri.EscapeDataString(category)}", ct);
 
+    /// <summary>
+    /// 按空间图同步（delete + insert）：DROP SPACE → 重建 schema → 全量装载该空间顶点/边写入 NebulaGraph。
+    /// </summary>
+    public Task<GraphCategorySyncResultDto?> SyncSpaceGraphAsync(
+        string spaceId, CancellationToken ct = default)
+        => PostNoBodyAsync<GraphCategorySyncResultDto>(
+            $"api/graph-sync/space/{Uri.EscapeDataString(spaceId)}", ct);
+
     // ============================================================
     // 通用助手
     // ============================================================

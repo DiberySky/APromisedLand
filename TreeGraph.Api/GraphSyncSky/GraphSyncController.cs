@@ -7,6 +7,7 @@ namespace TreeGraph.Api.GraphSyncSky;
 /// 图同步 API。
 /// 路由：POST /api/graph-sync/rebuild（全量重建）
 ///       POST /api/graph-sync/category/{category}（按类别幂等推送）
+///       POST /api/graph-sync/space/{spaceId}（按空间 delete + insert 同步）
 /// 响应信封由 NodeEavSky 全局 ApiEnvelopeFilter 统一包装。
 /// </summary>
 [ApiController]
@@ -63,6 +64,29 @@ public sealed class GraphSyncController : ControllerBase
         _logger.LogInformation(
             "手动图按类别同步：{Category} 顶点 {V}/{VT} 边 {E}/{ET} 错误 {Err}",
             cat, result.VerticesWritten, result.Vertices,
+            result.EdgesWritten, result.ParentEdges + result.LineEdges + result.SemanticEdges,
+            result.Errors.Count);
+
+        return Ok(new GraphCategorySyncResultDto(
+            result.Vertices, result.ParentEdges + result.LineEdges + result.SemanticEdges,
+            result.VerticesWritten, result.EdgesWritten, result.Errors));
+    }
+
+    /// <summary>
+    /// 按空间图同步（delete + insert）：DROP SPACE → 重建 schema → 全量装载该空间顶点/边写入 NebulaGraph。
+    /// 用于单空间数据漂移修复。
+    /// </summary>
+    [HttpPost("space/{spaceId}")]
+    public async Task<IActionResult> SyncSpace(string spaceId, CancellationToken ct)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var synchronizer = scope.ServiceProvider.GetRequiredService<GraphSynchronizer>();
+
+        var result = await synchronizer.SyncSpaceAsync(spaceId, ct);
+
+        _logger.LogInformation(
+            "手动图按空间同步：{SpaceId} 顶点 {V}/{VT} 边 {E}/{ET} 错误 {Err}",
+            spaceId, result.VerticesWritten, result.Vertices,
             result.EdgesWritten, result.ParentEdges + result.LineEdges + result.SemanticEdges,
             result.Errors.Count);
 

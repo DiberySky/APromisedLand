@@ -1,0 +1,134 @@
+@* SpaceGraphSyncDialog.razor — 单空间图同步对话框（delete + insert）
+   打开即自动执行：DROP SPACE → 重建 schema → 全量装载该空间顶点/边写入 NebulaGraph。
+   展示写入统计与错误批次；可重新同步。 *@
+
+@namespace TreeGraph.Blazor.Shared.SpaceSky.Dialogs
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@implements IDisposable
+@inject EavApiClient EavApi
+
+<DialogSky Title="@($"图同步 · {Space.Name}")"
+           CancelButtonVisible="true" CancelButtonText="关闭"
+           SubmitButtonVisible="true" SubmitButtonText="@_submitText"
+           SubmitButtonColor="Color.Info"
+           SubmitButtonDisabled="_running"
+           OnSubmitClick="@RunAsync">
+    <DialogContent>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+            按空间 delete + insert 同步：清空 NebulaGraph 中该空间并从 PostgreSQL 全量重建。
+        </MudText>
+
+        @if (_running)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Info" Class="mb-2" />
+            <MudText Typo="Typo.body2">正在同步「@Space.Name」…</MudText>
+        }
+        else if (_result is not null)
+        {
+            <MudSimpleTable Hover="false" Dense="true" Bordered="true">
+                <tbody>
+                    <tr>
+                        <td>顶点</td>
+                        <td>@_result.VerticesWritten / @_result.Vertices</td>
+                    </tr>
+                    <tr>
+                        <td>关系</td>
+                        <td>@_result.EdgesWritten / @_result.Edges</td>
+                    </tr>
+                    <tr>
+                        <td>错误批次</td>
+                        <td Class="@(_result.Errors.Count > 0 ? "mud-error-text" : "mud-success-text")">
+                            @_result.Errors.Count
+                        </td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+
+            @if (_result.Errors.Count > 0)
+            {
+                <MudExpansionPanels Class="mt-2" Elevation="0">
+                    <MudExpansionPanel Text="@($"错误详情（{_result.Errors.Count}）")" Dense="true">
+                        <MudList T="string" Dense="true" Class="pa-1" Style="max-height:200px; overflow-y:auto;">
+                            @foreach (var err in _result.Errors)
+                            {
+                                <MudListItem T="string">
+                                    <MudText Typo="Typo.caption" Color="Color.Error">@err</MudText>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+        }
+        else if (_error is not null)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Error">@_error</MudText>
+        }
+    </DialogContent>
+</DialogSky>
+
+@code {
+    /// <summary>目标空间。</summary>
+    [Parameter, EditorRequired] public SpaceDto Space { get; set; } = null!;
+
+    private bool _running;
+    private bool _disposed;
+    private string _submitText = "重新同步";
+    private GraphCategorySyncResultDto? _result;
+    private string? _error;
+    private CancellationTokenSource _cts = new();
+
+    /// <summary>每次打开都重新执行（对话框组件实例可能被宿主复用）。</summary>
+    protected override async Task OnParametersSetAsync() => await RunAsync();
+
+    private async Task RunAsync()
+    {
+        if (_running) return;
+        _running = true;
+        _submitText = "同步中…";
+        _result = null;
+        _error = null;
+        _cts.Dispose();
+        _cts = new();
+        SafeRefresh();
+        try
+        {
+            var result = await EavApi.SyncSpaceGraphAsync(Space.Id, _cts.Token);
+            if (result is null)
+            {
+                _error = "接口未返回结果";
+            }
+            else
+            {
+                _result = result;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 关闭对话框取消
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _running = false;
+            _submitText = "重新同步";
+            SafeRefresh();
+        }
+    }
+
+    private void SafeRefresh()
+    {
+        if (!_disposed) StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        try { _cts.Cancel(); _cts.Dispose(); } catch { /* 关闭竞态容错 */ }
+    }
+}

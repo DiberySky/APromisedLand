@@ -399,6 +399,43 @@ public sealed class GraphSynchronizer
         }, category.ToString(), ct);
     }
 
+    /// <summary>
+    /// 按空间图同步（delete + insert 语义）：DROP SPACE → 重建该空间 schema →
+    /// 从 PG 全量装载该空间的顶点/边批量写入 NebulaGraph。
+    /// 用于单空间数据漂移修复。
+    /// </summary>
+    public async Task<GraphRebuildResult> SyncSpaceAsync(string spaceId, CancellationToken ct)
+    {
+        var space = GraphNaming.ToNebulaSpace(spaceId);
+        await _client.QueryAsync($"DROP SPACE IF EXISTS `{space}`", ct);
+        await _schemaInitializer.EnsureSpaceSchemaAsync(spaceId, ct);
+
+        var ctx = await LoadGraphContextAsync(ct);
+        var batch = BuildSpaceBatch(ctx, spaceId,
+            includeSpaceTree: true, includeTrees: true, includeFreeNodes: true,
+            includeLines: true, includeSemantic: true);
+
+        var errors = new List<string>();
+        if (batch.Vertices.Count == 0 && batch.Edges.Count == 0)
+        {
+            _logger.LogInformation("图按空间同步：{SpaceId} 无顶点/边需写入", spaceId);
+            return new GraphRebuildResult(0, 0, 0, 0, 0, 0, errors);
+        }
+
+        var result = await BulkWithSchemaRetryAsync(space, batch.Vertices, batch.Edges, ct);
+        CollectErrors(result, errors);
+
+        _logger.LogInformation(
+            "图按空间同步：{SpaceId} 顶点 {V}/{VT}，边 {E}/{ET}，错误批次 {Err}",
+            spaceId, result.VerticesSuccess, batch.Vertices.Count,
+            result.EdgesSuccess, batch.ParentEdges + batch.LineEdges + batch.SemanticEdges,
+            errors.Count);
+
+        return new GraphRebuildResult(
+            batch.Vertices.Count, batch.ParentEdges, batch.LineEdges, batch.SemanticEdges,
+            result.VerticesSuccess, result.EdgesSuccess, errors);
+    }
+
     /// <summary>逐空间构建批次并 bulk 写入，聚合统计（不 DROP，schema 由启动对齐/重建保证）。</summary>
     private async Task<GraphRebuildResult> SyncSpacesAsync(
         IReadOnlyList<string> spaceIds,

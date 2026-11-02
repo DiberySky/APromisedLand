@@ -22,14 +22,7 @@ else
             <MudTh>名称</MudTh>
             <MudTh>类型</MudTh>
             <MudTh>描述</MudTh>
-            <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">同步刷新</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
-                @* 同步刷新：分步列出 space/tree/line/edge 同步到 向量/图 的过程进度 *@
-                <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
-                               Color="Color.Info"
-                               Size="Size.Small"
-                               OnClick="OpenSyncRefreshAsync"
-                               title="同步刷新" />
                 <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                Color="Color.Success"
                                Size="Size.Small"
@@ -41,14 +34,6 @@ else
             <MudTd>@context.Name</MudTd>
             <MudTd>@SpaceTypeLabel(context.Type)</MudTd>
             <MudTd>@context.Description</MudTd>
-            <MudTd Style="white-space: nowrap; text-align: center;">
-                @* 向量刷新：打开对话框可视化该空间范围的向量对账进度（补缺 + 删孤） *@
-                <MudIconButton Icon="@Icons.Material.Outlined.Sync"
-                               Color="Color.Info"
-                               Size="Size.Small"
-                               OnClick="@(async () => await OpenVectorRefreshAsync(context))"
-                               title="向量刷新" />
-            </MudTd>
             <MudTd Style="white-space: nowrap; text-align: right;">
                 <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                Color="Color.Error"
@@ -71,8 +56,8 @@ else
             @if (IsExpanded(context.Id))
             {
                 <MudTr>
-                    <td colspan="5" style="padding: 0 32px; background-color: #000;">
-                        @* 二级列表：线路 + 关系（与空间管理「空间」列表二级列表风格对齐） *@
+                    <td colspan="4" style="padding: 0 32px; background-color: #000;">
+                        @* 二级列表：线路 + 关系 + 语义刷新（与空间管理「空间」列表二级列表风格对齐） *@
                         <MudSimpleTable Dense="true" Hover="true"
                                         Style="background-color: #000;">
                             <tbody>
@@ -88,14 +73,36 @@ else
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td>关系</td>
+                                    <td>节点关系</td>
                                     <td style="white-space: nowrap; text-align: right;">
                                         @* 打开该空间的边类型维护对话框（EdgeType 为图空间级资源） *@
                                         <MudIconButton Icon="@Icons.Material.Outlined.Share"
                                                        Color="Color.Warning"
                                                        Size="Size.Small"
                                                        OnClick="@(async () => await OpenEdgeTypesAsync(context))"
-                                                       title="关系" />
+                                                       title="节点关系" />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>语义刷新</td>
+                                    <td style="white-space: nowrap; text-align: right;">
+                                        @* 该空间范围的向量对账进度（补缺 + 删孤） *@
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Sync"
+                                                       Color="Color.Info"
+                                                       Size="Size.Small"
+                                                       OnClick="@(async () => await OpenVectorRefreshAsync(context))"
+                                                       title="语义刷新" />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>图同步</td>
+                                    <td style="white-space: nowrap; text-align: right;">
+                                        @* 按空间 delete + insert 同步：清空 NebulaGraph 该空间并从 PG 全量重建 *@
+                                        <MudIconButton Icon="@Icons.Material.Outlined.SwapHoriz"
+                                                       Color="Color.Error"
+                                                       Size="Size.Small"
+                                                       OnClick="@(async () => await OpenSpaceGraphSyncAsync(context))"
+                                                       title="图同步" />
                                     </td>
                                 </tr>
                             </tbody>
@@ -245,9 +252,15 @@ else
             "向量刷新", parameters, options);
     }
 
-    /// <summary>打开同步刷新对话框：分步列出 space/tree/line/edge 同步到 向量/图 的过程进度。</summary>
-    private async Task OpenSyncRefreshAsync()
+    /// <summary>
+    /// 打开图同步对话框：按空间 delete + insert 同步（DROP SPACE → 重建 schema → 全量装载写入 NebulaGraph）。
+    /// </summary>
+    private async Task OpenSpaceGraphSyncAsync(SpaceDto space)
     {
+        var parameters = new DialogParameters<SpaceGraphSyncDialog>
+        {
+            { x => x.Space, space }
+        };
         var options = new DialogOptionsEx
         {
             Position = DialogPosition.TopCenter,
@@ -256,8 +269,8 @@ else
             MaximizeButton = true,
             BackdropClick = false
         };
-        await DialogService.ShowExAsync<SyncRefreshDialog>(
-            "同步刷新", new DialogParameters<SyncRefreshDialog>(), options);
+        await DialogService.ShowExAsync<SpaceGraphSyncDialog>(
+            $"图同步 · {space.Name}", parameters, options);
     }
 
     private async Task OpenCreateAsync()
