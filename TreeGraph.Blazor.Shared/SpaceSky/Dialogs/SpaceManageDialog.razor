@@ -1,10 +1,11 @@
 @* SpaceManageDialog.razor — 空间维护对话框（内嵌 SpaceManagePanel 完整功能：CRUD + 关系/线路/同步）。
-   工具栏右侧提供「节点属性」入口，打开全局节点属性对话框。 *@
+   工具栏右侧提供「同步刷新」「节点属性」入口。 *@
 @namespace TreeGraph.Blazor.Shared.SpaceSky.Dialogs
 
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Blazor.Shared.SpaceSky.Components
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
+@using MudBlazor.Extensions
 
 @inject IDialogService DialogService
 
@@ -15,7 +16,14 @@
            OnCanceledClick="@Close">
     <ToolBarRightContent>
         <MudButton Variant="Variant.Text"
-                   Color="Color.Success"
+                   Color="Color.Info"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Outlined.SwapHoriz"
+                   OnClick="OpenSyncRefreshAsync">
+            图同步
+        </MudButton>
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Primary"
                    Size="Size.Small"
                    StartIcon="@Icons.Material.Outlined.Tune"
                    OnClick="OpenNodeAttributesAsync">
@@ -33,6 +41,21 @@
     private void Close()
     {
         MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    /// <summary>打开同步刷新对话框：分步列出 space/tree/line/edge 同步到 向量/图 的过程进度。</summary>
+    private async Task OpenSyncRefreshAsync()
+    {
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+        await DialogService.ShowExAsync<SyncRefreshDialog>(
+            "同步刷新", new DialogParameters<SyncRefreshDialog>(), options);
     }
 
     /// <summary>打开节点属性对话框（全屏，内嵌属性定义列表 + 组合/表格/选项集入口）。</summary>

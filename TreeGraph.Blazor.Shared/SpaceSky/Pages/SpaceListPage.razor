@@ -1,4 +1,4 @@
-@* SpaceListPage.razor — 空间管理页（Tab 集成）：「空间」只读列表（行展开二级列表：树 + 线路）+「空间维护」CRUD 面板。 *@
+@* SpaceListPage.razor — 空间管理页：空间只读列表（行展开二级列表：树 + 线路），空间维护/节点属性走对话框入口。 *@
 @page "/spaces"
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Blazor.Shared.SpaceSky
@@ -28,46 +28,30 @@
 
 <PageTitle>空间管理</PageTitle>
 
-@* 选项卡图标缩至 12px（scoped 类限定本页，不影响全局 MudTabs） *@
-<style>
-    .spaces-tabs .mud-tab .mud-icon-root {
-        font-size: 12px;
-        width: 12px;
-        height: 12px;
-    }
-
-    /* 仅内嵌 tabs（节点属性 → 属性定义）：选中 tab 的文字用 Info 色 */
-    .spaces-tabs .spaces-tabs .mud-tab.mud-tab-active {
-        color: var(--mud-palette-info) !important;
-    }
-</style>
-
 <PageSky Title="空间管理" ArrowBackVisible="false">
     <PageContent>
-        <MudTabs Elevation="0" ApplyEffectsToContainer="true" Class="spaces-tabs">
-            <MudTabPanel Text="空间" Icon="@Icons.Material.Outlined.Workspaces">
-                @if (_loading)
-                {
-                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-                }
-                else if (_spaces is null || _spaces.Count == 0)
-                {
-                    <EmptyStateSky Icon="@Icons.Material.Outlined.Workspaces"
-                                   Title="暂无空间">
-                        <Description>
-                            <text>切换到"空间维护"创建第一个</text>
-                        </Description>
-                    </EmptyStateSky>
-                }
-                else
-                {
-                    <MudTable Items="_spaces" Hover="true">
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_spaces is null || _spaces.Count == 0)
+        {
+            <EmptyStateSky Icon="@Icons.Material.Outlined.Workspaces"
+                           Title="暂无空间">
+                <Description>
+                    <text>点击右上角编辑图标维护空间</text>
+                </Description>
+            </EmptyStateSky>
+        }
+        else
+        {
+            <MudTable Items="_spaces" Hover="true">
                         <HeaderContent>
                             <MudTh>名称</MudTh>
                             <MudTh>描述</MudTh>
                             <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
                                 <MudIconButton Icon="@Icons.Material.Outlined.EditNote"
-                                               Color="Color.Primary"
+                                               Color="Color.Success"
                                                Size="Size.Small"
                                                OnClick="@OpenSpaceManageAsync"
                                                title="空间维护" />
@@ -128,30 +112,7 @@
                             }
                         </ChildRowContent>
                     </MudTable>
-                }
-            </MudTabPanel>
-            <MudTabPanel Text="空间维护" Icon="@Icons.Material.Outlined.Settings">
-                <SpaceManagePanel OnChanged="LoadAsync" />
-            </MudTabPanel>
-            @* 节点属性：内嵌属性定义管理（IsDialogMode 隐藏页头，工具栏置于内容顶部）。
-               线路/关系已改为 per-space 入口（空间维护 → 线路设置/关系设置），不再保留全局 tab *@
-            <MudTabPanel Text="节点属性" Icon="@Icons.Material.Outlined.Tune">
-                <MudTabs Elevation="0" ApplyEffectsToContainer="true" Class="spaces-tabs mt-2">
-                    <MudTabPanel Text="属性定义" Icon="@Icons.Material.Outlined.Tune">
-                        <EntityTypes IsDialogMode="true" />
-                    </MudTabPanel>
-                    <MudTabPanel Text="组合定义" Icon="@Icons.Material.Outlined.AccountTree">
-                        <CompositeTypes IsDialogMode="true" />
-                    </MudTabPanel>
-                    <MudTabPanel Text="表格定义" Icon="@Icons.Material.Outlined.TableChart">
-                        <CustomTables IsDialogMode="true" />
-                    </MudTabPanel>
-                    <MudTabPanel Text="选项集定义" Icon="@Icons.Material.Outlined.Checklist">
-                        <OptionSets IsDialogMode="true" />
-                    </MudTabPanel>
-                </MudTabs>
-            </MudTabPanel>
-        </MudTabs>
+        }
     </PageContent>
 </PageSky>
 
