@@ -17,14 +17,10 @@ else
 {
     @* 表格始终渲染：空态走 NoRecordsContent（EmptyStateSky，与 EntityTypes 对齐），
        表头操作列的新建 + 按钮在空态时同样可用 *@
-    @* 表格底色纯黑，与一级「空间」列表一致 *@
-    <MudTable Items="_spaces ?? (IReadOnlyList<SpaceDto>)[]" Hover="true" Bordered="true" Dense="true"
-              Style="background-color: #000;">
+    <MudTable Items="_spaces ?? (IReadOnlyList<SpaceDto>)[]" Hover="true" Bordered="true" Dense="true">
         <HeaderContent>
             <MudTh>名称</MudTh>
             <MudTh>类型</MudTh>
-            <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">关系设置</MudTh>
-            <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">线路设置</MudTh>
             <MudTh>描述</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">同步刷新</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
@@ -44,22 +40,6 @@ else
         <RowTemplate>
             <MudTd>@context.Name</MudTd>
             <MudTd>@SpaceTypeLabel(context.Type)</MudTd>
-            <MudTd DataLabel="关系设置" Style="white-space: nowrap; text-align: center;">
-                @* 关系图标：打开该空间的边类型维护对话框（EdgeType 为图空间级资源） *@
-                <MudIconButton Icon="@Icons.Material.Outlined.Hub"
-                               Color="Color.Warning"
-                               Size="Size.Small"
-                               OnClick="@(async () => await OpenEdgeTypesAsync(context))"
-                               title="关系设置" />
-            </MudTd>
-            <MudTd DataLabel="线路设置" Style="white-space: nowrap; text-align: center;">
-                @* 线路设置：line 统一使用 Route 图标（打开该空间的线路维护对话框，Line 为图空间级资源） *@
-                <MudIconButton Icon="@Icons.Material.Outlined.Route"
-                               Color="Color.Tertiary"
-                               Size="Size.Small"
-                               OnClick="@(async () => await OpenLinesAsync(context))"
-                               title="线路设置" />
-            </MudTd>
             <MudTd>@context.Description</MudTd>
             <MudTd Style="white-space: nowrap; text-align: center;">
                 @* 向量刷新：打开对话框可视化该空间范围的向量对账进度（补缺 + 删孤） *@
@@ -80,8 +60,50 @@ else
                                Size="Size.Small"
                                OnClick="@(async () => await OpenEditAsync(context))"
                                title="编辑空间" />
+                <MudIconButton Icon="@(IsExpanded(context.Id) ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)"
+                               Color="Color.Info"
+                               Size="Size.Small"
+                               OnClick="@(() => ToggleExpand(context.Id))"
+                               title="线路/关系" />
             </MudTd>
         </RowTemplate>
+        <ChildRowContent>
+            @if (IsExpanded(context.Id))
+            {
+                <MudTr>
+                    <td colspan="5" style="padding: 0 32px; background-color: #000;">
+                        @* 二级列表：线路 + 关系（与空间管理「空间」列表二级列表风格对齐） *@
+                        <MudSimpleTable Dense="true" Hover="true"
+                                        Style="background-color: #000;">
+                            <tbody>
+                                <tr>
+                                    <td>线路</td>
+                                    <td style="white-space: nowrap; text-align: right;">
+                                        @* 打开该空间的线路维护对话框（Line 为图空间级资源） *@
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Route"
+                                                       Color="Color.Success"
+                                                       Size="Size.Small"
+                                                       OnClick="@(async () => await OpenLinesAsync(context))"
+                                                       title="线路" />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>关系</td>
+                                    <td style="white-space: nowrap; text-align: right;">
+                                        @* 打开该空间的边类型维护对话框（EdgeType 为图空间级资源） *@
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Share"
+                                                       Color="Color.Warning"
+                                                       Size="Size.Small"
+                                                       OnClick="@(async () => await OpenEdgeTypesAsync(context))"
+                                                       title="关系" />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </MudSimpleTable>
+                    </td>
+                </MudTr>
+            }
+        </ChildRowContent>
         <NoRecordsContent>
             <EmptyStateSky Icon="@Icons.Material.Outlined.Workspaces"
                            Title="暂无空间">
@@ -113,6 +135,17 @@ else
     private IReadOnlyList<SpaceDto>? _spaces;
     private bool _loading;
     private bool _initialized;
+
+    /// <summary>已展开二级列表的空间 ID。</summary>
+    private readonly HashSet<string> _expandedIds = new();
+
+    private bool IsExpanded(string id) => _expandedIds.Contains(id);
+
+    private void ToggleExpand(string id)
+    {
+        if (!_expandedIds.Add(id))
+            _expandedIds.Remove(id);
+    }
 
     /// <summary>CRUD 子对话框选项（与 OptionSets 页面一致：小宽度全宽）。</summary>
     private static readonly DialogOptions DialogOptions = new()

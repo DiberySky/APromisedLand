@@ -1,0 +1,45 @@
+@* SpaceManageDialog.razor — 空间维护对话框（内嵌 SpaceManagePanel 完整功能：CRUD + 关系/线路/同步）。
+   工具栏右侧提供「节点属性」入口，打开全局节点属性对话框。 *@
+@namespace TreeGraph.Blazor.Shared.SpaceSky.Dialogs
+
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.SpaceSky.Components
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
+
+@inject IDialogService DialogService
+
+<DialogSky Title="空间维护"
+           SubmitButtonVisible="false"
+           CancelButtonVisible="true"
+           CancelButtonText="关闭"
+           OnCanceledClick="@Close">
+    <ToolBarRightContent>
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Success"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Outlined.Tune"
+                   OnClick="OpenNodeAttributesAsync">
+            节点属性
+        </MudButton>
+    </ToolBarRightContent>
+    <DialogContent>
+        <SpaceManagePanel />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    /// <summary>打开节点属性对话框（全屏，内嵌属性定义列表 + 组合/表格/选项集入口）。</summary>
+    private async Task OpenNodeAttributesAsync()
+    {
+        var dialog = await DialogService.ShowExAsync<NodeAttributesDialog>(
+            "节点属性", DialogOptionsSky.FullScreen());
+        await dialog.Result;
+    }
+}
