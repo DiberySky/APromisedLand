@@ -7,7 +7,9 @@
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky.Services
+@using TreeGraph.Blazor.Shared.EdgeSky.Dialogs
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
 @using TreeGraph.Blazor.Shared.NodeEavSky.Pages.Metadata
 @using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Space
 @using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Unit
@@ -62,7 +64,14 @@
                         <HeaderContent>
                             <MudTh>名称</MudTh>
                             <MudTh>描述</MudTh>
-                            <MudTh Style="width: 80px;">操作</MudTh>
+                            <MudTh Style="width: 1%; white-space: nowrap;">
+                                <span style="cursor: pointer;" @onclick="@OpenNodeAttributesAsync">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Category"
+                                             Color="Color.Success"
+                                             Size="Size.Small"
+                                             Class="mr-1" />节点属性
+                                </span>
+                            </MudTh>
                         </HeaderContent>
                         <RowTemplate>
                             <MudTd>@context.Name</MudTd>
@@ -82,10 +91,10 @@
                             @if (_expandedIds.Contains(context.Id))
                             {
                                 <MudTr>
-                                    <td colspan="3" style="padding: 0; background-color: #000;">
+                                    <td colspan="3" style="padding: 0 32px; background-color: #000;">
                                         @* 二级列表：两列（项目名称/操作）；操作列用类型图标（树=AccountTree，线路=Route） *@
                                         <MudSimpleTable Dense="true" Hover="true"
-                                                        Style="background-color: #000; width: 320px; margin-left: auto; margin-right: 64px;">
+                                                        Style="background-color: #000;">
                                             <thead>
                                                 <tr>
                                                     <th>项目</th>
@@ -118,6 +127,28 @@
                                                         </td>
                                                     </tr>
                                                 }
+                                                <tr>
+                                                    <td>关系</td>
+                                                    <td style="white-space: nowrap; text-align: right;">
+                                                        @* 打开该空间的边类型（关系）维护对话框 *@
+                                                        <MudIconButton Icon="@Icons.Material.Outlined.Share"
+                                                                       Color="Color.Warning"
+                                                                       Size="Size.Small"
+                                                                       OnClick="@(async () => await OpenEdgeTypesAsync(context))"
+                                                                       title="关系" />
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>节点属性</td>
+                                                    <td style="white-space: nowrap; text-align: right;">
+                                                        @* 打开节点属性对话框（内嵌属性定义列表） *@
+                                                        <MudIconButton Icon="@Icons.Material.Outlined.Category"
+                                                                       Color="Color.Secondary"
+                                                                       Size="Size.Small"
+                                                                       OnClick="@(async () => await OpenNodeAttributesAsync())"
+                                                                       title="节点属性" />
+                                                    </td>
+                                                </tr>
                                             </tbody>
                                         </MudSimpleTable>
                                     </td>
@@ -234,6 +265,30 @@
         };
         await DialogService.ShowExAsync<LinesDialog>("线路", parameters, options);
     }
+
+    /// <summary>打开该空间的边类型（关系）维护对话框。</summary>
+    private async Task OpenEdgeTypesAsync(SpaceDto space)
+    {
+        var parameters = new DialogParameters<EdgeTypesDialog>
+        {
+            { x => x.SpaceId, space.Id },
+            { x => x.SpaceName, space.Name }
+        };
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+        await DialogService.ShowExAsync<EdgeTypesDialog>(string.Empty, parameters, options);
+    }
+
+    /// <summary>打开节点属性对话框（内嵌属性定义列表），全屏展示。</summary>
+    private Task OpenNodeAttributesAsync()
+        => DialogService.ShowExAsync<NodeAttributesDialog>(
+            "节点属性", DialogOptionsSky.FullScreen());
 
     /// <summary>
     /// 根据空间类型打开对应树：

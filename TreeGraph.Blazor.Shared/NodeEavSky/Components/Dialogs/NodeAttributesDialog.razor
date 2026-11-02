@@ -1,0 +1,25 @@
+@* NodeAttributesDialog.razor — 节点属性对话框：内嵌「属性定义」列表（EntityTypes，对话框模式）。
+   入口：空间管理 → 空间列表 → 行展开二级列表 → 节点属性。 *@
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
+
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.NodeEavSky.Pages.Metadata
+
+<DialogSky Title="节点属性"
+           SubmitButtonVisible="false"
+           CancelButtonVisible="true"
+           CancelButtonText="关闭"
+           OnCanceledClick="@Close">
+    <DialogContent>
+        <EntityTypes IsDialogMode="true" />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+}
