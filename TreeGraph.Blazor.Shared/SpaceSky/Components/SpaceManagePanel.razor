@@ -8,6 +8,13 @@
 @inject IDialogService DialogService
 @using TreeGraph.Blazor.Shared.EdgeSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky.Dialogs
+@using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Space
+@using TreeGraph.Blazor.Shared.TreeEavSky.Services
+@using TreeGraph.Blazor.Shared.TreeEavSky.Dialogs
+@using TreeGraph.Shared.TreeEavSky.Entities
+@using TreeGraph.Shared.TreeEavSky.Models
+@inject TreeApiClient<SpaceTree> TreeApi
+@inject BlazorService BlazorService
 
 @if (_loading)
 {
@@ -57,10 +64,21 @@ else
             {
                 <MudTr>
                     <td colspan="4" style="padding: 0 32px; background-color: #000;">
-                        @* 二级列表：线路 + 关系 + 语义刷新（与空间管理「空间」列表二级列表风格对齐） *@
+                        @* 二级列表：树 + 线路 + 关系 + 语义刷新 + 图同步（与空间管理「空间」列表二级列表风格对齐） *@
                         <MudSimpleTable Dense="true" Hover="true"
                                         Style="background-color: #000;">
                             <tbody>
+                                <tr>
+                                    <td>@SpaceTypeLabel(context.Type)</td>
+                                    <td style="white-space: nowrap; text-align: right;">
+                                        @* 打开该空间对应的树（类型 → 对应整棵树；动态 → 空间树 RootId = Space.Id） *@
+                                        <MudIconButton Icon="@Icons.Material.Outlined.AccountTree"
+                                                       Color="Color.Info"
+                                                       Size="Size.Small"
+                                                       OnClick="@(async () => await OpenTreeAsync(context))"
+                                                       title="打开树" />
+                                    </td>
+                                </tr>
                                 <tr>
                                     <td>线路</td>
                                     <td style="white-space: nowrap; text-align: right;">
@@ -135,6 +153,86 @@ else
     private static string SpaceTypeLabel(string? type)
         => SpaceTypeOptions.FirstOrDefault(o => o.Value == type).Label
            ?? type ?? "空间树";
+
+    /// <summary>
+    /// 根据空间类型打开对应树：
+    /// - Type = Unit → 打开单位树（整棵树，不使用空间 Id）
+    /// - Type = Type → 打开分类树（整棵树，不使用空间 Id）
+    /// - Type = Knowledge → 打开知识树（整棵树，不使用空间 Id）
+    /// - 其他（Dynamic）→ 打开空间树（RootId = Space.Id）
+    /// </summary>
+    private async Task OpenTreeAsync(SpaceDto space)
+    {
+        switch (space.Type)
+        {
+            case "Unit":
+                await BlazorService.ShowUnitTreeDialogPageAsync();
+                break;
+
+            case "Type":
+                await BlazorService.ShowCategoryTreeDialogPageAsync();
+                break;
+
+            case "Knowledge":
+                await BlazorService.ShowKnowledgeTreeDialogPageAsync();
+                break;
+
+            default:
+                await OpenSpaceTreeAsync(space);
+                break;
+        }
+    }
+
+    /// <summary>打开该空间对应的空间树对话框（RootId = Space.Id）。打开前自检：根节点不存在则补建。</summary>
+    private async Task OpenSpaceTreeAsync(SpaceDto space)
+    {
+        try
+        {
+            var root = await TreeApi.GetFullTreeAsync(space.Id);
+            if (root is null)
+            {
+                var entity = new SpaceTree
+                {
+                    Id = space.Id,
+                    Name = space.Name,
+                    Description = space.Description ?? "",
+                    ParentId = null,
+                    CanHaveChildren = true,
+                    SortOrder = 0,
+                    HasChildren = false
+                };
+                await TreeApi.CreateNodeAsync(new TreeNodeDto<SpaceTree>
+                {
+                    Id = entity.Id,
+                    Text = entity.Name,
+                    ParentId = null,
+                    Value = entity
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"空间树检查失败：{ex.Message}", Severity.Error);
+            return;
+        }
+
+        var parameters = new DialogParameters<SpaceTreeDialogPage>
+        {
+            { x => x.RootId, space.Id },
+            { x => x.Title, $"空间树：{space.Name}" }
+        };
+        var options = new DialogOptionsEx
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            Position = DialogPosition.TopCenter,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+
+        await DialogService.ShowExAsync<SpaceTreeDialogPage>(
+            string.Empty, parameters, options);
+    }
 
     /// <summary>CRUD 变更后触发（供宿主刷新自身列表）。</summary>
     [Parameter] public EventCallback OnChanged { get; set; }
