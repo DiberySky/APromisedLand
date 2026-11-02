@@ -374,7 +374,7 @@
     {
         var dialog = await DialogService.ShowAsync<CustomTableManageDialog>(
             string.Empty,
-            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true });
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true, Position = DialogPosition.TopCenter });
         await dialog.Result;
         _customTables = await Api.ListCustomTablesAsync() ?? new List<CustomTableDetailDto>();
 

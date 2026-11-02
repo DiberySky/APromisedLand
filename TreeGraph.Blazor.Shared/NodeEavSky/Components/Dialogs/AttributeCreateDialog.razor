@@ -269,7 +269,7 @@
     {
         var dialog = await DialogService.ShowAsync<CustomTableManageDialog>(
             string.Empty,
-            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true });
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true, Position = DialogPosition.TopCenter });
         await dialog.Result;
 
         // 管理对话框内可能增删表/列，无论结果如何都刷新本地列表
