@@ -322,7 +322,7 @@ public class NodeEavDialogSmokeTests : BunitTestBase
                 { x => x.IsBoot, false },
             });
 
-        AssertDialog(provider, "节点操作");
+        AssertDialog(provider, "节点内容");
         var html = provider.Find(".mud-dialog").InnerHtml;
         Assert.Contains("测试单位", html);
         Assert.Contains("上级单位", html);

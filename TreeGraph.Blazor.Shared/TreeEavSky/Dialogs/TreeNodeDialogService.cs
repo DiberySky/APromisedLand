@@ -76,7 +76,7 @@ public class TreeNodeDialogService<TItem>(
             MaxWidth = MaxWidth.Small,
         }).ToDialogOptions();
 
-        var dialog = await dialogService.ShowExAsync<TreeNodeActionsDialog<TItem>>("节点操作", parameters, options);
+        var dialog = await dialogService.ShowExAsync<TreeNodeActionsDialog<TItem>>("节点内容", parameters, options);
 
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not NodeActionResult<TItem> actionResult)

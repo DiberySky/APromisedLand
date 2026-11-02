@@ -86,7 +86,7 @@ public class LineNodeActionsDialogSmokeTests : BunitTestBase
     {
         var provider = Render<MudDialogProvider>();
         var ds = Services.GetRequiredService<IDialogService>();
-        var reference = await ds.ShowAsync<LineNodeActionsDialog>("节点操作",
+        var reference = await ds.ShowAsync<LineNodeActionsDialog>("节点内容",
             new DialogParameters
             {
                 { nameof(LineNodeActionsDialog.Node), TestNode },
@@ -124,7 +124,7 @@ public class LineNodeActionsDialogSmokeTests : BunitTestBase
         var (provider, _) = await OpenAsync(showLineManage: true);
 
         var html = provider.Find(".mud-dialog").InnerHtml;
-        Assert.Contains("节点操作", html);
+        Assert.Contains("节点内容", html);
         Assert.Contains("测试线路", html);
         Assert.Contains("牵引所A", html);
         Assert.Contains("测试节点", html);

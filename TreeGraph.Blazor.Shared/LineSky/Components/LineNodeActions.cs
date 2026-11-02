@@ -83,7 +83,7 @@ public static class LineNodeActions
                 { x => x.ShowLineManage, showLineManage }
             };
             var dialog = await dialogService.ShowExAsync<LineNodeActionsDialog>(
-                "节点操作", parameters, NestedOptions);
+                "节点内容", parameters, NestedOptions);
             var result = await dialog.Result;
 
             if (result is not { Canceled: false } || result.Data is not LineNodeHostAction action)
