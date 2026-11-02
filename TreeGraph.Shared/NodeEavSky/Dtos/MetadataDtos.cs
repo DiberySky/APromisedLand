@@ -44,7 +44,6 @@ public class CreateCompositeFieldRequest
     public string FieldName { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string DataType { get; set; } = "string";
-    public string? RefCompositeTypeId { get; set; }
     public string? UnitId { get; set; }
     public string? RefOptionSetId { get; set; }
     public bool IsArray { get; set; }
@@ -75,7 +74,6 @@ public class CreateTableColumnRequest
     public string ColumnName { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string DataType { get; set; } = "string";
-    public string? RefCompositeTypeId { get; set; }
     public bool IsRequired { get; set; }
     public bool IsSearchable { get; set; }
     public bool IsSortable { get; set; }

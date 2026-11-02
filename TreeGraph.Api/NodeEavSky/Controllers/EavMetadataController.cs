@@ -64,23 +64,11 @@ public class EavMetadataController : ControllerBase
                 error = $"实体类型不存在: {req.EntityType}。请先在「实体类型管理」中创建"
             });
 
-        // ---- 引用互斥 ----
-        var refCount = new[] {
-            req.RefCompositeTypeId, req.RefTableDefinitionId, req.RefOptionSetId
-        }.Count(x => x is not null);
-        if (refCount > 1)
-            return BadRequest(new { error = "组合类型 / 自定义表 / 选项集引用互斥" });
-
-        // ---- 类型与引用匹配 ----
-        if (req.DataType == EavDataTypes.Composite && req.RefCompositeTypeId is null)
-            return BadRequest(new { error = "composite 必须指定 refCompositeTypeId" });
-        if (req.DataType == EavDataTypes.Table && req.RefTableDefinitionId is null)
-            return BadRequest(new { error = "table 必须指定 refTableDefinitionId" });
-        if (req.DataType == EavDataTypes.SingleChoice && req.RefOptionSetId is null)
-            return BadRequest(new { error = "single_choice 必须指定 refOptionSetId" });
-        if (req.DataType is not (EavDataTypes.Composite or EavDataTypes.Table
-            or EavDataTypes.SingleChoice) && refCount > 0)
-            return BadRequest(new { error = "当前 dataType 不支持引用" });
+        // ---- 类型与引用匹配（目录驱动：含宿主白名单 / 引用必需 / 引用互斥） ----
+        if (ValidateDataTypeAndRefs(req.DataType, EavHost.TopLevel,
+                req.RefCompositeTypeId, req.RefTableDefinitionId, req.RefOptionSetId)
+            is { } typeError)
+            return typeError;
 
         // ---- 引用存在性 ----
         if (req.UnitId is { } uid
@@ -301,21 +289,10 @@ public class EavMetadataController : ControllerBase
                 });
         }
 
-        // ★ 类型与引用匹配
-        if (req.DataType == EavDataTypes.Composite)
-        {
-            if (req.RefCompositeTypeId is not string rid)
-                return BadRequest(new { error = "composite 类型必须指定 refCompositeTypeId" });
-
-            var exists = await _db.CompositeTypes
-                .AnyAsync(t => t.CompositeTypeId == rid && !t.IsDeleted, ct);
-            if (!exists)
-                return BadRequest(new { error = $"组合类型不存在: {rid}" });
-        }
-        else if (req.RefCompositeTypeId is not null)
-        {
-            return BadRequest(new { error = "只有 composite 类型可以引用组合类型" });
-        }
+        // ★ 类型与宿主匹配（目录驱动）：表列仅允许标量，无任何引用
+        if (ValidateDataTypeAndRefs(req.DataType, EavHost.TableColumn, null, null, null)
+            is { } typeError)
+            return typeError;
 
         // ★ 单位只允许 int / decimal
         if (req.UnitId is not null)
@@ -338,7 +315,6 @@ public class EavMetadataController : ControllerBase
             ColumnName = req.ColumnName,
             DisplayName = req.DisplayName,
             DataType = req.DataType,
-            RefCompositeTypeId = req.RefCompositeTypeId,
             IsRequired = req.IsRequired,
             IsSearchable = req.IsSearchable,
             IsSortable = req.IsSortable,
@@ -360,9 +336,9 @@ public class EavMetadataController : ControllerBase
     /// <summary>
     /// 添加组合字段。
     ///
-    /// ★ 校验：
-    ///   - composite 类型必须指定 refCompositeTypeId，且不能自引用/循环引用
-    ///   - 只有 decimal 类型可以绑定单位
+    /// ★ 校验（目录驱动）：
+    ///   - 组合字段仅允许标量 + single_choice（容器/特殊叶子由宿主白名单拦截）
+    ///   - 只有 int / decimal 类型可以绑定单位
     ///   - 只有 single_choice 类型可以引用选项集
     /// </summary>
     [HttpPost("composite-types/{id}/fields")]
@@ -374,28 +350,10 @@ public class EavMetadataController : ControllerBase
             .AnyAsync(t => t.CompositeTypeId == id && !t.IsDeleted, ct);
         if (!typeExists) return NotFound(new { error = $"组合类型不存在: {id}" });
 
-        // 组合类型引用校验
-        if (req.DataType == EavDataTypes.Composite)
-        {
-            if (req.RefCompositeTypeId is not string rid)
-                return BadRequest(new { error = "composite 类型必须指定 refCompositeTypeId" });
-
-            if (rid == id)
-                return BadRequest(new { error = "组合类型不能自引用" });
-
-            var exists = await _db.CompositeTypes
-                .AnyAsync(t => t.CompositeTypeId == rid && !t.IsDeleted, ct);
-            if (!exists)
-                return BadRequest(new { error = $"组合类型不存在: {rid}" });
-
-            // ★ 循环引用检测：从 rid 出发，看是否能回到 id
-            if (await WouldCreateCycleAsync(id, rid, ct))
-                return BadRequest(new { error = "会造成组合类型循环引用" });
-        }
-        else if (req.RefCompositeTypeId is not null)
-        {
-            return BadRequest(new { error = "只有 composite 类型可以引用组合类型" });
-        }
+        // ★ 类型与宿主匹配（目录驱动）
+        if (ValidateDataTypeAndRefs(req.DataType, EavHost.CompositeField, null, null, req.RefOptionSetId)
+            is { } typeError)
+            return typeError;
 
         // ★ 单位只允许 int / decimal
         if (req.UnitId is not null)
@@ -412,15 +370,10 @@ public class EavMetadataController : ControllerBase
                 return BadRequest(new { error = $"单位不存在: {req.UnitId}" });
         }
 
-        // 选项集引用校验
-        if (req.RefOptionSetId is { } sid)
-        {
-            if (req.DataType != EavDataTypes.SingleChoice)
-                return BadRequest(new { error = "只有 single_choice 类型可以引用选项集" });
-
-            var exists = await _db.OptionSets.AnyAsync(s => s.OptionSetId == sid, ct);
-            if (!exists) return BadRequest(new { error = $"选项集不存在: {sid}" });
-        }
+        // 选项集存在性（类型形状已由 ValidateDataTypeAndRefs 保证）
+        if (req.RefOptionSetId is { } sid
+            && !await _db.OptionSets.AnyAsync(s => s.OptionSetId == sid, ct))
+            return BadRequest(new { error = $"选项集不存在: {sid}" });
 
         var field = new CompositeFieldDefinition
         {
@@ -428,7 +381,6 @@ public class EavMetadataController : ControllerBase
             FieldName = req.FieldName,
             DisplayName = req.DisplayName,
             DataType = req.DataType,
-            RefCompositeTypeId = req.RefCompositeTypeId,
             UnitId = req.UnitId,
             RefOptionSetId = req.RefOptionSetId,
             IsArray = req.IsArray,
@@ -449,42 +401,37 @@ public class EavMetadataController : ControllerBase
     }
 
     /// <summary>
-    /// 循环引用检测：从 refTypeId 出发 BFS，若回溯到 parentTypeId 则说明
-    /// 添加此字段会形成环（A→B→A 或更深），导致 CompositeTypeCache.GetType
-    /// 无限递归 StackOverflow（不可捕获）。
+    /// 类型与引用匹配校验（目录驱动，三个创建端点共用）：
+    ///   1. dataType 必须存在于目录
+    ///   2. dataType 必须允许出现在 host 宿主位置（容器/特殊叶子仅顶层、single_choice 不进表列）
+    ///   3. 目录要求的引用必须携带；目录未要求的引用禁止携带
+    /// 通过返回 null，失败返回 BadRequest。
     /// </summary>
-    private async Task<bool> WouldCreateCycleAsync(
-        string parentTypeId, string refTypeId, CancellationToken ct)
+    private IActionResult? ValidateDataTypeAndRefs(
+        string dataType, EavHost host,
+        string? refCompositeTypeId, string? refTableDefinitionId, string? refOptionSetId)
     {
-        if (parentTypeId == refTypeId) return true;
+        if (!EavDataTypes.Catalog.TryGetValue(dataType, out var info))
+            return BadRequest(new { error = $"未知的 dataType: {dataType}" });
 
-        // 一次性加载所有组合字段的引用关系，避免 BFS 中的 N+1 查询
-        var edges = await _db.CompositeFields
-            .Where(f => f.RefCompositeTypeId != null && !f.IsDeleted)
-            .Select(f => new { f.CompositeTypeId, Ref = f.RefCompositeTypeId! })
-            .AsNoTracking()
-            .ToListAsync(ct);
+        if (!info.Hosts.HasFlag(host))
+            return BadRequest(new { error = $"当前位置不支持的 dataType: {dataType}" });
 
-        var lookup = edges
-            .GroupBy(e => e.CompositeTypeId)
-            .ToDictionary(g => g.Key, g => g.Select(e => e.Ref).ToList());
+        if (info.Ref == EavRefKind.CompositeType && refCompositeTypeId is null)
+            return BadRequest(new { error = "composite 必须指定 refCompositeTypeId" });
+        if (info.Ref == EavRefKind.TableDefinition && refTableDefinitionId is null)
+            return BadRequest(new { error = "table 必须指定 refTableDefinitionId" });
+        if (info.Ref == EavRefKind.OptionSet && refOptionSetId is null)
+            return BadRequest(new { error = "single_choice 必须指定 refOptionSetId" });
 
-        var visited = new HashSet<string>();
-        var queue = new Queue<string>();
-        queue.Enqueue(refTypeId);
+        if (info.Ref != EavRefKind.CompositeType && refCompositeTypeId is not null)
+            return BadRequest(new { error = "只有 composite 类型可以引用组合类型" });
+        if (info.Ref != EavRefKind.TableDefinition && refTableDefinitionId is not null)
+            return BadRequest(new { error = "只有 table 类型可以引用自定义表" });
+        if (info.Ref != EavRefKind.OptionSet && refOptionSetId is not null)
+            return BadRequest(new { error = "只有 single_choice 类型可以引用选项集" });
 
-        while (queue.Count > 0)
-        {
-            var cur = queue.Dequeue();
-            if (cur == parentTypeId) return true;
-            if (!visited.Add(cur)) continue;
-
-            if (lookup.TryGetValue(cur, out var children))
-            {
-                foreach (var c in children) queue.Enqueue(c);
-            }
-        }
-        return false;
+        return null;
     }
 
     // ============================================================

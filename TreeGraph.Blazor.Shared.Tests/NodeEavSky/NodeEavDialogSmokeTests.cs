@@ -184,7 +184,6 @@ public class NodeEavDialogSmokeTests : BunitTestBase
             { x => x.EditingField, CompositeField() },
             { x => x.InitialDisplayOrder, 1 },
             { x => x.OptionSets, new[] { OptionSet() } },
-            { x => x.NestedTypes, new[] { CompositeType() } },
         }), "编辑字段");
 
     // ─── CustomTables ───
@@ -206,7 +205,6 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         {
             { x => x.Table, CustomTable() },
             { x => x.EditingColumn, CustomColumn() },
-            { x => x.CompositeTypes, new[] { CompositeType() } },
         }), "编辑列");
 
     [Fact]

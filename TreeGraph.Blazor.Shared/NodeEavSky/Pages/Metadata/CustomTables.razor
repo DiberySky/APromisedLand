@@ -409,7 +409,6 @@
         var parameters = new DialogParameters<CustomTableColumnsDialog>
         {
             { x => x.Table, table },
-            { x => x.CompositeTypes, _compositeTypes },
             { x => x.OnChanged, EventCallback.Factory.Create(this, LoadAsync) }
         };
 

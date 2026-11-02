@@ -113,7 +113,6 @@
     [Parameter] public string? TableId { get; set; }
 
     private CustomTableDetailDto? _table;
-    private IReadOnlyList<CompositeTypeDetailDto>? _compositeTypes;
     private bool _loading;
     private string? _loadedId;
 
@@ -143,7 +142,6 @@
         try
         {
             _table = await Api.GetCustomTableAsync(TableId);
-            _compositeTypes ??= await Api.ListCompositeTypesAsync();
         }
         finally
         {
@@ -158,8 +156,7 @@
         var parameters = new DialogParameters<CustomTableColumnDialog>
         {
             { x => x.Table, _table },
-            { x => x.InitialDisplayOrder, _table.Columns.Count(c => !c.IsDeleted) + 1 },
-            { x => x.CompositeTypes, _compositeTypes }
+            { x => x.InitialDisplayOrder, _table.Columns.Count(c => !c.IsDeleted) + 1 }
         };
 
         var dialog = await DialogService.ShowAsync<CustomTableColumnDialog>(
@@ -177,8 +174,7 @@
         var parameters = new DialogParameters<CustomTableColumnDialog>
         {
             { x => x.Table, _table },
-            { x => x.EditingColumn, column },
-            { x => x.CompositeTypes, _compositeTypes }
+            { x => x.EditingColumn, column }
         };
 
         var dialog = await DialogService.ShowAsync<CustomTableColumnDialog>(

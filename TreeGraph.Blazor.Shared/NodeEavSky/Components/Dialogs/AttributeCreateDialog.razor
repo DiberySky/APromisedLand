@@ -221,22 +221,9 @@
     /// <summary>选项集本地副本（同上）。</summary>
     private IReadOnlyList<OptionSetSummaryDto>? _optionSets;
 
-    private static readonly (string Value, string Label)[] DataTypeOptions =
-    {
-        ("string",   "字符串"),
-        ("int",      "整数"),
-        ("decimal",  "小数"),
-        ("bool",     "布尔"),
-        ("datetime", "日期时间"),
-        ("date",     "日期"),
-        ("time",     "时间"),
-        ("single_choice", "单选"),
-        ("location", "位置"),
-        ("file",     "文件"),
-        ("composite", "组合类型"),
-        ("table",    "自定义表"),
-        ("json",     "JSON")
-    };
+    /// <summary>顶层属性可用类型（目录派生：全部 13 种）。</summary>
+    private static readonly IReadOnlyList<(string Value, string Label)> DataTypeOptions =
+        EavDataTypeLabels.OptionsFor(EavHost.TopLevel);
 
     protected override void OnParametersSet()
     {

@@ -68,23 +68,6 @@
             }
         </div>
 
-        @if (_columnForm.DataType == "composite")
-        {
-            <MudSelect T="string"
-                       Value="@(_columnForm.RefCompositeTypeId ?? "")"
-                       ValueChanged="@(v => _columnForm.RefCompositeTypeId = string.IsNullOrEmpty(v) ? null : v)"
-                       Label="嵌套组合类型"
-                       Variant="Variant.Outlined"
-                       Class="mb-3">
-                @foreach (var t in CompositeTypes ?? (IReadOnlyList<CompositeTypeDetailDto>)Array.Empty<CompositeTypeDetailDto>())
-                {
-                    <MudSelectItem T="string" Value="@t.CompositeTypeId">
-                        @t.DisplayName (@t.TypeName)
-                    </MudSelectItem>
-                }
-            </MudSelect>
-        }
-
         <MudGrid Justify="Justify.Center">
             <MudItem xs="12" md="3">
                 <MudSwitch T="bool"
@@ -117,8 +100,6 @@
     [Parameter] public CustomTableColumnDto? EditingColumn { get; set; }
     /// <summary>添加模式下的初始显示顺序（由页面按各自口径计算后传入）。</summary>
     [Parameter] public int InitialDisplayOrder { get; set; }
-    /// <summary>组合类型候选（composite 类型列用）。</summary>
-    [Parameter] public IReadOnlyList<CompositeTypeDetailDto>? CompositeTypes { get; set; }
 
     private ColumnForm _columnForm = new();
     private bool _submitting;
@@ -133,19 +114,9 @@
         _ => "display:grid; gap:8px; align-items:start; grid-template-columns:minmax(0,1fr);"
     };
 
-    private static readonly (string Value, string Label)[] DataTypeOptions =
-    {
-        ("string",   "字符串"),
-        ("int",      "整数"),
-        ("decimal",  "小数"),
-        ("bool",     "布尔"),
-        ("datetime", "日期时间"),
-        ("date",     "日期"),
-        ("time",     "时间"),
-        ("single_choice", "单选"),
-        ("composite", "嵌套组合"),
-        ("json",     "JSON")
-    };
+    /// <summary>表列可用类型（目录派生：仅标量；容器不进容器、single_choice 不进表列）。</summary>
+    private static readonly IReadOnlyList<(string Value, string Label)> DataTypeOptions =
+        EavDataTypeLabels.OptionsFor(EavHost.TableColumn);
 
     protected override void OnParametersSet()
     {
@@ -160,7 +131,6 @@
                 ColumnName = EditingColumn.ColumnName,
                 DisplayName = EditingColumn.DisplayName,
                 DataType = EditingColumn.DataType,
-                RefCompositeTypeId = EditingColumn.RefCompositeTypeId,
                 IsRequired = EditingColumn.IsRequired,
                 IsSearchable = EditingColumn.IsSearchable,
                 IsSortable = EditingColumn.IsSortable,
@@ -178,7 +148,6 @@
     private void OnColumnDataTypeChanged(string dt)
     {
         _columnForm.DataType = dt;
-        if (dt != "composite") _columnForm.RefCompositeTypeId = null;
         if (dt != "decimal") _columnForm.Precision = null;
         if (dt != "int" && dt != "decimal") { _columnForm.UnitId = null; _columnForm.UnitName = null; }
     }
@@ -194,13 +163,6 @@
             return;
         }
 
-        if (_columnForm.DataType == "composite" &&
-            _columnForm.RefCompositeTypeId is null)
-        {
-            Snackbar.Add("组合类型列必须指定嵌套类型", Severity.Warning);
-            return;
-        }
-
         _submitting = true;
         try
         {
@@ -213,7 +175,6 @@
                         ColumnName = _columnForm.ColumnName,
                         DisplayName = _columnForm.DisplayName,
                         DataType = _columnForm.DataType,
-                        RefCompositeTypeId = _columnForm.RefCompositeTypeId,
                         IsRequired = _columnForm.IsRequired,
                         IsSearchable = _columnForm.IsSearchable,
                         IsSortable = _columnForm.IsSortable,
@@ -279,7 +240,6 @@
         public string ColumnName { get; set; } = "";
         public string DisplayName { get; set; } = "";
         public string DataType { get; set; } = "string";
-        public string? RefCompositeTypeId { get; set; }
         public bool IsRequired { get; set; }
         public bool IsSearchable { get; set; }
         public bool IsSortable { get; set; }

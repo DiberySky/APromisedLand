@@ -161,18 +161,6 @@
         }
     }
 
-    /// <summary>嵌套类型候选：排除当前类型自身与已删除类型。</summary>
-    private IEnumerable<CompositeTypeDetailDto> GetNestedTypeOptions()
-    {
-        if (_allTypes is null) yield break;
-        foreach (var t in _allTypes)
-        {
-            if (t.CompositeTypeId == CompositeTypeId) continue;
-            if (t.IsDeleted) continue;
-            yield return t;
-        }
-    }
-
     private async Task OpenAddFieldAsync()
     {
         if (_type is null) return;
@@ -181,8 +169,7 @@
         {
             { x => x.Type, _type },
             { x => x.InitialDisplayOrder, _type.Fields.Count(f => !f.IsDeleted) + 1 },
-            { x => x.OptionSets, _optionSets },
-            { x => x.NestedTypes, GetNestedTypeOptions() }
+            { x => x.OptionSets, _optionSets }
         };
 
         var dialog = await DialogService.ShowAsync<CompositeTypeFieldDialog>(
@@ -201,8 +188,7 @@
         {
             { x => x.Type, _type },
             { x => x.EditingField, field },
-            { x => x.OptionSets, _optionSets },
-            { x => x.NestedTypes, GetNestedTypeOptions() }
+            { x => x.OptionSets, _optionSets }
         };
 
         var dialog = await DialogService.ShowAsync<CompositeTypeFieldDialog>(

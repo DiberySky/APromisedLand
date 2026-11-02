@@ -94,9 +94,6 @@
     /// <summary>选项集（供字段对话框下拉）。</summary>
     [Parameter] public IReadOnlyList<OptionSetSummaryDto>? OptionSets { get; set; }
 
-    /// <summary>可作嵌套引用的组合类型（已排除当前 Type 与已删除）。</summary>
-    [Parameter] public IReadOnlyList<CompositeTypeDetailDto>? NestedTypes { get; set; }
-
     /// <summary>字段变更回调（父级刷新徽标计数）。</summary>
     [Parameter] public EventCallback OnChanged { get; set; }
 
@@ -146,8 +143,7 @@
         {
             { x => x.Type, Type },
             { x => x.InitialDisplayOrder, _fields.Count + 1 },
-            { x => x.OptionSets, OptionSets },
-            { x => x.NestedTypes, NestedTypes }
+            { x => x.OptionSets, OptionSets }
         };
 
         var dialog = await DialogService.ShowAsync<CompositeTypeFieldDialog>(
@@ -164,8 +160,7 @@
         {
             { x => x.Type, Type },
             { x => x.EditingField, field },
-            { x => x.OptionSets, OptionSets },
-            { x => x.NestedTypes, NestedTypes }
+            { x => x.OptionSets, OptionSets }
         };
 
         var dialog = await DialogService.ShowAsync<CompositeTypeFieldDialog>(

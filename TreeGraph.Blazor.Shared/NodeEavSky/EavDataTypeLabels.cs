@@ -22,4 +22,15 @@ public static class EavDataTypeLabels
         EavDataTypes.Location => "位置",
         _ => dataType ?? ""
     };
+
+    /// <summary>
+    /// 按宿主位置生成类型下拉选项（过滤与顺序均派生自 EavDataTypes.Catalog）。
+    /// 容器不进容器：composite / table 仅 TopLevel；file / location 仅 TopLevel；
+    /// single_choice 不进 TableColumn。
+    /// </summary>
+    public static IReadOnlyList<(string Value, string Label)> OptionsFor(EavHost host)
+        => EavDataTypes.Catalog.Values
+            .Where(t => t.Hosts.HasFlag(host))
+            .Select(t => (t.Value, GetLabel(t.Value)))
+            .ToArray();
 }

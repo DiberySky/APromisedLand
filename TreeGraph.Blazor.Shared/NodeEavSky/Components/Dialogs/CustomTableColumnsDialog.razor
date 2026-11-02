@@ -101,9 +101,6 @@
     /// <summary>锁定的自定义表。</summary>
     [Parameter, EditorRequired] public CustomTableDetailDto Table { get; set; } = default!;
 
-    /// <summary>可作嵌套引用的组合类型。</summary>
-    [Parameter] public IReadOnlyList<CompositeTypeDetailDto>? CompositeTypes { get; set; }
-
     /// <summary>列变更回调（父级刷新徽标计数）。</summary>
     [Parameter] public EventCallback OnChanged { get; set; }
 
@@ -152,8 +149,7 @@
         var parameters = new DialogParameters<CustomTableColumnDialog>
         {
             { x => x.Table, Table },
-            { x => x.InitialDisplayOrder, _columns.Count + 1 },
-            { x => x.CompositeTypes, CompositeTypes }
+            { x => x.InitialDisplayOrder, _columns.Count + 1 }
         };
 
         var dialog = await DialogService.ShowAsync<CustomTableColumnDialog>(
@@ -169,8 +165,7 @@
         var parameters = new DialogParameters<CustomTableColumnDialog>
         {
             { x => x.Table, Table },
-            { x => x.EditingColumn, column },
-            { x => x.CompositeTypes, CompositeTypes }
+            { x => x.EditingColumn, column }
         };
 
         var dialog = await DialogService.ShowAsync<CustomTableColumnDialog>(

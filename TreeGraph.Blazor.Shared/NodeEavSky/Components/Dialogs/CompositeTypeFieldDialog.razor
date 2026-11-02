@@ -93,24 +93,6 @@
             </MudText>
         }
 
-        @* composite 类型的嵌套引用 *@
-        @if (_fieldForm.DataType == "composite")
-        {
-            <MudSelect T="string"
-                       Value="@(_fieldForm.RefCompositeTypeId ?? "")"
-                       ValueChanged="@(v => _fieldForm.RefCompositeTypeId = string.IsNullOrEmpty(v) ? null : v)"
-                       Label="嵌套组合类型"
-                       Variant="Variant.Outlined"
-                       Class="mb-3">
-                @foreach (var t in NestedTypes)
-                {
-                    <MudSelectItem T="string" Value="@t.CompositeTypeId">
-                        @t.DisplayName (@t.TypeName)
-                    </MudSelectItem>
-                }
-            </MudSelect>
-        }
-
         <MudGrid Justify="Justify.Center" Class="mb-3">
             <MudItem xs="12" sm="3" Class="d-flex align-center justify-center">
                 <MudSwitch T="bool"
@@ -145,8 +127,6 @@
     [Parameter] public int InitialDisplayOrder { get; set; }
     /// <summary>选项集候选（single_choice 类型用）。</summary>
     [Parameter] public IReadOnlyList<OptionSetSummaryDto>? OptionSets { get; set; }
-    /// <summary>嵌套组合类型候选（已排除自身与已删除类型）。</summary>
-    [Parameter] public IEnumerable<CompositeTypeDetailDto> NestedTypes { get; set; } = Enumerable.Empty<CompositeTypeDetailDto>();
 
     private FieldForm _fieldForm = new();
     private bool _submitting;
@@ -165,19 +145,9 @@
         _ => "display:grid; gap:8px; align-items:start; grid-template-columns:minmax(0,1fr);"
     };
 
-    private static readonly (string Value, string Label)[] DataTypeOptions =
-    {
-        ("string",   "字符串"),
-        ("int",      "整数"),
-        ("decimal",  "小数"),
-        ("bool",     "布尔"),
-        ("datetime", "日期时间"),
-        ("date",     "日期"),
-        ("time",     "时间"),
-        ("single_choice", "单选"),
-        ("composite", "嵌套组合"),
-        ("json",     "JSON")
-    };
+    /// <summary>组合字段可用类型（目录派生：标量 + single_choice；容器不进容器）。</summary>
+    private static readonly IReadOnlyList<(string Value, string Label)> DataTypeOptions =
+        EavDataTypeLabels.OptionsFor(EavHost.CompositeField);
 
     protected override void OnParametersSet()
     {
@@ -193,7 +163,6 @@
                 FieldName = EditingField.FieldName,
                 DisplayName = EditingField.DisplayName,
                 DataType = EditingField.DataType,
-                RefCompositeTypeId = EditingField.RefCompositeTypeId,
                 UnitId = EditingField.UnitId,
                 UnitName = FormatUnitName(EditingField.UnitName, EditingField.UnitAbbreviation),
                 RefOptionSetId = EditingField.RefOptionSetId,
@@ -208,9 +177,8 @@
 
     /// <summary>
     /// 切换类型时清空不适用的引用。
-    ///   - int / decimal 保留 UnitId，清空 RefOptionSetId / RefCompositeTypeId
-    ///   - single_choice 保留 RefOptionSetId，清空 UnitId / RefCompositeTypeId
-    ///   - composite 保留 RefCompositeTypeId，清空 UnitId / RefOptionSetId
+    ///   - int / decimal 保留 UnitId，清空 RefOptionSetId
+    ///   - single_choice 保留 RefOptionSetId，清空 UnitId
     ///   - 其它类型全部清空
     /// </summary>
     private void OnFieldDataTypeChanged(string dt)
@@ -220,7 +188,6 @@
         if (dt != "int" && dt != "decimal") { _fieldForm.UnitId = null; _fieldForm.UnitName = null; }
         if (dt != "decimal") _fieldForm.Precision = null;
         if (dt != "single_choice") _fieldForm.RefOptionSetId = null;
-        if (dt != "composite") _fieldForm.RefCompositeTypeId = null;
     }
 
     private async Task SaveFieldAsync()
@@ -231,13 +198,6 @@
             string.IsNullOrWhiteSpace(_fieldForm.DisplayName))
         {
             Snackbar.Add("请填写字段名和显示名", Severity.Warning);
-            return;
-        }
-
-        if (_fieldForm.DataType == "composite" &&
-            _fieldForm.RefCompositeTypeId is null)
-        {
-            Snackbar.Add("组合类型字段必须指定嵌套类型", Severity.Warning);
             return;
         }
 
@@ -253,7 +213,6 @@
                         FieldName = _fieldForm.FieldName,
                         DisplayName = _fieldForm.DisplayName,
                         DataType = _fieldForm.DataType,
-                        RefCompositeTypeId = _fieldForm.RefCompositeTypeId,
                         UnitId = _fieldForm.UnitId,
                         RefOptionSetId = _fieldForm.RefOptionSetId,
                         IsArray = _fieldForm.IsArray,
@@ -381,7 +340,6 @@
         public string FieldName { get; set; } = "";
         public string DisplayName { get; set; } = "";
         public string DataType { get; set; } = "string";
-        public string? RefCompositeTypeId { get; set; }
         public string? UnitId { get; set; }
         public string? UnitName { get; set; }
         public string? RefOptionSetId { get; set; }

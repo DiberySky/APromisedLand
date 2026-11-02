@@ -326,7 +326,6 @@
         {
             { x => x.Type, type },
             { x => x.OptionSets, _optionSets },
-            { x => x.NestedTypes, GetNestedTypeOptions(type) },
             { x => x.OnChanged, EventCallback.Factory.Create(this, LoadAsync) }
         };
 
@@ -345,16 +344,6 @@
 
         // 字段可能增删，关闭后刷新字段数徽标
         await LoadAsync();
-    }
-
-    /// <summary>嵌套类型候选：排除当前类型自身。</summary>
-    private List<CompositeTypeDetailDto> GetNestedTypeOptions(
-        CompositeTypeDetailDto currentType)
-    {
-        if (_types is null) return [];
-        return _types
-            .Where(t => t.CompositeTypeId != currentType.CompositeTypeId)
-            .ToList();
     }
 
     // ---------- 行内展开：字段二级列表 ----------
