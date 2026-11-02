@@ -40,17 +40,18 @@ public class DialogConfig
 
     /// <summary>
     /// 转换为 DialogOptionsEx（MudBlazor.Extensions）。
+    /// 全屏时强制 MaxWidth = MaxWidth.False，否则对话框打开时顶部留空、需手动点最大化才铺满。
     /// </summary>
     public DialogOptionsEx ToDialogOptions()
     {
         var options = new DialogOptionsEx
         {
-            MaxWidth = MaxWidth,
+            MaxWidth = FullScreen ? MaxWidth.False : MaxWidth,
             CloseButton = CloseButton,
             BackdropClick = BackdropClick,
             FullScreen = FullScreen,
             FullWidth = FullWidth,
-            Position = Position,
+            Position = FullScreen ? DialogPosition.Center : Position,
             MaximizeButton = MaximizeButton
         };
         if (DragMode.HasValue)

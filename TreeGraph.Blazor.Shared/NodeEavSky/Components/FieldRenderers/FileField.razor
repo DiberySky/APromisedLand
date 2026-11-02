@@ -118,12 +118,8 @@ else
             { nameof(FilePreviewDialog.FileMeta), new FilePreviewDialog.FilePreviewMeta(
                 _meta.DocId, _meta.FileName, _meta.ContentType, _meta.Version, _meta.Size) }
         };
-        var options = new DialogOptionsEx
-        {
-            FullScreen = true, FullWidth = true, MaxWidth = MaxWidth.False,
-            CloseButton = false, BackdropClick = false, CloseOnEscapeKey = true,
-            MaximizeButton = false, Position = DialogPosition.Center,
-        };
+        var options = DialogOptionsSky.FullScreen(maximizeButton: false);
+        options.CloseOnEscapeKey = true;
         await Dialog.ShowExAsync<FilePreviewDialog>(string.Empty, parameters, options);
     }
 
