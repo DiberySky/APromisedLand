@@ -10,7 +10,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<DialogSky Title="线路管理"
+<DialogSky Title="线路"
            SubmitButtonVisible="false">
     <ToolBarContent>
         <MudText Typo="Typo.subtitle1" Color="Color.Info">@(SpaceName ?? SpaceId)</MudText>
@@ -26,9 +26,8 @@
                   Loading="@_loading" LoadingProgressColor="Color.Primary">
             <HeaderContent>
                 <MudTh>名称</MudTh>
-                <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">设置</MudTh>
                 <MudTh>描述</MudTh>
-                <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">同步刷新</MudTh>
+                <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">图同步</MudTh>
                 <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
                     <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                    Color="Color.Success"
@@ -36,17 +35,10 @@
                                    OnClick="OpenCreateAsync"
                                    title="新建线路" />
                 </MudTh>
+                <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">详情</MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd>@context.Name</MudTd>
-                <MudTd Style="white-space: nowrap; text-align: center;">
-                    @* 线路节点设置：打开该线路的 LineNode 维护对话框 *@
-                    <MudIconButton Icon="@Icons.Material.Outlined.Settings"
-                                   Color="Color.Success"
-                                   Size="Size.Small"
-                                   OnClick="@(async () => await OpenLineNodesAsync(context))"
-                                   title="线路节点设置" />
-                </MudTd>
                 <MudTd>@context.Description</MudTd>
                 <MudTd Style="white-space: nowrap; text-align: center;">
                     @* 向量刷新：按该线路自身 + 其下线路节点范围对账（补缺 + 删孤） *@
@@ -67,6 +59,14 @@
                                    Size="Size.Small"
                                    OnClick="@(async () => await OpenEditAsync(context))"
                                    title="编辑线路" />
+                </MudTd>
+                <MudTd Style="white-space: nowrap; text-align: center;">
+                    @* 详情：打开该线路的 LineNode 维护对话框 *@
+                    <MudIconButton Icon="@Icons.Material.Outlined.Route"
+                                   Color="Color.Success"
+                                   Size="Size.Small"
+                                   OnClick="@(async () => await OpenLineNodesAsync(context))"
+                                   title="详情" />
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
