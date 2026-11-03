@@ -234,10 +234,12 @@ public class LineNodeCrudTests : IntegrationTestBase
         var n3 = await CreateLineNodeAsync(lineId, "节点3"); // 独立节点，无出边
 
         // n2 重接前驱：n1 → n3（next 单值语义：旧前驱边删除，新前驱边写入）
+        // 重接时必须显式指定段边类型（424992d 已移除默认边类型）
         var resp = await Client.PutAsJsonAsync($"/api/LineNode/{n2}", new
         {
             name = (string?)null, description = (string?)null,
-            lineId = (string?)null, predecessorId = n3
+            lineId = (string?)null, predecessorId = n3,
+            predecessorEdgeType = "line_segment"
         });
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
 
