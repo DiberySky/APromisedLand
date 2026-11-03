@@ -50,11 +50,13 @@
                             <MudTh>名称</MudTh>
                             <MudTh>描述</MudTh>
                             <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
-                                <MudIconButton Icon="@Icons.Material.Outlined.EditNote"
-                                               Color="Color.Success"
-                                               Size="Size.Small"
-                                               OnClick="@OpenSpaceManageAsync"
-                                               title="空间维护" />
+                                <MudButton Variant="Variant.Text"
+                                           StartIcon="@Icons.Material.Outlined.EditNote"
+                                           Color="Color.Success"
+                                           Size="Size.Small"
+                                           OnClick="@OpenSpaceManageAsync">
+                                    空间维护
+                                </MudButton>
                             </MudTh>
                         </HeaderContent>
                         <RowTemplate>

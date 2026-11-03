@@ -205,16 +205,15 @@ else if (!_loading && _space is not null)
             return;
         }
 
-        var parameters = new DialogParameters<EdgeInstanceEditDialog>
+        var parameters = new DialogParameters<EdgeInstancePropsEditDialog>
         {
             { x => x.SpaceId, _space.SpaceId },
             { x => x.NodeId, NodeId },
-            { x => x.NodeName, NodeName },
             { x => x.EdgeType, type },
             { x => x.Edge, edge }
         };
 
-        var dialog = await DialogService.ShowExAsync<EdgeInstanceEditDialog>(
+        var dialog = await DialogService.ShowExAsync<EdgeInstancePropsEditDialog>(
             string.Empty, parameters,
             new DialogOptionsEx
             {
@@ -251,7 +250,7 @@ else if (!_loading && _space is not null)
         await ReloadAsync();
     }
 
-    /// <summary>单张边表格（出边/入边共用）：类型 / 起止 / 操作（删除、编辑、展开详情）。</summary>
+    /// <summary>单张边表格（出边/入边共用）：类型 / 起止 / 操作（编辑、删除、展开详情）。</summary>
     private RenderFragment EdgeTable(IReadOnlyList<EdgeDto> items, bool outgoing) => @<MudTable T="EdgeDto" Items="@items"
                                                                                               Hover="true" Bordered="true" Dense="true"
                                                                                               Breakpoint="Breakpoint.Sm">
@@ -275,16 +274,16 @@ else if (!_loading && _space is not null)
             <MudTd DataLabel="操作" Style="text-align: right;">
                 @if (AllowManage)
                 {
-                    <MudIconButton Icon="@Icons.Material.Outlined.Delete"
-                                   Size="Size.Small" Color="Color.Error"
-                                   Disabled="@_loading"
-                                   OnClick="@(async () => await DeleteAsync(context))"
-                                   title="删除该关系" />
                     <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                    Size="Size.Small" Color="Color.Primary"
                                    Disabled="@_loading"
                                    OnClick="@(() => OpenEditAsync(context))"
                                    title="编辑该关系" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                   Size="Size.Small" Color="Color.Error"
+                                   Disabled="@_loading"
+                                   OnClick="@(async () => await DeleteAsync(context))"
+                                   title="删除该关系" />
                 }
                 @* 二级列表：展开只读的「关系详情」（对齐编辑关系对话框内容） *@
                 <MudIconButton Icon="@(IsExpanded(context) ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)"

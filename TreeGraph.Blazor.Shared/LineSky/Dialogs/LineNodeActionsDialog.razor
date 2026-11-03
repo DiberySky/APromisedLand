@@ -37,12 +37,14 @@
         <MudText Typo="Typo.subtitle1" Color="Color.Info">@LineName</MudText>
     </ToolBarContent>
     <ToolBarRightContent>
-        @* 设置修改入口（工具栏右侧，对齐 TreeNodeActionsDialog） *@
-        <MudIconButton Icon="@Icons.Material.Outlined.EditNote"
-                       Size="Size.Small"
-                       Color="Color.Primary"
-                       title="设置修改"
-                       OnClick="OnEdit" />
+        @* 设置修改入口（工具栏右侧，文字按钮） *@
+        <MudButton Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Outlined.EditNote"
+                   Size="Size.Small"
+                   Color="Color.Primary"
+                   OnClick="OnEdit">
+            设置修改
+        </MudButton>
     </ToolBarRightContent>
     <DialogContent>
         <MudContainer Class="pt-0 pb-4" MaxWidth="MaxWidth.Medium">
