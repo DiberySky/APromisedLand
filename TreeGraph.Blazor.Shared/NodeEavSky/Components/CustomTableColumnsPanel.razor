@@ -7,19 +7,9 @@
 @if (!string.IsNullOrEmpty(TableId))
 {
     <MudDivider Class="my-4" />
-    <div class="d-flex align-center justify-space-between mb-2">
-        <MudText Typo="Typo.subtitle2">
-            列 · @(_table is null ? "加载中…" : $"{_table.DisplayName} ({_table.TableName})")
-        </MudText>
-        <MudButton Size="Size.Small"
-                   Variant="Variant.Outlined"
-                   Color="Color.Primary"
-                   StartIcon="@Icons.Material.Outlined.Add"
-                   Disabled="@(_table is null)"
-                   OnClick="OpenAddColumnAsync">
-            添加列
-        </MudButton>
-    </div>
+    <MudText Typo="Typo.subtitle2" Class="mb-2">
+        列 · @(_table is null ? "加载中…" : $"{_table.DisplayName} ({_table.TableName})")
+    </MudText>
 
     @if (_loading)
     {
@@ -31,7 +21,7 @@
             自定义表加载失败
         </MudAlert>
     }
-    else if (_table.Columns.Count(c => !c.IsDeleted) == 0)
+    else if (_columns.Count == 0)
     {
         <MudAlert Severity="Severity.Info" Dense="true">
             该自定义表暂无列
@@ -39,69 +29,68 @@
     }
     else
     {
-        <MudTable Items="_table.Columns.Where(c => !c.IsDeleted).OrderBy(c => c.DisplayOrder)"
+        <MudTable Items="_columns"
                   Dense="true" Bordered="true" Hover="true"
                   Breakpoint="Breakpoint.Sm">
             <HeaderContent>
-                <MudTh>列名</MudTh>
+                <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">排序</MudTh>
                 <MudTh>显示名</MudTh>
                 <MudTh>类型</MudTh>
-                <MudTh>必填</MudTh>
-                <MudTh>可搜索</MudTh>
-                <MudTh>可排序</MudTh>
-                <MudTh>唯一</MudTh>
-                <MudTh>顺序</MudTh>
-                <MudTh>操作</MudTh>
+                <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
+                    @* 添加列入口：置于操作列表头（与「列定义」对话框一致） *@
+                    <MudIconButton Icon="@Icons.Material.Outlined.Add"
+                                   Color="Color.Success"
+                                   Size="Size.Small"
+                                   Disabled="@(_table is null)"
+                                   OnClick="@OpenAddColumnAsync"
+                                   title="添加列" />
+                </MudTh>
             </HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="列名"><code>@context.ColumnName</code></MudTd>
+                @{
+                    var locked = IsLockedTimeColumn(context);
+                    var idx = _columns.FindIndex(c => c.ColumnId == context.ColumnId);
+                    var canMoveUp = !locked && idx > LockedColumnCount();
+                    var canMoveDown = !locked && idx >= 0 && idx < _columns.Count - 1;
+                }
+                <MudTd DataLabel="排序" Style="white-space: nowrap; text-align: center;">
+                    <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
+                                   Size="Size.Small"
+                                   Disabled="@(!canMoveUp)"
+                                   OnClick="@(async () => await MoveUpAsync(context))"
+                                   title="@(locked ? "时间维度列已锁定，不可排序" : canMoveUp ? "上移" : "已在首位")" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
+                                   Size="Size.Small"
+                                   Disabled="@(!canMoveDown)"
+                                   OnClick="@(async () => await MoveDownAsync(context))"
+                                   title="@(locked ? "时间维度列已锁定，不可排序" : canMoveDown ? "下移" : "已在末位")" />
+                </MudTd>
                 <MudTd DataLabel="显示名">@context.DisplayName</MudTd>
                 <MudTd DataLabel="类型">
                     <MudChip T="string" Size="Size.Small"
                              Color="@GetDataTypeColor(context.DataType)">
                         @EavDataTypeLabels.GetLabel(context.DataType)
                     </MudChip>
-                </MudTd>
-                <MudTd DataLabel="必填">
-                    @if (context.IsRequired)
+                    @if (locked)
                     {
-                        <MudIcon Icon="@Icons.Material.Outlined.Check"
-                                 Color="Color.Success" Size="Size.Small" />
+                        <MudIcon Icon="@Icons.Material.Outlined.Lock"
+                                 Color="Color.Tertiary" Size="Size.Small"
+                                 Class="ml-1"
+                                 title="时间维度列已锁定（创建时定死）" />
                     }
                 </MudTd>
-                <MudTd DataLabel="可搜索">
-                    @if (context.IsSearchable)
-                    {
-                        <MudIcon Icon="@Icons.Material.Outlined.Check"
-                                 Color="Color.Success" Size="Size.Small" />
-                    }
-                </MudTd>
-                <MudTd DataLabel="可排序">
-                    @if (context.IsSortable)
-                    {
-                        <MudIcon Icon="@Icons.Material.Outlined.Check"
-                                 Color="Color.Success" Size="Size.Small" />
-                    }
-                </MudTd>
-                <MudTd DataLabel="唯一">
-                    @if (context.IsUnique)
-                    {
-                        <MudIcon Icon="@Icons.Material.Outlined.Check"
-                                 Color="Color.Success" Size="Size.Small" />
-                    }
-                </MudTd>
-                <MudTd DataLabel="顺序">@context.DisplayOrder</MudTd>
-                <MudTd DataLabel="操作">
-                    <MudIconButton Icon="@Icons.Material.Outlined.Edit"
-                                   Size="Size.Medium"
-                                   Color="Color.Primary"
-                                   OnClick="@(async () => await OpenEditColumnAsync(context))"
-                                   title="编辑" />
+                <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
                     <MudIconButton Icon="@Icons.Material.Outlined.Delete"
-                                   Size="Size.Medium"
+                                   Size="Size.Small"
                                    Color="Color.Error"
-                                   OnClick="@(async () => await DeleteColumnAsync(context))"
-                                   title="删除" />
+                                   Disabled="@locked"
+                                   title="@(locked ? "时间维度列已锁定，不可删除" : "删除")"
+                                   OnClick="@(async () => await DeleteColumnAsync(context))" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => OpenEditColumnAsync(context))"
+                                   title="编辑" />
                 </MudTd>
             </RowTemplate>
         </MudTable>
@@ -113,6 +102,7 @@
     [Parameter] public string? TableId { get; set; }
 
     private CustomTableDetailDto? _table;
+    private List<CustomTableColumnDto> _columns = [];
     private bool _loading;
     private string? _loadedId;
 
@@ -135,6 +125,7 @@
         if (string.IsNullOrEmpty(TableId))
         {
             _table = null;
+            _columns = [];
             return;
         }
 
@@ -142,6 +133,11 @@
         try
         {
             _table = await Api.GetCustomTableAsync(TableId);
+            _columns = _table?.Columns
+                .Where(c => !c.IsDeleted)
+                .OrderBy(c => c.DisplayOrder)
+                .ToList()
+                ?? [];
         }
         finally
         {
@@ -156,7 +152,7 @@
         var parameters = new DialogParameters<CustomTableColumnDialog>
         {
             { x => x.Table, _table },
-            { x => x.InitialDisplayOrder, _table.Columns.Count(c => !c.IsDeleted) + 1 }
+            { x => x.InitialDisplayOrder, _columns.Count + 1 }
         };
 
         var dialog = await DialogService.ShowAsync<CustomTableColumnDialog>(
@@ -208,6 +204,70 @@
         {
             Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
         }
+    }
+
+    /// <summary>record 表锁定时间维度列数（第 1 列日期 + 可选第 2 列时间）。</summary>
+    private int LockedColumnCount()
+        => _table?.IsRecordTable == true ? (_table.HasTimeColumn ? 2 : 1) : 0;
+
+    /// <summary>判定列是否为 record 表的锁定时间维度列。</summary>
+    private bool IsLockedTimeColumn(CustomTableColumnDto column)
+    {
+        var n = LockedColumnCount();
+        if (n == 0) return false;
+        return _columns
+            .OrderBy(c => c.DisplayOrder)
+            .Take(n)
+            .Any(c => c.ColumnId == column.ColumnId);
+    }
+
+    /// <summary>上移一位（时间维度锁定列不参与排序）。</summary>
+    private async Task MoveUpAsync(CustomTableColumnDto column)
+    {
+        if (IsLockedTimeColumn(column)) return;
+
+        var idx = _columns.FindIndex(c => c.ColumnId == column.ColumnId);
+        if (idx <= LockedColumnCount()) return;
+
+        (_columns[idx - 1], _columns[idx]) = (_columns[idx], _columns[idx - 1]);
+        await ApplyReorderAsync();
+    }
+
+    /// <summary>下移一位（时间维度锁定列不参与排序）。</summary>
+    private async Task MoveDownAsync(CustomTableColumnDto column)
+    {
+        if (IsLockedTimeColumn(column)) return;
+
+        var idx = _columns.FindIndex(c => c.ColumnId == column.ColumnId);
+        if (idx < 0 || idx >= _columns.Count - 1) return;
+
+        (_columns[idx + 1], _columns[idx]) = (_columns[idx], _columns[idx + 1]);
+        await ApplyReorderAsync();
+    }
+
+    /// <summary>按当前列表顺序重排 DisplayOrder（从 1 开始），只提交有变化的列。</summary>
+    private async Task ApplyReorderAsync()
+    {
+        if (_table is null) return;
+
+        for (var i = 0; i < _columns.Count; i++)
+        {
+            var order = i + 1;
+            if (_columns[i].DisplayOrder == order) continue;
+
+            var (ok, error) = await Api.UpdateTableColumnAsync(
+                _table.TableDefinitionId,
+                _columns[i].ColumnId,
+                new UpdateTableColumnRequest { DisplayOrder = order });
+
+            if (!ok)
+            {
+                Snackbar.Add($"排序失败：{error ?? "未知错误"}", Severity.Error);
+                break;
+            }
+        }
+
+        await ReloadAsync();
     }
 
     private static Color GetDataTypeColor(string dataType) => dataType switch

@@ -50,14 +50,6 @@
                       Class="mb-3"
                       HelperText="用户在界面上看到的名字" />
 
-        @* int / decimal：单位仅为命名约定（显示名以「-单位」结尾） *@
-        @if (_createForm.DataType is "int" or "decimal")
-        {
-            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                如需标注计量单位，请以「-单位」追加到显示名，例如：长度-米
-            </MudAlert>
-        }
-
         @* 内部标识（AttributeName，可空：留空由服务端自动生成） *@
         <NamingTextField @bind-Value="_createForm.AttributeName"
                          SourceText="@_createForm.DisplayName"
@@ -75,6 +67,7 @@
                        Label="数据类型"
                        Variant="Variant.Outlined"
                        Margin="Margin.Dense"
+                       HelperText="@DataTypeHelperText"
                        Style="flex: 1 1 0;">
                 @foreach (var dt in DataTypeOptions)
                 {
@@ -223,6 +216,16 @@
     private static readonly IReadOnlyList<(string Value, string Label)> DataTypeOptions =
         EavDataTypeLabels.OptionsFor(EavHost.TopLevel);
 
+    /// <summary>
+    /// 数据类型 HelperText：int / decimal 时提示计量单位命名约定
+    /// （单位不结构化存储，以「-单位」追加到显示名末尾）。
+    /// </summary>
+    private string? DataTypeHelperText => _createForm.DataType switch
+    {
+        "int" or "decimal" => "如需标注计量单位，请在显示名末尾追加「-单位」，例如：长度-米",
+        _ => null
+    };
+
     protected override void OnParametersSet()
     {
         _createForm = new CreateAttributeForm
@@ -266,7 +269,7 @@
     {
         var dialog = await DialogService.ShowAsync<OptionSetManageDialog>(
             string.Empty,
-            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true });
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true, Position = DialogPosition.TopCenter });
         await dialog.Result;
 
         // 管理对话框内可能增删选项集/选项项，无论结果如何都刷新本地列表

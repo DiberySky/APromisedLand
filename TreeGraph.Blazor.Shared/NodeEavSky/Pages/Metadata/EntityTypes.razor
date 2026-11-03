@@ -45,8 +45,8 @@ else
     <HeaderContent>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">排序</MudTh>
         <MudTh>名称</MudTh>
-        <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">属性</MudTh>
         <MudTh>说明</MudTh>
+        <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">属性</MudTh>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
             @if (IsDialogMode)
             {
@@ -82,6 +82,11 @@ else
             @* 只显示 DisplayName（中文），不显示 et_xxx 内部标识 *@
             <MudText Typo="Typo.body1">@context.DisplayName</MudText>
         </MudTd>
+        <MudTd DataLabel="说明">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @(string.IsNullOrEmpty(context.Description) ? "—" : context.Description)
+            </MudText>
+        </MudTd>
         <MudTd DataLabel="属性" Style="white-space: nowrap; text-align: center;">
             @* 图标入口：点击打开独立属性定义对话框并锁定该类型；
                属性数量以徽标叠加在图标右上角 *@
@@ -93,11 +98,6 @@ else
                                OnClick="@(async () => await OpenAttributesAsync(context))"
                                title="管理属性" />
             </MudBadge>
-        </MudTd>
-        <MudTd DataLabel="说明">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                @(string.IsNullOrEmpty(context.Description) ? "—" : context.Description)
-            </MudText>
         </MudTd>
         <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
             <MudIconButton Icon="@Icons.Material.Outlined.Delete"

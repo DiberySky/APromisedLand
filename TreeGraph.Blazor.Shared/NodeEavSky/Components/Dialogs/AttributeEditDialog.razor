@@ -20,14 +20,6 @@
                       Margin="Margin.Dense"
                       HelperText="用户在界面上看到的名字" />
 
-        @* int / decimal：单位仅为命名约定（显示名以「-单位」结尾） *@
-        @if (Attribute?.DataType is "int" or "decimal")
-        {
-            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
-                如需标注计量单位，请以「-单位」追加到显示名，例如：长度-米
-            </MudAlert>
-        }
-
         @* 内部标识：创建后不可修改，只读展示完整值 *@
         <MudTextField Value="@Attribute?.AttributeName"
                       Label="内部标识"
@@ -44,6 +36,7 @@
                               Label="数据类型"
                               Variant="Variant.Outlined"
                               Margin="Margin.Dense"
+                              HelperText="@DataTypeHelperText"
                               ReadOnly="true" />
             </div>
             @if (Attribute?.DataType == "decimal")
@@ -232,6 +225,16 @@
         => Attribute is null ? "" : EavDataTypeLabels.GetLabel(Attribute.DataType);
 
     /// <summary>
+    /// 数据类型 HelperText：int / decimal 时提示计量单位命名约定
+    /// （单位不结构化存储，以「-单位」追加到显示名末尾）。
+    /// </summary>
+    private string? DataTypeHelperText => Attribute?.DataType switch
+    {
+        "int" or "decimal" => "如需标注计量单位，请在显示名末尾追加「-单位」，例如：长度-米",
+        _ => null
+    };
+
+    /// <summary>
     /// 数据类型行布局：decimal 两列、其它单列。
     /// 用 Grid + minmax(0, fr) 固定分配，避免宽度被控件固有内容撑开。
     /// </summary>
@@ -339,7 +342,7 @@
     {
         var dialog = await DialogService.ShowAsync<OptionSetManageDialog>(
             string.Empty,
-            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true });
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true, Position = DialogPosition.TopCenter });
         await dialog.Result;
         _optionSets = await Api.ListOptionSetsAsync() ?? new List<OptionSetSummaryDto>();
 

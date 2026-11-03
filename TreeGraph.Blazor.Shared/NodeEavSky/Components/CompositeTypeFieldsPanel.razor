@@ -7,19 +7,9 @@
 @if (!string.IsNullOrEmpty(CompositeTypeId))
 {
     <MudDivider Class="my-4" />
-    <div class="d-flex align-center justify-space-between mb-2">
-        <MudText Typo="Typo.subtitle2">
-            字段 · @(_type is null ? "加载中…" : $"{_type.DisplayName} ({_type.TypeName})")
-        </MudText>
-        <MudButton Size="Size.Small"
-                   Variant="Variant.Outlined"
-                   Color="Color.Primary"
-                   StartIcon="@Icons.Material.Outlined.Add"
-                   Disabled="@(_type is null)"
-                   OnClick="OpenAddFieldAsync">
-            添加字段
-        </MudButton>
-    </div>
+    <MudText Typo="Typo.subtitle2" Class="mb-2">
+        字段 · @(_type is null ? "加载中…" : $"{_type.DisplayName} ({_type.TypeName})")
+    </MudText>
 
     @if (_loading)
     {
@@ -31,7 +21,7 @@
             组合类型加载失败
         </MudAlert>
     }
-    else if (_type.Fields.Count(f => !f.IsDeleted) == 0)
+    else if (_fields.Count == 0)
     {
         <MudAlert Severity="Severity.Info" Dense="true">
             该组合类型暂无字段
@@ -39,21 +29,41 @@
     }
     else
     {
-        <MudTable Items="_type.Fields.Where(f => !f.IsDeleted).OrderBy(f => f.DisplayOrder)"
+        <MudTable Items="_fields"
                   Dense="true" Bordered="true" Hover="true"
                   Breakpoint="Breakpoint.Sm">
             <HeaderContent>
-                <MudTh>字段名</MudTh>
+                <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">排序</MudTh>
                 <MudTh>显示名</MudTh>
                 <MudTh>类型</MudTh>
-                <MudTh>引用</MudTh>
-                <MudTh>数组</MudTh>
-                <MudTh>必填</MudTh>
-                <MudTh>顺序</MudTh>
-                <MudTh>操作</MudTh>
+                <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
+                    @* 添加字段入口：置于操作列表头（与「字段定义」对话框一致） *@
+                    <MudIconButton Icon="@Icons.Material.Outlined.Add"
+                                   Color="Color.Success"
+                                   Size="Size.Small"
+                                   Disabled="@(_type is null)"
+                                   OnClick="@OpenAddFieldAsync"
+                                   title="添加字段" />
+                </MudTh>
             </HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="字段名"><code>@context.FieldName</code></MudTd>
+                @{
+                    var idx = _fields.FindIndex(f => f.FieldId == context.FieldId);
+                    var canMoveUp = idx > 0;
+                    var canMoveDown = idx >= 0 && idx < _fields.Count - 1;
+                }
+                <MudTd DataLabel="排序" Style="white-space: nowrap; text-align: center;">
+                    <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
+                                   Size="Size.Small"
+                                   Disabled="@(!canMoveUp)"
+                                   OnClick="@(async () => await MoveUpAsync(context))"
+                                   title="@(canMoveUp ? "上移" : "已在首位")" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
+                                   Size="Size.Small"
+                                   Disabled="@(!canMoveDown)"
+                                   OnClick="@(async () => await MoveDownAsync(context))"
+                                   title="@(canMoveDown ? "下移" : "已在末位")" />
+                </MudTd>
                 <MudTd DataLabel="显示名">@context.DisplayName</MudTd>
                 <MudTd DataLabel="类型">
                     <MudChip T="string" Size="Size.Small"
@@ -61,48 +71,17 @@
                         @EavDataTypeLabels.GetLabel(context.DataType)
                     </MudChip>
                 </MudTd>
-                <MudTd DataLabel="引用">
-                    @if (context.RefOptionSetId is not null)
-                    {
-                        <MudChip T="string" Size="Size.Small"
-                                 Color="Color.Secondary" Class="mr-1">
-                            选项: @context.OptionSetName
-                        </MudChip>
-                    }
-                    @if (context.RefCompositeTypeId is not null)
-                    {
-                        <MudChip T="string" Size="Size.Small"
-                                 Color="Color.Dark">
-                            嵌套: @GetTypeName(context.RefCompositeTypeId!)
-                        </MudChip>
-                    }
-                </MudTd>
-                <MudTd DataLabel="数组">
-                    @if (context.IsArray)
-                    {
-                        <MudIcon Icon="@Icons.Material.Outlined.Check"
-                                 Color="Color.Success" Size="Size.Small" />
-                    }
-                </MudTd>
-                <MudTd DataLabel="必填">
-                    @if (context.IsRequired)
-                    {
-                        <MudIcon Icon="@Icons.Material.Outlined.Check"
-                                 Color="Color.Success" Size="Size.Small" />
-                    }
-                </MudTd>
-                <MudTd DataLabel="顺序">@context.DisplayOrder</MudTd>
-                <MudTd DataLabel="操作">
-                    <MudIconButton Icon="@Icons.Material.Outlined.Edit"
-                                   Size="Size.Medium"
-                                   Color="Color.Primary"
-                                   OnClick="@(async () => await OpenEditFieldAsync(context))"
-                                   title="编辑" />
+                <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
                     <MudIconButton Icon="@Icons.Material.Outlined.Delete"
-                                   Size="Size.Medium"
+                                   Size="Size.Small"
                                    Color="Color.Error"
                                    OnClick="@(async () => await DeleteFieldAsync(context))"
                                    title="删除" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => OpenEditFieldAsync(context))"
+                                   title="编辑" />
                 </MudTd>
             </RowTemplate>
         </MudTable>
@@ -114,8 +93,8 @@
     [Parameter] public string? CompositeTypeId { get; set; }
 
     private CompositeTypeDetailDto? _type;
+    private List<CompositeFieldDetailDto> _fields = [];
     private IReadOnlyList<OptionSetSummaryDto>? _optionSets;
-    private IReadOnlyList<CompositeTypeDetailDto>? _allTypes;
     private bool _loading;
     private string? _loadedId;
 
@@ -138,6 +117,7 @@
         if (string.IsNullOrEmpty(CompositeTypeId))
         {
             _type = null;
+            _fields = [];
             return;
         }
 
@@ -145,8 +125,12 @@
         try
         {
             _type = await Api.GetCompositeTypeAsync(CompositeTypeId);
+            _fields = _type?.Fields
+                .Where(f => !f.IsDeleted)
+                .OrderBy(f => f.DisplayOrder)
+                .ToList()
+                ?? [];
             _optionSets ??= await Api.ListOptionSetsAsync();
-            _allTypes = await Api.ListCompositeTypesAsync();
         }
         finally
         {
@@ -161,7 +145,7 @@
         var parameters = new DialogParameters<CompositeTypeFieldDialog>
         {
             { x => x.Type, _type },
-            { x => x.InitialDisplayOrder, _type.Fields.Count(f => !f.IsDeleted) + 1 },
+            { x => x.InitialDisplayOrder, _fields.Count + 1 },
             { x => x.OptionSets, _optionSets }
         };
 
@@ -217,9 +201,54 @@
         }
     }
 
-    private string GetTypeName(string compositeTypeId)
-        => _allTypes?.FirstOrDefault(t => t.CompositeTypeId == compositeTypeId)?.TypeName
-           ?? compositeTypeId;
+    /// <summary>上移一位（与相邻字段交换显示顺序）。</summary>
+    private async Task MoveUpAsync(CompositeFieldDetailDto field)
+    {
+        if (_type is null) return;
+
+        var idx = _fields.FindIndex(f => f.FieldId == field.FieldId);
+        if (idx <= 0) return;
+
+        (_fields[idx - 1], _fields[idx]) = (_fields[idx], _fields[idx - 1]);
+        await ApplyReorderAsync();
+    }
+
+    /// <summary>下移一位（与相邻字段交换显示顺序）。</summary>
+    private async Task MoveDownAsync(CompositeFieldDetailDto field)
+    {
+        if (_type is null) return;
+
+        var idx = _fields.FindIndex(f => f.FieldId == field.FieldId);
+        if (idx < 0 || idx >= _fields.Count - 1) return;
+
+        (_fields[idx + 1], _fields[idx]) = (_fields[idx], _fields[idx + 1]);
+        await ApplyReorderAsync();
+    }
+
+    /// <summary>按当前列表顺序重排 DisplayOrder（从 1 开始），只提交有变化的字段。</summary>
+    private async Task ApplyReorderAsync()
+    {
+        if (_type is null) return;
+
+        for (var i = 0; i < _fields.Count; i++)
+        {
+            var order = i + 1;
+            if (_fields[i].DisplayOrder == order) continue;
+
+            var (ok, error) = await Api.UpdateCompositeFieldAsync(
+                _type.CompositeTypeId,
+                _fields[i].FieldId,
+                new UpdateCompositeFieldRequest { DisplayOrder = order });
+
+            if (!ok)
+            {
+                Snackbar.Add($"排序失败：{error ?? "未知错误"}", Severity.Error);
+                break;
+            }
+        }
+
+        await ReloadAsync();
+    }
 
     private static Color GetDataTypeColor(string dataType) => dataType switch
     {
