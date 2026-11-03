@@ -291,13 +291,7 @@ public sealed class SubtreeService
             EavDataTypes.String => Truncate(v.ValueString, MaxAttrValueLen),
             EavDataTypes.SingleChoice => await FormatSingleChoiceAsync(v.ValueString, def, ct),
 
-            // ★ Int 带单位时读 ValueInt（文档原版本误读 ValueDecimal，已修复）
-            EavDataTypes.Int when def.UnitId is not null
-                => $"{v.ValueInt} {await GetUnitNameAsync(def.UnitId, ct)}",
             EavDataTypes.Int => v.ValueInt?.ToString(),
-
-            EavDataTypes.Decimal when def.UnitId is not null
-                => $"{v.ValueDecimal} {await GetUnitNameAsync(def.UnitId, ct)}",
             EavDataTypes.Decimal => v.ValueDecimal?.ToString(),
 
             EavDataTypes.Bool => v.ValueBool == true ? "是" : "否",
@@ -428,18 +422,6 @@ public sealed class SubtreeService
         JsonValueKind.Object => el.GetRawText(),
         _ => ""
     };
-
-    private async Task<string> GetUnitNameAsync(string? unitId, CancellationToken ct)
-    {
-        if (string.IsNullOrEmpty(unitId)) return "";
-        var unit = await _db.UnitTrees
-            .Include(u => u.Node)
-            .Where(u => u.Id == unitId)
-            .Select(u => new { Name = u.Node!.Name, u.Abbreviation })
-            .AsNoTracking().FirstOrDefaultAsync(ct);
-        if (unit is null) return "";
-        return string.IsNullOrEmpty(unit.Abbreviation) ? unit.Name : unit.Abbreviation;
-    }
 
     private async Task<string> BuildPathAsync(
         string hostType, string nodeId, CancellationToken ct)

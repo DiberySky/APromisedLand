@@ -35,9 +35,7 @@ public class CompositeFieldDefinition
     public string? RefCompositeTypeId { get; set; }
     public CompositeTypeDefinition? RefCompositeType { get; set; }
 
-    /// <summary>数量字段绑定的单位（指向 unit_trees 节点 Id，仅 DataType = "decimal" 允许）</summary>
-    public string? UnitId { get; set; }
-    public TreeGraph.Shared.TreeEavSky.Entities.UnitTree? Unit { get; set; }
+    // ★ 方案A：计量单位不再结构化存储；如需标注单位，以 "-单位" 追加到 DisplayName。
 
     /// <summary>
     /// ★ #8：选项集引用（仅 DataType = "single_choice" 允许）。

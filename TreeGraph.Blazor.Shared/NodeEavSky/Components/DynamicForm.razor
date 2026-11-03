@@ -22,20 +22,10 @@
 
                     case EavDataTypes.Int:
                     case EavDataTypes.Decimal:
-                        if (!string.IsNullOrEmpty(attr.UnitId))
-                        {
-                            <UnitNumberField Attr="attr"
-                                             ReadOnly="@ReadOnly"
-                                             Value="GetNumeric(attr.AttributeName)"
-                                             ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                        }
-                        else
-                        {
-                            <NumberField Attr="attr"
-                                         ReadOnly="@ReadOnly"
-                                         Value="GetDecimal(attr.AttributeName)"
-                                         ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                        }
+                        <NumberField Attr="attr"
+                                     ReadOnly="@ReadOnly"
+                                     Value="GetDecimal(attr.AttributeName)"
+                                     ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
 
                     case EavDataTypes.Bool:
@@ -201,8 +191,6 @@
         => _values.TryGetValue(key, out var v) && v is DateTime dt ? dt : null;
     private TimeSpan? GetTime(string key)
         => _values.TryGetValue(key, out var v) && v is TimeSpan t ? t : null;
-    private NumericValueDto? GetNumeric(string key)
-        => _values.TryGetValue(key, out var v) ? v as NumericValueDto : null;
 
     // composite/file 的原始 JSON 值（编辑场景由 ConvertElement 写入）
     private JsonElement? GetJson(string key)
@@ -248,7 +236,7 @@
         {
             EavDataTypes.String => elem.ValueKind == JsonValueKind.String
                 ? elem.GetString() : elem.GetRawText(),
-            EavDataTypes.Int or EavDataTypes.Decimal => ConvertNumeric(elem, attr),
+            EavDataTypes.Int or EavDataTypes.Decimal => ConvertNumeric(elem),
             EavDataTypes.Bool => elem.ValueKind == JsonValueKind.True,
             EavDataTypes.Datetime => elem.TryGetDateTime(out var dt)
                 ? dt : (DateTime?)null,
@@ -292,28 +280,9 @@
         };
     }
 
-    /// <summary>数值：带单位属性为 { value, unitId } 或裸数字；否则为裸数字。</summary>
-    private static object? ConvertNumeric(JsonElement elem, AttributeSchemaDto attr)
-    {
-        if (!string.IsNullOrEmpty(attr.UnitId))
-        {
-            if (elem.ValueKind == JsonValueKind.Object
-                && elem.TryGetProperty("value", out var v))
-            {
-                return new NumericValueDto
-                {
-                    Value = v.ValueKind == JsonValueKind.Number ? v.GetDecimal() : null,
-                    UnitId = elem.TryGetProperty("unitId", out var u)
-                        && u.ValueKind == JsonValueKind.String
-                        ? u.GetString() : null
-                };
-            }
-            if (elem.ValueKind == JsonValueKind.Number)
-                return new NumericValueDto { Value = elem.GetDecimal() };
-            return null;
-        }
-        return elem.ValueKind == JsonValueKind.Number ? elem.GetDecimal() : null;
-    }
+    /// <summary>数值：恒为裸数字（不再有 { value, unitId } 对象形态）。</summary>
+    private static object? ConvertNumeric(JsonElement elem)
+        => elem.ValueKind == JsonValueKind.Number ? elem.GetDecimal() : null;
 
     // ---------- 提交值构建 ----------
 
@@ -335,11 +304,7 @@
             result[attr.AttributeName] = attr.DataType switch
             {
                 // decimal 序列化会带小数点（5.0），int 属性先转为 long
-                EavDataTypes.Int when !string.IsNullOrEmpty(attr.UnitId) =>
-                    BuildUnitValue(v, isInt: true),
                 EavDataTypes.Int => v is decimal d ? (long)d : v,
-                EavDataTypes.Decimal when !string.IsNullOrEmpty(attr.UnitId) =>
-                    BuildUnitValue(v),
                 EavDataTypes.Datetime => ((DateTime)v).ToString("o"),
                 EavDataTypes.Date => DateOnly.FromDateTime((DateTime)v).ToString("yyyy-MM-dd"),
                 EavDataTypes.Time => TimeOnly.FromTimeSpan((TimeSpan)v).ToString("HH:mm:ss"),
@@ -357,9 +322,4 @@
         try { return JsonDocument.Parse(s).RootElement.Clone(); }
         catch (JsonException) { return s; }
     }
-
-    private static object? BuildUnitValue(object v, bool isInt = false)
-        => v is NumericValueDto { Value: { } num } nv
-            ? new { value = isInt ? (long)num : num, unitId = nv.UnitId }
-            : null;
 }

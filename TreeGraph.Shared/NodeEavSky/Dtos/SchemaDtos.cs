@@ -14,8 +14,6 @@ public sealed record CompositeFieldSchemaDto(
     CompositeTypeSchemaDto? NestedType = null,
     JsonElement? ValidationRule = null,
     JsonElement? AllowedValues = null,
-    string? UnitId = null,
-    string? UnitName = null,
     OptionSetSchemaDto? OptionSet = null);
 
 public sealed record CompositeTypeSchemaDto(
@@ -46,8 +44,6 @@ public sealed record AttributeSchemaDto(
     JsonElement? AllowedValues,
     JsonElement? ValidationRule,
     CompositeTypeSchemaDto? CompositeType,
-    string? UnitId = null,
-    string? UnitName = null,
     OptionSetSchemaDto? OptionSet = null,
     string? RefTableDefinitionId = null,
     /// <summary>时序记录模式（table 属性）：行列表屏蔽序号列。</summary>

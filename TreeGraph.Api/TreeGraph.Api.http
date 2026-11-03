@@ -63,11 +63,10 @@ Content-Type: application/json
 {
   "entityType": "Product",
   "attributeName": "screen_area",
-  "displayName": "屏幕面积",
+  "displayName": "屏幕面积-m²",
   "dataType": "decimal",
   "isSearchable": true,
   "displayOrder": 5,
-  "unitId": "{{getUnits.response.body.$.[?(@.symbol=='m²')].id}}",
   "validationRule": { "min": 0, "max": 10 }
 }
 
@@ -85,16 +84,15 @@ Content-Type: application/json
   "displayName": "尺寸"
 }
 
-### 元数据：添加组合字段（长度，绑定米基准单位）
+### 元数据：添加组合字段（高度；单位以 -单位 命名约定写入显示名）
 POST {{TreeGraph.Api_HostAddress}}/api/eav/metadata/composite-types/{{createCompositeType.response.body.$.compositeTypeId}}/fields
 Content-Type: application/json
 
 {
   "fieldName": "height",
-  "displayName": "高度",
+  "displayName": "高度-m",
   "dataType": "decimal",
-  "displayOrder": 1,
-  "unitId": "{{getUnits.response.body.$.[?(@.symbol=='m')].id}}"
+  "displayOrder": 1
 }
 
 ### 动态查询：多属性 AND（Intersect）
@@ -110,7 +108,7 @@ Content-Type: application/json
   "pageSize": 20
 }
 
-### 跨单位查询：净重 > 1 吨（过滤值带单位，自动归一化到千克比较）
+### 数值过滤：净重 > 1（裸数值比较）
 POST {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/query
 Content-Type: application/json
 
@@ -119,23 +117,7 @@ Content-Type: application/json
     {
       "attributeName": "net_weight",
       "operator": "gt",
-      "value": { "value": 1, "unitId": "{{getUnits.response.body.$.[?(@.symbol=='t')].id}}" }
-    }
-  ],
-  "page": 1,
-  "pageSize": 20
-}
-
-### 按原始输入单位过滤（unit_eq：净重以克为单位输入的实体）
-POST {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/query
-Content-Type: application/json
-
-{
-  "filters": [
-    {
-      "attributeName": "net_weight",
-      "operator": "unit_eq",
-      "value": "{{getUnits.response.body.$.[?(@.symbol=='g')].id}}"
+      "value": 1
     }
   ],
   "page": 1,

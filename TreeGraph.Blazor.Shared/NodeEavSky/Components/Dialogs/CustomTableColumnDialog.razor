@@ -22,6 +22,14 @@
                       Placeholder="界面上展示的中文名称"
                       Variant="Variant.Outlined"
                       Class="mb-3" />
+
+        @* int / decimal：单位仅为命名约定（显示名以「-单位」结尾） *@
+        @if (_columnForm.DataType is "int" or "decimal")
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                如需标注计量单位，请以「-单位」追加到显示名，例如：长度-米
+            </MudAlert>
+        }
         <NamingTextField @bind-Value="_columnForm.ColumnName"
                          SourceText="@_columnForm.DisplayName"
                          NameCase="snake"
@@ -31,7 +39,7 @@
                          Class="mb-3" />
 
         @* 数据类型行：参照 CompositeTypeFieldDialog 的 Grid 定比布局，
-           int / decimal 时「小数精度」「单位」与数据类型合并到同一行 *@
+           decimal 时「小数精度」与数据类型合并到同一行 *@
         <div style="@DataTypeRowStyle" class="mb-3">
             <div>
                 <MudSelect T="string"
@@ -56,14 +64,6 @@
                                       Min="0" Max="10" Step="1"
                                       Margin="Margin.Dense"
                                       HelperText="0–10 位，留空不限制" />
-                </div>
-            }
-            @if (_columnForm.DataType is "int" or "decimal")
-            {
-                <div>
-                    <UnitTreeField @bind-UnitId="_columnForm.UnitId"
-                                   @bind-UnitName="_columnForm.UnitName"
-                                   Margin="Margin.Dense" />
                 </div>
             }
         </div>
@@ -104,13 +104,11 @@
     private ColumnForm _columnForm = new();
     private bool _submitting;
 
-    /// <summary>数据类型行布局：decimal 三列（类型/精度/单位）、int 两列（类型/单位）、其余单列。</summary>
+    /// <summary>数据类型行布局：decimal 两列（类型/精度）、其余单列。</summary>
     private string DataTypeRowStyle => _columnForm.DataType switch
     {
         "decimal" => "display:grid; gap:8px; align-items:start; "
-                   + "grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);",
-        "int" => "display:grid; gap:8px; align-items:start; "
-               + "grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);",
+                   + "grid-template-columns:minmax(0,1fr) minmax(0,1fr);",
         _ => "display:grid; gap:8px; align-items:start; grid-template-columns:minmax(0,1fr);"
     };
 
@@ -136,12 +134,7 @@
                 IsSortable = EditingColumn.IsSortable,
                 IsUnique = EditingColumn.IsUnique,
                 DisplayOrder = EditingColumn.DisplayOrder,
-                Precision = ExtractPrecision(EditingColumn.ValidationRule),
-                UnitId = EditingColumn.UnitId,
-                UnitName = EditingColumn.UnitName is null ? null
-                    : string.IsNullOrEmpty(EditingColumn.UnitAbbreviation)
-                        ? EditingColumn.UnitName
-                        : $"{EditingColumn.UnitName} 【{EditingColumn.UnitAbbreviation}】"
+                Precision = ExtractPrecision(EditingColumn.ValidationRule)
             };
     }
 
@@ -149,7 +142,6 @@
     {
         _columnForm.DataType = dt;
         if (dt != "decimal") _columnForm.Precision = null;
-        if (dt != "int" && dt != "decimal") { _columnForm.UnitId = null; _columnForm.UnitName = null; }
     }
 
     private async Task SaveColumnAsync()
@@ -183,8 +175,7 @@
                         // decimal 精度 → ValidationRule.precision
                         ValidationRule = _columnForm.Precision is int p
                             ? System.Text.Json.JsonSerializer.SerializeToElement(new { precision = p })
-                            : null,
-                        UnitId = _columnForm.UnitId
+                            : null
                     });
 
                 if (id is null)
@@ -196,10 +187,6 @@
             }
             else
             {
-                // UnitId diff：当前 vs 原始
-                var unitChanged = _columnForm.UnitId != EditingColumn.UnitId;
-                var unitCleared = unitChanged && _columnForm.UnitId is null;
-
                 var (ok, error) = await Api.UpdateTableColumnAsync(
                     Table.TableDefinitionId,
                     EditingColumn.ColumnId,
@@ -213,10 +200,7 @@
                         DisplayOrder = _columnForm.DisplayOrder,
                         // 合并 ValidationRule：保留既有规则键，仅增删 precision
                         ValidationRule = MergeValidationRule(
-                            EditingColumn.ValidationRule, _columnForm.Precision),
-                        // UnitId 更新
-                        UnitId = unitChanged ? _columnForm.UnitId : null,
-                        ClearUnitId = unitCleared
+                            EditingColumn.ValidationRule, _columnForm.Precision)
                     });
 
                 if (!ok)
@@ -246,8 +230,6 @@
         public bool IsUnique { get; set; }
         public int DisplayOrder { get; set; }
         public int? Precision { get; set; }  // decimal 精度 → ValidationRule.precision
-        public string? UnitId { get; set; }
-        public string? UnitName { get; set; }
     }
 
     /// <summary>从既有 ValidationRule 解析 precision；缺失/非法返回 null。</summary>

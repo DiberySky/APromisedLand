@@ -148,10 +148,6 @@
                                                 </MudChip>
                                             </td>
                                             <td>
-                                                @if (f.UnitId is not null)
-                                                {
-                                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="mr-1">单位</MudChip>
-                                                }
                                                 @if (f.RefOptionSetId is not null)
                                                 {
                                                     <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Class="mr-1">选项: @(f.OptionSetDisplayName ?? f.OptionSetName)</MudChip>

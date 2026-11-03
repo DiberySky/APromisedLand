@@ -158,16 +158,10 @@ public class EavReadService
             EavDataTypes.String => row.ValueString,
             EavDataTypes.SingleChoice => ExtractSingleChoice(row, def),
 
-            // ★ int + 单位：读 ValueDecimal
-            EavDataTypes.Int when def.UnitId is not null => ExtractNumericValue(
-                row.ValueDecimal, row.UnitId, def),
-
-            // int 无单位：读 ValueInt
-            EavDataTypes.Int => ExtractNumericValue(
-                row.ValueInt is { } i ? i : null, row.UnitId, def),
-
-            EavDataTypes.Decimal => ExtractNumericValue(
-                row.ValueDecimal, row.UnitId, def),
+            // ★ 方案A：int 恒读 ValueInt 返回 long（避免 JSON 小数位与契约不符）；
+            //   decimal 恒读 ValueDecimal。
+            EavDataTypes.Int => row.ValueInt,
+            EavDataTypes.Decimal => row.ValueDecimal,
             EavDataTypes.Bool => row.ValueBool,
             EavDataTypes.Datetime => row.ValueDatetime,
             EavDataTypes.Date => row.ValueDateOnly,
@@ -196,29 +190,6 @@ public class EavReadService
         {
             return row.ValueString;
         }
-    }
-
-    /// <summary>
-    /// 数值列还原。
-    ///
-    /// ★ 当属性未绑定单位时，int 类型必须返回 long（而非 decimal），
-    /// 否则前端会收到 decimal 的 JSON 数字（含小数位）与 API 契约不符。
-    /// 绑定单位时返回 NumericValue（单位仅作记录，取输入时记录的单位）。
-    /// </summary>
-    private object? ExtractNumericValue(
-        decimal? value, string? recordUnitId, AttributeDefinition def)
-    {
-        if (value is null) return null;
-
-        if (def.UnitId is not { } unitId)
-        {
-            // 无单位绑定：按数据类型返回对应 C# 类型
-            return def.DataType == EavDataTypes.Int
-                ? (object)(long)value.Value
-                : value.Value;
-        }
-
-        return new NumericValue(value.Value, recordUnitId ?? unitId);
     }
 
     public async Task<List<AttributeAuditLog>> GetHistoryAsync(

@@ -440,23 +440,9 @@ public class InodeController : ControllerBase
         string inodeId,
         [FromQuery] bool displayName = false,
         [FromQuery] bool includeNull = false,
-        [FromQuery] string? units = null,
         CancellationToken ct = default)
     {
-        // ---- 1. 参数校验 ----
-        var unitsMode = units?.ToLowerInvariant();
-        if (unitsMode is not (null or "default" or "base" or "original"))
-        {
-            return BadRequest(new
-            {
-                error = "units 参数必须是 default / base / original 之一"
-            });
-        }
-
-        // 单位不做换算：base 和 original 等价，都返回裸数字（存储值即输入值）
-        var bareValue = unitsMode is "base" or "original";
-
-        // ---- 2. 加载所有绑定实体（复用现有 Facade） ----
+        // ---- 1. 加载所有绑定实体（复用现有 Facade） ----
         var all = await _facade.LoadAllByInodeAsync(inodeId, ct);
 
         // ---- 3. 构建 entities 字典（key = entityType/entityId，同类型可多条） ----
@@ -486,7 +472,7 @@ public class InodeController : ControllerBase
                 }
 
                 // 值转换
-                props[key] = ConvertPropertyValue(rawValue, bareValue);
+                props[key] = ConvertPropertyValue(rawValue);
             }
 
             // includeNull=true：该类型已定义但实体中未写入的属性补 null 键。
@@ -531,21 +517,14 @@ public class InodeController : ControllerBase
 
     /// <summary>
     /// 属性值 → JSON 友好形式。
-    ///
-    ///   bareValue = false：数值保留 { value, unitId } 对象（含原始输入单位）
-    ///   bareValue = true：数值只返回裸 decimal（用于 base / original 模式）
+    /// ★ 方案A：数值恒为裸数字（无 { value, unitId } 对象形态）。
     /// </summary>
-    private static object? ConvertPropertyValue(object? value, bool bareValue)
+    private static object? ConvertPropertyValue(object? value)
     {
         if (value is null) return null;
 
         return value switch
         {
-            // 数值 + 单位
-            NumericValue nv => bareValue
-                ? (object)nv.Value
-                : new { value = nv.Value, unitId = nv.UnitId },
-
             // 单选值
             SingleChoiceValue sc => new { value = sc.Value, label = sc.Label },
 

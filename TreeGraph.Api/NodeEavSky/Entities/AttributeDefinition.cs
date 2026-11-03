@@ -45,9 +45,7 @@ public class AttributeDefinition
     public string? RefOptionSetId { get; set; }
     public OptionSet? RefOptionSet { get; set; }
 
-    /// <summary>数值属性绑定的单位（指向 unit_trees 节点 Id，仅作记录不参与换算）</summary>
-    public string? UnitId { get; set; }
-    public TreeGraph.Shared.TreeEavSky.Entities.UnitTree? Unit { get; set; }
+    // ★ 方案A：计量单位不再结构化存储；如需标注单位，以 "-单位" 追加到 DisplayName（如"长度-米"）。
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

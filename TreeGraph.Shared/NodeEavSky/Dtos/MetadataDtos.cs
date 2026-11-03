@@ -22,7 +22,6 @@ public class CreateAttributeRequest
     public bool IsSearchable { get; set; }
     public bool IsSortable { get; set; }
     public int DisplayOrder { get; set; }
-    public string? UnitId { get; set; }
     public string? RefCompositeTypeId { get; set; }
     public string? RefTableDefinitionId { get; set; }
 
@@ -44,7 +43,6 @@ public class CreateCompositeFieldRequest
     public string FieldName { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string DataType { get; set; } = "string";
-    public string? UnitId { get; set; }
     public string? RefOptionSetId { get; set; }
     public bool IsArray { get; set; }
     public bool IsRequired { get; set; }
@@ -82,7 +80,6 @@ public class CreateTableColumnRequest
     public string? DefaultValue { get; set; }
     public JsonElement? AllowedValues { get; set; }
     public JsonElement? ValidationRule { get; set; }
-    public string? UnitId { get; set; }
 }
 
 public record CompositeTypeDetailDto(
@@ -108,9 +105,6 @@ public record CompositeFieldDetailDto(
     string? DefaultValue,
     JsonElement? AllowedValues,
     JsonElement? ValidationRule,
-    string? UnitId = null,
-    string? UnitName = null,
-    string? UnitAbbreviation = null,
     string? RefOptionSetId = null,
     string? OptionSetName = null,
     string? OptionSetDisplayName = null,
@@ -135,9 +129,6 @@ public class UpdateCompositeFieldRequest
 
     public string? RefOptionSetId { get; set; }
     public bool ClearRefOptionSetId { get; set; }
-
-    public string? UnitId { get; set; }
-    public bool ClearUnitId { get; set; }
 }
 
 public record CustomTableDetailDto(
@@ -165,9 +156,6 @@ public record CustomTableColumnDto(
     string? DefaultValue,
     JsonElement? AllowedValues,
     JsonElement? ValidationRule,
-    string? UnitId = null,
-    string? UnitName = null,
-    string? UnitAbbreviation = null,
     bool IsDeleted = false);
 
 public class UpdateCustomTableRequest
@@ -187,9 +175,6 @@ public class UpdateTableColumnRequest
     public string? DefaultValue { get; set; }
     public JsonElement? AllowedValues { get; set; }
     public JsonElement? ValidationRule { get; set; }
-
-    public string? UnitId { get; set; }
-    public bool ClearUnitId { get; set; }
 }
 
 public record AttributeDetailDto(
@@ -208,9 +193,6 @@ public record AttributeDetailDto(
     DateTimeOffset UpdatedAt,
     JsonElement? AllowedValues,
     JsonElement? ValidationRule,
-    string? UnitId,
-    string? UnitName,
-    string? UnitAbbreviation,
     string? RefCompositeTypeId,
     string? CompositeTypeName,
     string? CompositeTypeDisplayName,
@@ -233,12 +215,10 @@ public class UpdateAttributeRequest
     public JsonElement? AllowedValues { get; set; }
     public JsonElement? ValidationRule { get; set; }
 
-    public string? UnitId { get; set; }
     public string? RefCompositeTypeId { get; set; }
     public string? RefTableDefinitionId { get; set; }
     public string? RefOptionSetId { get; set; }
 
-    public bool ClearUnitId { get; set; }
     public bool ClearRefCompositeTypeId { get; set; }
     public bool ClearRefTableDefinitionId { get; set; }
     public bool ClearRefOptionSetId { get; set; }

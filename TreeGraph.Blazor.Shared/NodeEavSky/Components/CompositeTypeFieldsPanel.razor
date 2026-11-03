@@ -62,13 +62,6 @@
                     </MudChip>
                 </MudTd>
                 <MudTd DataLabel="引用">
-                    @if (context.UnitId is not null)
-                    {
-                        <MudChip T="string" Size="Size.Small"
-                                 Color="Color.Warning" Class="mr-1">
-                            单位
-                        </MudChip>
-                    }
                     @if (context.RefOptionSetId is not null)
                     {
                         <MudChip T="string" Size="Size.Small"

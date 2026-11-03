@@ -23,9 +23,5 @@ public class AttributeValue
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-    /// <summary>输入时绑定的单位（指向 unit_trees 节点 Id，仅作记录不参与换算）</summary>
-    public string? UnitId { get; set; }
-    public TreeGraph.Shared.TreeEavSky.Entities.UnitTree? Unit { get; set; }
-
     public AttributeDefinition Attribute { get; set; } = null!;
 }

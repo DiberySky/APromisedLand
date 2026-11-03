@@ -50,9 +50,7 @@ public class CustomTableColumn
     public JsonDocument? AllowedValues { get; set; }
     public string? DefaultValue { get; set; }
 
-    /// <summary>数量列绑定的单位（指向 unit_trees 节点 Id，仅 int / decimal 允许）</summary>
-    public string? UnitId { get; set; }
-    public TreeGraph.Shared.TreeEavSky.Entities.UnitTree? Unit { get; set; }
+    // ★ 方案A：计量单位不再结构化存储；如需标注单位，以 "-单位" 追加到 DisplayName。
 
     public CustomTableDefinition Table { get; set; } = null!;
 }

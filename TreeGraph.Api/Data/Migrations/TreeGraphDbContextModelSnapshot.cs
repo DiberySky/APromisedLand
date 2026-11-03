@@ -374,11 +374,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("ref_table_definition_id");
 
-                    b.Property<string>("UnitId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("unit_id");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -401,8 +396,6 @@ namespace TreeGraph.Api.Data.Migrations
                     b.HasIndex("RefOptionSetId");
 
                     b.HasIndex("RefTableDefinitionId");
-
-                    b.HasIndex("UnitId");
 
                     b.HasIndex("EntityType", "AttributeName")
                         .IsUnique()
@@ -435,11 +428,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)")
                         .HasColumnName("entity_id");
-
-                    b.Property<string>("UnitId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("unit_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -487,8 +475,6 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasIndex("EntityId")
                         .HasDatabaseName("ix_av_entity");
-
-                    b.HasIndex("UnitId");
 
                     b.HasIndex("ValueFileMeta")
                         .HasDatabaseName("ix_av_file_meta")
@@ -617,11 +603,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("ref_option_set_id");
 
-                    b.Property<string>("UnitId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("unit_id");
-
                     b.Property<JsonDocument>("ValidationRule")
                         .HasColumnType("jsonb")
                         .HasColumnName("validation_rule");
@@ -632,16 +613,12 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasIndex("RefOptionSetId");
 
-                    b.HasIndex("UnitId");
-
                     b.HasIndex("CompositeTypeId", "FieldName")
                         .IsUnique()
                         .HasDatabaseName("uq_composite_field");
 
                     b.ToTable("composite_field_definitions", null, t =>
                         {
-                            t.HasCheckConstraint("ck_composite_field_decimal_unit", "data_type IN ('int', 'decimal') OR unit_id IS NULL");
-
                             t.HasCheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
                         });
                 });
@@ -767,11 +744,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("table_definition_id");
 
-                    b.Property<string>("UnitId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("unit_id");
-
                     b.Property<JsonDocument>("ValidationRule")
                         .HasColumnType("jsonb")
                         .HasColumnName("validation_rule");
@@ -780,16 +752,11 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasIndex("RefCompositeTypeId");
 
-                    b.HasIndex("UnitId");
-
                     b.HasIndex("TableDefinitionId", "ColumnName")
                         .IsUnique()
                         .HasDatabaseName("uq_custom_table_column");
 
-                    b.ToTable("custom_table_columns", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_custom_table_column_numeric_unit", "data_type IN ('int', 'decimal') OR unit_id IS NULL");
-                        });
+                    b.ToTable("custom_table_columns", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", b =>
@@ -2942,18 +2909,11 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasForeignKey("RefTableDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("RefCompositeType");
 
                     b.Navigation("RefOptionSet");
 
                     b.Navigation("RefTableDefinition");
-
-                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeValue", b =>
@@ -2964,14 +2924,7 @@ namespace TreeGraph.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Attribute");
-
-                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeFieldDefinition", b =>
@@ -2992,18 +2945,11 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasForeignKey("RefOptionSetId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("CompositeType");
 
                     b.Navigation("RefCompositeType");
 
                     b.Navigation("RefOptionSet");
-
-                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableColumn", b =>
@@ -3019,16 +2965,9 @@ namespace TreeGraph.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("RefCompositeType");
 
                     b.Navigation("Table");
-
-                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableRow", b =>

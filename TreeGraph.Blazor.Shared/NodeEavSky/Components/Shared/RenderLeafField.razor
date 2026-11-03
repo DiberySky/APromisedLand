@@ -37,41 +37,20 @@ else if (Field.DataType == "int")
 }
 else if (Field.DataType == "decimal")
 {
-    @if (!string.IsNullOrEmpty(Field.UnitId))
-    {
-        var numeric = Value as NumericInput ?? new NumericInput { UnitId = Field.UnitId };
-        <NumberInputField T="decimal?"
-                          Label="@Field.DisplayName"
-                          Value="@numeric.Value"
-                          ValueChanged="@(v =>
-                          {
-                              var n = Value as NumericInput ?? new NumericInput { UnitId = Field.UnitId };
-                              n.Value = v ?? 0;
-                              n.UnitId = Field.UnitId;
-                              ValueChanged.InvokeAsync(n);
-                          })"
-                          Required="@Field.IsRequired"
-                          Error="@hasError"
-                          ErrorText="@errorText"
-                          Suffix="@Field.UnitName" />
-    }
-    else
-    {
-        <NumberInputField T="decimal?"
-                          Label="@Field.DisplayName"
-                          Value="@(Value switch
-                          {
-                              decimal d => d,
-                              double db => (decimal)db,
-                              int i => i,
-                              long l => l,
-                              _ => null
-                          })"
-                          ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                          Required="@Field.IsRequired"
-                          Error="@hasError"
-                          ErrorText="@errorText" />
-    }
+    <NumberInputField T="decimal?"
+                      Label="@Field.DisplayName"
+                      Value="@(Value switch
+                      {
+                          decimal d => d,
+                          double db => (decimal)db,
+                          int i => i,
+                          long l => l,
+                          _ => null
+                      })"
+                      ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                      Required="@Field.IsRequired"
+                      Error="@hasError"
+                      ErrorText="@errorText" />
 }
 else if (Field.DataType == "bool")
 {

@@ -489,15 +489,12 @@ public class EavWriteService
             case EavDataTypes.Int:
             case EavDataTypes.Decimal:
             {
-                var (numericValue, inputUnitId) = UnwrapNumeric(value);
+                var numericValue = UnwrapNumeric(value);
                 if (numericValue is null)
                     throw new InvalidOperationException("数值格式错误");
 
-                // 单位仅作记录：存储输入值本身与输入单位，不做任何换算
-                target.UnitId = inputUnitId;
-
-                // ★ int 无单位 → ValueInt；int 有单位 → ValueDecimal；decimal → ValueDecimal
-                if (def.DataType == EavDataTypes.Int && def.UnitId is null)
+                // ★ 方案A：int 恒 ValueInt；decimal 恒 ValueDecimal
+                if (def.DataType == EavDataTypes.Int)
                     target.ValueInt = (long)numericValue.Value;
                 else
                     target.ValueDecimal = numericValue.Value;
@@ -554,21 +551,19 @@ public class EavWriteService
         v.ValueTime = null;
         v.ValueFileMeta = null;
         v.ValueJsonb = null;
-        v.UnitId = null;
     }
 
-    private static (decimal? Value, string? UnitId) UnwrapNumeric(object value)
+    private static decimal? UnwrapNumeric(object value)
     {
         return value switch
         {
-            NumericValue nv => (nv.Value, nv.UnitId),
-            decimal d => (d, null),
-            int i => (i, null),
-            long l => (l, null),
-            double db => ((decimal)db, null),
+            decimal d => d,
+            int i => i,
+            long l => l,
+            double db => (decimal)db,
             string s when decimal.TryParse(s, NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var parsed) => (parsed, null),
-            _ => (null, null)
+                CultureInfo.InvariantCulture, out var parsed) => parsed,
+            _ => null
         };
     }
 
@@ -579,12 +574,9 @@ public class EavWriteService
             EavDataTypes.String => v.ValueString,
             EavDataTypes.SingleChoice => FormatSingleChoice(v.ValueString, def),
 
-            // ★ int 无单位：ValueInt
-            EavDataTypes.Int when v.ValueInt is { } i && def.UnitId is null
+            // ★ 方案A：int 恒读 ValueInt
+            EavDataTypes.Int when v.ValueInt is { } i
                 => i.ToString(CultureInfo.InvariantCulture),
-            // ★ int 有单位：ValueDecimal
-            EavDataTypes.Int when v.ValueDecimal is { } di
-                => di.ToString(CultureInfo.InvariantCulture),
             EavDataTypes.Int => null,
 
             EavDataTypes.Decimal when v.ValueDecimal is { } d

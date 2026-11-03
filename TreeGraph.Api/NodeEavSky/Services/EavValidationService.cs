@@ -24,10 +24,8 @@ public class EavValidationService
     /// <summary>
     /// 验证属性值（基础类型）。
     ///
-    /// ★ int / decimal 均可绑定单位（单位仅作记录，不参与校验与换算）。
-    ///   - int 无单位：必须为整数，写入 ValueInt
-    ///   - int 有单位：允许小数，写入 ValueDecimal
-    ///   - decimal：无论有无单位，写入 ValueDecimal
+    /// ★ 方案A：int 恒存 ValueInt（必须为整数），decimal 恒存 ValueDecimal。
+    ///   计量单位不再结构化存储，仅以 "-单位" 命名约定出现在 DisplayName。
     /// </summary>
     public ValidationResult ValidateBaseValue(AttributeDefinition def, object? value)
     {
@@ -45,23 +43,22 @@ public class EavValidationService
         }
         if (value is null) return new ValidationResult(true, errors);
 
-        // 数量类型：解包 NumericValue（单位仅作记录，不参与校验与换算）
+        // 数量类型：解包为裸数值
         if (def.DataType is EavDataTypes.Int or EavDataTypes.Decimal)
         {
-            var (numericValue, _) = UnwrapNumeric(value);
+            var numericValue = UnwrapNumeric(value);
             if (numericValue is null)
             {
                 errors.Add(new(def.AttributeName, "数值格式错误"));
                 return new ValidationResult(false, errors);
             }
 
-            // ★ int 无单位时必须为整数
+            // ★ int 必须为整数
             if (def.DataType == EavDataTypes.Int
-                && def.UnitId is null
                 && numericValue.Value != Math.Truncate(numericValue.Value))
             {
                 errors.Add(new(def.AttributeName,
-                    $"int 类型（无单位）不接受小数，收到 {numericValue.Value}"));
+                    $"int 类型不接受小数，收到 {numericValue.Value}"));
                 return new ValidationResult(false, errors);
             }
 
@@ -161,18 +158,17 @@ public class EavValidationService
         return new ValidationResult(errors.Count == 0, errors);
     }
 
-    private static (decimal? Value, string? UnitId) UnwrapNumeric(object value)
+    private static decimal? UnwrapNumeric(object value)
     {
         return value switch
         {
-            NumericValue nv => (nv.Value, nv.UnitId),
-            decimal d => (d, null),
-            int i => (i, null),
-            long l => (l, null),
-            double db => ((decimal)db, null),
+            decimal d => d,
+            int i => i,
+            long l => l,
+            double db => (decimal)db,
             string s when decimal.TryParse(s, NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var parsed) => (parsed, null),
-            _ => (null, null)
+                CultureInfo.InvariantCulture, out var parsed) => parsed,
+            _ => null
         };
     }
 

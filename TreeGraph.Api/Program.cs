@@ -24,7 +24,6 @@ builder.Services.AddControllers(options =>
     })
     .AddJsonOptions(options =>
     {
-        options.JsonSerializerOptions.Converters.Add(new NumericValueJsonConverter());
         options.JsonSerializerOptions.Converters.Add(new DynamicCompositeValueJsonConverter());
         // 枚举序列化为字符串（与 EF Core HasConversion<string>() 对齐，前端 DTO 用 string 接收）
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());

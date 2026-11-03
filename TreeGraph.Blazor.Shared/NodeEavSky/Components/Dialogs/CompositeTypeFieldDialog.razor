@@ -23,6 +23,14 @@
                       Placeholder="界面上展示的中文名称"
                       Variant="Variant.Outlined"
                       Class="mb-3" />
+
+        @* int / decimal：单位仅为命名约定（显示名以「-单位」结尾） *@
+        @if (_fieldForm.DataType is "int" or "decimal")
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                如需标注计量单位，请以「-单位」追加到显示名，例如：长度-米
+            </MudAlert>
+        }
         <NamingTextField @bind-Value="_fieldForm.FieldName"
                          SourceText="@_fieldForm.DisplayName"
                          NameCase="snake"
@@ -32,7 +40,7 @@
                          Class="mb-3" />
 
         @* 数据类型行：参照 AttributeEditDialog 的 Grid 定比布局，
-           int / decimal 时「单位」「小数精度」与数据类型合并到同一行 *@
+           decimal 时「小数精度」与数据类型合并到同一行 *@
         <div style="@DataTypeRowStyle" class="mb-3">
             <div>
                 <MudSelect T="string"
@@ -57,14 +65,6 @@
                                       Min="0" Max="10" Step="1"
                                       Margin="Margin.Dense"
                                       HelperText="0–10 位，留空不限制" />
-                </div>
-            }
-            @if (_fieldForm.DataType is "int" or "decimal")
-            {
-                <div>
-                    <UnitTreeField @bind-UnitId="_fieldForm.UnitId"
-                                   @bind-UnitName="_fieldForm.UnitName"
-                                   Margin="Margin.Dense" />
                 </div>
             }
         </div>
@@ -133,15 +133,13 @@
 
     /// <summary>
     /// 数据类型行布局（与 AttributeEditDialog 一致）：
-    /// decimal 三等分、int 两列（数据类型稍宽）、其它单列。
+    /// decimal 两列、其它单列。
     /// 用 Grid + minmax(0, fr) 固定分配，避免宽度被控件固有内容撑开。
     /// </summary>
     private string DataTypeRowStyle => _fieldForm.DataType switch
     {
         "decimal" => "display:grid; gap:8px; align-items:start; "
-                   + "grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);",
-        "int" => "display:grid; gap:8px; align-items:start; "
-               + "grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);",
+                   + "grid-template-columns:minmax(0,1fr) minmax(0,1fr);",
         _ => "display:grid; gap:8px; align-items:start; grid-template-columns:minmax(0,1fr);"
     };
 
@@ -163,8 +161,6 @@
                 FieldName = EditingField.FieldName,
                 DisplayName = EditingField.DisplayName,
                 DataType = EditingField.DataType,
-                UnitId = EditingField.UnitId,
-                UnitName = FormatUnitName(EditingField.UnitName, EditingField.UnitAbbreviation),
                 RefOptionSetId = EditingField.RefOptionSetId,
                 IsArray = EditingField.IsArray,
                 IsRequired = EditingField.IsRequired,
@@ -176,16 +172,14 @@
     }
 
     /// <summary>
-    /// 切换类型时清空不适用的引用。
-    ///   - int / decimal 保留 UnitId，清空 RefOptionSetId
-    ///   - single_choice 保留 RefOptionSetId，清空 UnitId
-    ///   - 其它类型全部清空
+    /// 切换类型时清空不适用的引用：
+    ///   - single_choice 保留 RefOptionSetId
+    ///   - 其它类型清空 RefOptionSetId
     /// </summary>
     private void OnFieldDataTypeChanged(string dt)
     {
         _fieldForm.DataType = dt;
 
-        if (dt != "int" && dt != "decimal") { _fieldForm.UnitId = null; _fieldForm.UnitName = null; }
         if (dt != "decimal") _fieldForm.Precision = null;
         if (dt != "single_choice") _fieldForm.RefOptionSetId = null;
     }
@@ -213,7 +207,6 @@
                         FieldName = _fieldForm.FieldName,
                         DisplayName = _fieldForm.DisplayName,
                         DataType = _fieldForm.DataType,
-                        UnitId = _fieldForm.UnitId,
                         RefOptionSetId = _fieldForm.RefOptionSetId,
                         IsArray = _fieldForm.IsArray,
                         IsRequired = _fieldForm.IsRequired,
@@ -235,11 +228,9 @@
             }
             else
             {
-                // diff 计算 ClearRefOptionSetId / ClearUnitId
+                // diff 计算 ClearRefOptionSetId
                 var (optId, clearOpt) = Diff(
                     _fieldForm.RefOptionSetId, EditingField.RefOptionSetId);
-                var (unitId, clearUnit) = Diff(
-                    _fieldForm.UnitId, EditingField.UnitId);
 
                 var (ok, error) = await Api.UpdateCompositeFieldAsync(
                     Type.CompositeTypeId,
@@ -254,9 +245,6 @@
 
                         RefOptionSetId = optId,
                         ClearRefOptionSetId = clearOpt,
-
-                        UnitId = unitId,
-                        ClearUnitId = clearUnit,
 
                         // 合并 ValidationRule：保留既有规则键，仅增删 precision
                         ValidationRule = MergeValidationRule(
@@ -286,11 +274,6 @@
         if (current is not null && current != original) return (current, false);
         return (null, false);
     }
-
-    private static string? FormatUnitName(string? name, string? abbreviation)
-        => name is null ? null
-            : string.IsNullOrEmpty(abbreviation) ? name
-            : $"{name} 【{abbreviation}】";
 
     /// <summary>从既有 ValidationRule 解析 precision；缺失/非法返回 null。</summary>
     private static int? ExtractPrecision(System.Text.Json.JsonElement? rule)
@@ -340,8 +323,6 @@
         public string FieldName { get; set; } = "";
         public string DisplayName { get; set; } = "";
         public string DataType { get; set; } = "string";
-        public string? UnitId { get; set; }
-        public string? UnitName { get; set; }
         public string? RefOptionSetId { get; set; }
         public bool IsArray { get; set; }
         public bool IsRequired { get; set; }

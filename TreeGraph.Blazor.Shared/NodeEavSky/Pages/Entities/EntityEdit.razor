@@ -412,8 +412,7 @@ else
     /// <summary>
     /// 后端返回的 JSON 属性值 → 前端内部模型。
     ///
-    /// ★ int / decimal 有单位时，后端返回 { value, unitId } 对象，统一走
-    ///   JsonToNumeric → NumericInput；无单位时返回裸数字。
+    /// ★ int / decimal 恒为裸数字（不再有 { value, unitId } 对象形态）。
     /// </summary>
     private object? JsonElementToValue(JsonElement elem, AttributeSchemaDto schema)
     {
@@ -423,15 +422,11 @@ else
         {
             "string" => elem.ValueKind == JsonValueKind.String ? elem.GetString() : elem.ToString(),
 
-            // int：有单位走 JsonToNumeric，无单位走裸数字 → long
-            "int" => !string.IsNullOrEmpty(schema.UnitId)
-                ? JsonToNumeric(elem)
-                : (elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
+            "int" => elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
                   : elem.ValueKind == JsonValueKind.String
                     && long.TryParse(elem.GetString(), out var l) ? l
-                  : (object?)null),
+                  : (object?)null,
 
-            // decimal：统一走 JsonToNumeric
             "decimal" => JsonToNumeric(elem),
 
             "bool" => elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False
@@ -458,35 +453,20 @@ else
         };
     }
 
-    /// <summary>
-    /// 数值 JSON → NumericInput。
-    ///
-    /// 支持两种形态：
-    ///   - { value: 1.5, unitId: "..." }  → 值 + 单位（单位仅记录，不换算）
-    ///   - 裸数字                          → 单位取属性定义绑定的单位
-    /// </summary>
-    private NumericInput JsonToNumeric(JsonElement elem)
+    /// <summary>数值 JSON → 裸 decimal（后端恒返回数字）。</summary>
+    private static decimal? JsonToNumeric(JsonElement elem)
     {
-        if (elem.ValueKind == JsonValueKind.Object)
-        {
-            var val = elem.GetProperty("value").GetDecimal();
-            string? unitId = elem.TryGetProperty("unitId", out var u)
-                             && u.ValueKind == JsonValueKind.String
-                ? u.GetString()
-                : null;
-            return new NumericInput { Value = val, UnitId = unitId };
-        }
         if (elem.ValueKind == JsonValueKind.Number)
-            return new NumericInput { Value = elem.GetDecimal(), UnitId = null };
+            return elem.GetDecimal();
         if (elem.ValueKind == JsonValueKind.String
             && decimal.TryParse(elem.GetString(),
                 System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture,
                 out var d))
         {
-            return new NumericInput { Value = d, UnitId = null };
+            return d;
         }
-        return new NumericInput();
+        return null;
     }
 
     private Dictionary<string, object?> JsonToComposite(

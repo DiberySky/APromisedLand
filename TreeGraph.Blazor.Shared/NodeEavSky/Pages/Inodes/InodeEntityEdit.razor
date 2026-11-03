@@ -433,12 +433,10 @@ else
         {
             "string" => elem.ValueKind == JsonValueKind.String
                 ? elem.GetString() : elem.ToString(),
-            "int" => !string.IsNullOrEmpty(schema.UnitId)
-                ? JsonToNumeric(elem)
-                : (elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
+            "int" => elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
                   : elem.ValueKind == JsonValueKind.String
                     && long.TryParse(elem.GetString(), out var l) ? l
-                  : (object?)null),
+                  : (object?)null,
             "decimal" => JsonToNumeric(elem),
             "bool" => elem.ValueKind == JsonValueKind.True
                       || elem.ValueKind == JsonValueKind.False
@@ -460,28 +458,20 @@ else
         };
     }
 
-    private NumericInput JsonToNumeric(JsonElement elem)
+    /// <summary>数值 JSON → 裸 decimal（后端恒返回数字）。</summary>
+    private static decimal? JsonToNumeric(JsonElement elem)
     {
-        if (elem.ValueKind == JsonValueKind.Object)
-        {
-            var val = elem.GetProperty("value").GetDecimal();
-            string? unitId = elem.TryGetProperty("unitId", out var u)
-                             && u.ValueKind == JsonValueKind.String
-                ? u.GetString()
-                : null;
-            return new NumericInput { Value = val, UnitId = unitId };
-        }
         if (elem.ValueKind == JsonValueKind.Number)
-            return new NumericInput { Value = elem.GetDecimal(), UnitId = null };
+            return elem.GetDecimal();
         if (elem.ValueKind == JsonValueKind.String
             && decimal.TryParse(elem.GetString(),
                 System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture,
                 out var d))
         {
-            return new NumericInput { Value = d, UnitId = null };
+            return d;
         }
-        return new NumericInput();
+        return null;
     }
 
     private Dictionary<string, object?> JsonToComposite(

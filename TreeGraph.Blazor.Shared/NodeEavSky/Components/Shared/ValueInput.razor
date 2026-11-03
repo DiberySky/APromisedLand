@@ -19,65 +19,26 @@
 }
 else if (Attribute.DataType == "int")
 {
-    @* ★ int 有单位时：数值可编辑，单位只读展示（绑定在属性定义上） *@
-    @if (!string.IsNullOrEmpty(Attribute.UnitId))
-    {
-        var numeric = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-        <NumberInputField T="decimal?"
-                          Value="@numeric.Value"
-                          ValueChanged="@(v =>
-                          {
-                              var n = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-                              n.Value = v ?? 0;
-                              n.UnitId = Attribute.UnitId;
-                              ValueChanged.InvokeAsync(n);
-                          })"
-                          Margin="Margin.Dense"
-                          Placeholder="值"
-                          Suffix="@Attribute.UnitName" />
-    }
-    else
-    {
-        <NumberInputField T="long?"
-                          Value="@(Value switch { long l => l, int i => i, _ => null })"
-                          ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                          Margin="Margin.Dense"
-                          Placeholder="值" />
-    }
+    <NumberInputField T="long?"
+                      Value="@(Value switch { long l => l, int i => i, _ => null })"
+                      ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                      Margin="Margin.Dense"
+                      Placeholder="值" />
 }
 else if (Attribute.DataType == "decimal")
 {
-    @if (!string.IsNullOrEmpty(Attribute.UnitId))
-    {
-        var numeric = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-        <NumberInputField T="decimal?"
-                          Value="@numeric.Value"
-                          ValueChanged="@(v =>
-                          {
-                              var n = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-                              n.Value = v ?? 0;
-                              n.UnitId = Attribute.UnitId;
-                              ValueChanged.InvokeAsync(n);
-                          })"
-                          Margin="Margin.Dense"
-                          Placeholder="值"
-                          Suffix="@Attribute.UnitName" />
-    }
-    else
-    {
-        <NumberInputField T="decimal?"
-                          Value="@(Value switch
-                          {
-                              decimal d => d,
-                              double db => (decimal)db,
-                              int i => i,
-                              long l => l,
-                              _ => null
-                          })"
-                          ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                          Margin="Margin.Dense"
-                          Placeholder="值" />
-    }
+    <NumberInputField T="decimal?"
+                      Value="@(Value switch
+                      {
+                          decimal d => d,
+                          double db => (decimal)db,
+                          int i => i,
+                          long l => l,
+                          _ => null
+                      })"
+                      ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                      Margin="Margin.Dense"
+                      Placeholder="值" />
 }
 else if (Attribute.DataType == "bool")
 {

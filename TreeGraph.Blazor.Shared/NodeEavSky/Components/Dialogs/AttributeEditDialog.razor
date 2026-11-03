@@ -20,6 +20,14 @@
                       Margin="Margin.Dense"
                       HelperText="用户在界面上看到的名字" />
 
+        @* int / decimal：单位仅为命名约定（显示名以「-单位」结尾） *@
+        @if (Attribute?.DataType is "int" or "decimal")
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
+                如需标注计量单位，请以「-单位」追加到显示名，例如：长度-米
+            </MudAlert>
+        }
+
         @* 内部标识：创建后不可修改，只读展示完整值 *@
         <MudTextField Value="@Attribute?.AttributeName"
                       Label="内部标识"
@@ -46,14 +54,6 @@
                                       Label="小数精度（可选）"
                                       Min="0" Max="10" Step="1"
                                       Margin="Margin.Dense" />
-                </div>
-            }
-            @if (Attribute?.DataType is "decimal" or "int")
-            {
-                <div>
-                    <UnitTreeField @bind-UnitId="_editForm.UnitId"
-                                   @bind-UnitName="_editForm.UnitName"
-                                   Margin="Margin.Dense" />
                 </div>
             }
         </div>
@@ -232,15 +232,13 @@
         => Attribute is null ? "" : EavDataTypeLabels.GetLabel(Attribute.DataType);
 
     /// <summary>
-    /// 数据类型行布局：decimal 三等分、int 两列（数据类型稍宽）、其它单列。
+    /// 数据类型行布局：decimal 两列、其它单列。
     /// 用 Grid + minmax(0, fr) 固定分配，避免宽度被控件固有内容撑开。
     /// </summary>
     private string DataTypeRowStyle => Attribute?.DataType switch
     {
         "decimal" => "display:grid; gap:8px; align-items:start; "
-                   + "grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);",
-        "int" => "display:grid; gap:8px; align-items:start; "
-               + "grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);",
+                   + "grid-template-columns:minmax(0,1fr) minmax(0,1fr);",
         _ => "display:grid; gap:8px; align-items:start; grid-template-columns:minmax(0,1fr);"
     };
 
@@ -276,8 +274,6 @@
                 IsSearchable = Attribute.IsSearchable,
                 IsSortable = Attribute.IsSortable,
                 DisplayOrder = Attribute.DisplayOrder,
-                UnitId = Attribute.UnitId,
-                UnitName = FormatUnitName(Attribute.UnitName, Attribute.UnitAbbreviation),
                 RefCompositeTypeId = Attribute.RefCompositeTypeId,
                 RefTableDefinitionId = Attribute.RefTableDefinitionId,
                 IsRecordMode = Attribute.IsRecordMode,
@@ -292,7 +288,6 @@
     {
         if (Attribute is null) return;
 
-        var (unitId, clearUnit) = Diff(_editForm.UnitId, Attribute.UnitId);
         var (ctId, clearCt) = Diff(_editForm.RefCompositeTypeId, Attribute.RefCompositeTypeId);
         var (tblId, clearTbl) = Diff(_editForm.RefTableDefinitionId, Attribute.RefTableDefinitionId);
         var (optId, clearOpt) = Diff(_editForm.RefOptionSetId, Attribute.RefOptionSetId);
@@ -313,9 +308,6 @@
                     IsSortable = _editForm.IsSortable,
                     DisplayOrder = _editForm.DisplayOrder,
                     ValidationRule = rule,
-
-                    UnitId = unitId,
-                    ClearUnitId = clearUnit,
 
                     RefCompositeTypeId = ctId,
                     ClearRefCompositeTypeId = clearCt,
@@ -424,11 +416,6 @@
         return System.Text.Json.JsonSerializer.SerializeToElement(dict);
     }
 
-    private static string? FormatUnitName(string? name, string? abbreviation)
-        => name is null ? null
-            : string.IsNullOrEmpty(abbreviation) ? name
-            : $"{name} 【{abbreviation}】";
-
     private class UpdateAttributeForm
     {
         public string DisplayName { get; set; } = "";
@@ -436,8 +423,6 @@
         public bool IsSearchable { get; set; }
         public bool IsSortable { get; set; }
         public int DisplayOrder { get; set; }
-        public string? UnitId { get; set; }
-        public string? UnitName { get; set; }
         /// <summary>decimal 小数精度（0–10，null 不限制）→ ValidationRule.precision</summary>
         public int? Precision { get; set; }
         public string? RefCompositeTypeId { get; set; }

@@ -115,9 +115,7 @@ public class EavQueryService
         AttributeDefinition def, bool descending)
         => def.DataType switch
         {
-            // ★ int + 单位：按 ValueDecimal 排序（归一化后的值）
-            EavDataTypes.Int when def.UnitId is not null
-                => SortDecimal(ids, keyRows, descending),
+            // ★ 方案A：int 恒按 ValueInt 排序；decimal 恒按 ValueDecimal 排序
             EavDataTypes.Int => SortLong(ids, keyRows, descending),
             EavDataTypes.Decimal => SortDecimal(ids, keyRows, descending),
             EavDataTypes.String or EavDataTypes.SingleChoice
@@ -256,21 +254,9 @@ public class EavQueryService
         var baseQuery = _db.AttributeValues
             .Where(v => v.AttributeId == def.AttributeId);
 
-        if (filter.Operator == "unit_eq")
-        {
-            var unitId = filter.Value!.ToString()!;
-            return baseQuery
-                .Where(x => x.UnitId == unitId)
-                .Select(x => x.EntityId)
-                .Distinct();
-        }
-
+        // ★ 方案A：int 恒 ValueInt 过滤；decimal 恒 ValueDecimal 过滤
         var filtered = def.DataType switch
         {
-            // ★ int + 单位：走 decimal 过滤路径（数据存于 ValueDecimal）
-            EavDataTypes.Int when def.UnitId is not null
-                => ApplyDecimalFilter(baseQuery, def, filter),
-
             EavDataTypes.Int => ApplyIntFilter(baseQuery, def, filter),
             EavDataTypes.Decimal => ApplyDecimalFilter(baseQuery, def, filter),
             EavDataTypes.String => ApplyStringFilter(baseQuery, filter),
@@ -533,7 +519,7 @@ public class EavQueryService
                              && values.Contains(x.ValueInt.Value));
         }
 
-        var (rawValue, _) = ParseNumericFilterValue(f.Value);
+        var rawValue = ParseNumericFilterValue(f.Value);
         if (rawValue is null) throw new ArgumentException("过滤值格式错误");
         var v = rawValue.Value;
         decimal? v2 = f.Value2 is null ? null : ParseNumericFilterValue2(f.Value2);
@@ -564,7 +550,7 @@ public class EavQueryService
                              && values.Contains(x.ValueDecimal.Value));
         }
 
-        var (rawValue, _) = ParseNumericFilterValue(f.Value);
+        var rawValue = ParseNumericFilterValue(f.Value);
         if (rawValue is null) throw new ArgumentException("过滤值格式错误");
         var v = rawValue.Value;
         decimal? v2 = f.Value2 is null ? null : ParseNumericFilterValue2(f.Value2);
@@ -585,26 +571,21 @@ public class EavQueryService
 
     private static decimal ParseNumericFilterValue2(object? value2)
     {
-        var (rawValue, _) = ParseNumericFilterValue(value2);
+        var rawValue = ParseNumericFilterValue(value2);
         if (rawValue is null) throw new ArgumentException("过滤值格式错误");
         return rawValue.Value;
     }
 
-    private static (decimal? Value, string? UnitId) ParseNumericFilterValue(object? value)
+    private static decimal? ParseNumericFilterValue(object? value)
     {
         return value switch
         {
-            null => (null, null),
-            NumericValue nv => (nv.Value, nv.UnitId),
-            JsonElement je when je.ValueKind == JsonValueKind.Object =>
-                (je.GetProperty("value").GetDecimal(),
-                 je.TryGetProperty("unitId", out var uid) && uid.ValueKind == JsonValueKind.String
-                     ? uid.GetString() : null),
-            JsonElement je when je.ValueKind == JsonValueKind.Number => (je.GetDecimal(), null),
-            decimal d => (d, null),
+            null => null,
+            JsonElement je when je.ValueKind == JsonValueKind.Number => je.GetDecimal(),
+            decimal d => d,
             string s when decimal.TryParse(s, NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var parsed) => (parsed, null),
-            _ => (null, null)
+                CultureInfo.InvariantCulture, out var parsed) => parsed,
+            _ => null
         };
     }
 
@@ -723,195 +704,89 @@ public class EavQueryService
 
         if (fieldPath.Length == 1)
         {
-            // ★ 带单位的组合内 decimal：JSONB 内可能存为 { value, unitId } 或裸数值，
-            //   需要专用查询路径
-            if (fieldDef.DataType == EavDataTypes.Decimal && fieldDef.UnitId is not null)
+            // ★ 方案A：组合内 decimal 恒为裸数值 JSONB
+            query = fieldDef.DataType switch
             {
-                query = ApplyCompositeDecimalFilterWithUnit(query, fieldName, filter);
-            }
-            else
-            {
-                query = fieldDef.DataType switch
+                EavDataTypes.Int => filter.Operator switch
                 {
-                    EavDataTypes.Int => filter.Operator switch
-                    {
-                        "eq" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetInt64() == ToInt64(filter.Value)),
-                        "gt" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetInt64() > ToInt64(filter.Value)),
-                        "gte" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetInt64() >= ToInt64(filter.Value)),
-                        "lt" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetInt64() < ToInt64(filter.Value)),
-                        "lte" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetInt64() <= ToInt64(filter.Value)),
-                        _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
-                    },
-                    EavDataTypes.Decimal => filter.Operator switch
-                    {
-                        "eq" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetDecimal() == ToDecimal(filter.Value)),
-                        "gt" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetDecimal() > ToDecimal(filter.Value)),
-                        "gte" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetDecimal() >= ToDecimal(filter.Value)),
-                        "lt" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetDecimal() < ToDecimal(filter.Value)),
-                        "lte" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetDecimal() <= ToDecimal(filter.Value)),
-                        _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
-                    },
-                    _ => ApplyJsonbStringFilter(query, fieldName, filter)
-                };
-            }
+                    "eq" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetInt64() == ToInt64(filter.Value)),
+                    "gt" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetInt64() > ToInt64(filter.Value)),
+                    "gte" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetInt64() >= ToInt64(filter.Value)),
+                    "lt" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetInt64() < ToInt64(filter.Value)),
+                    "lte" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetInt64() <= ToInt64(filter.Value)),
+                    _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
+                },
+                EavDataTypes.Decimal => filter.Operator switch
+                {
+                    "eq" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetDecimal() == ToDecimal(filter.Value)),
+                    "gt" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetDecimal() > ToDecimal(filter.Value)),
+                    "gte" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetDecimal() >= ToDecimal(filter.Value)),
+                    "lt" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetDecimal() < ToDecimal(filter.Value)),
+                    "lte" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetDecimal() <= ToDecimal(filter.Value)),
+                    _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
+                },
+                _ => ApplyJsonbStringFilter(query, fieldName, filter)
+            };
         }
         else
         {
             var nestedName = fieldPath[1];
 
-            // ★ 嵌套带单位 decimal 同样处理
-            if (fieldDef.DataType == EavDataTypes.Decimal && fieldDef.UnitId is not null)
+            query = fieldDef.DataType switch
             {
-                query = ApplyCompositeNestedDecimalFilterWithUnit(
-                    query, fieldName, nestedName, filter);
-            }
-            else
-            {
-                query = fieldDef.DataType switch
+                EavDataTypes.Int => filter.Operator switch
                 {
-                    EavDataTypes.Int => filter.Operator switch
-                    {
-                        "eq" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetProperty(nestedName)
-                            .GetInt64() == ToInt64(filter.Value)),
-                        "gt" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetProperty(nestedName)
-                            .GetInt64() > ToInt64(filter.Value)),
-                        "gte" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetProperty(nestedName)
-                            .GetInt64() >= ToInt64(filter.Value)),
-                        "lt" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetProperty(nestedName)
-                            .GetInt64() < ToInt64(filter.Value)),
-                        "lte" => query.Where(v => v.ValueJsonb!.RootElement
-                            .GetProperty(fieldName).GetProperty(nestedName)
-                            .GetInt64() <= ToInt64(filter.Value)),
-                        _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
-                    },
-                    _ => ApplyJsonbStringFilterNested(query, fieldName, nestedName, filter)
-                };
-            }
+                    "eq" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetProperty(nestedName)
+                        .GetInt64() == ToInt64(filter.Value)),
+                    "gt" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetProperty(nestedName)
+                        .GetInt64() > ToInt64(filter.Value)),
+                    "gte" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetProperty(nestedName)
+                        .GetInt64() >= ToInt64(filter.Value)),
+                    "lt" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetProperty(nestedName)
+                        .GetInt64() < ToInt64(filter.Value)),
+                    "lte" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetProperty(nestedName)
+                        .GetInt64() <= ToInt64(filter.Value)),
+                    _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
+                },
+                EavDataTypes.Decimal => filter.Operator switch
+                {
+                    "eq" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetProperty(nestedName)
+                        .GetDecimal() == ToDecimal(filter.Value)),
+                    "gt" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetProperty(nestedName)
+                        .GetDecimal() > ToDecimal(filter.Value)),
+                    "gte" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetProperty(nestedName)
+                        .GetDecimal() >= ToDecimal(filter.Value)),
+                    "lt" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetProperty(nestedName)
+                        .GetDecimal() < ToDecimal(filter.Value)),
+                    "lte" => query.Where(v => v.ValueJsonb!.RootElement
+                        .GetProperty(fieldName).GetProperty(nestedName)
+                        .GetDecimal() <= ToDecimal(filter.Value)),
+                    _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
+                },
+                _ => ApplyJsonbStringFilterNested(query, fieldName, nestedName, filter)
+            };
         }
 
         return query.Select(v => v.EntityId).Distinct();
-    }
-
-    /// <summary>
-    /// 组合内带单位 decimal 字段的单层查询。
-    ///
-    /// 存储形态（见 CompositeValueService.Serialize）：
-    ///   1) 裸数值 { "field": 1.5 }                          — 用户输入未指定单位
-    ///   2) 对象   { "field": { "value": 1.5, "unitId": ".." }} — 用户输入指定了单位
-    ///
-    /// ★ 用 jsonb_typeof + CASE（三元表达式）抽取数值：
-    ///   - 两种形态统一比较；其它类型（如 string）落到 NULL 被比较排除。
-    ///   - 不能用 JsonElement.ValueKind 做判断——EF 无法翻译为 SQL。
-    ///   - CASE 只计算命中的分支，number 行不会触发 object 取值（反之亦然），安全。
-    /// </summary>
-    private static IQueryable<AttributeValue> ApplyCompositeDecimalFilterWithUnit(
-        IQueryable<AttributeValue> query, string fieldName, AttributeFilter filter)
-    {
-        var target = ToDecimal(filter.Value);
-
-        return filter.Operator switch
-        {
-            "eq" => query.Where(v =>
-                (EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(fieldName)) == "number"
-                    ? v.ValueJsonb!.RootElement.GetProperty(fieldName).GetDecimal()
-                    : EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(fieldName)) == "object"
-                        ? v.ValueJsonb!.RootElement.GetProperty(fieldName).GetProperty("value").GetDecimal()
-                        : (decimal?)null) == target),
-
-            "gt" => query.Where(v =>
-                (EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(fieldName)) == "number"
-                    ? v.ValueJsonb!.RootElement.GetProperty(fieldName).GetDecimal()
-                    : EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(fieldName)) == "object"
-                        ? v.ValueJsonb!.RootElement.GetProperty(fieldName).GetProperty("value").GetDecimal()
-                        : (decimal?)null) > target),
-
-            "gte" => query.Where(v =>
-                (EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(fieldName)) == "number"
-                    ? v.ValueJsonb!.RootElement.GetProperty(fieldName).GetDecimal()
-                    : EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(fieldName)) == "object"
-                        ? v.ValueJsonb!.RootElement.GetProperty(fieldName).GetProperty("value").GetDecimal()
-                        : (decimal?)null) >= target),
-
-            "lt" => query.Where(v =>
-                (EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(fieldName)) == "number"
-                    ? v.ValueJsonb!.RootElement.GetProperty(fieldName).GetDecimal()
-                    : EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(fieldName)) == "object"
-                        ? v.ValueJsonb!.RootElement.GetProperty(fieldName).GetProperty("value").GetDecimal()
-                        : (decimal?)null) < target),
-
-            "lte" => query.Where(v =>
-                (EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(fieldName)) == "number"
-                    ? v.ValueJsonb!.RootElement.GetProperty(fieldName).GetDecimal()
-                    : EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(fieldName)) == "object"
-                        ? v.ValueJsonb!.RootElement.GetProperty(fieldName).GetProperty("value").GetDecimal()
-                        : (decimal?)null) <= target),
-
-            _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
-        };
-    }
-
-    /// <summary>
-    /// 嵌套（两层）带单位 decimal 字段查询。抽取策略同单层：
-    /// jsonb_typeof + CASE，EF.Functions.JsonTypeof 可翻译为 jsonb_typeof。
-    /// </summary>
-    private static IQueryable<AttributeValue> ApplyCompositeNestedDecimalFilterWithUnit(
-        IQueryable<AttributeValue> query, string outerName, string innerName, AttributeFilter filter)
-    {
-        var target = ToDecimal(filter.Value);
-
-        return filter.Operator switch
-        {
-            "eq" => query.Where(v =>
-                (EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName)) == "number"
-                    ? v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName).GetDecimal()
-                    : EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName)) == "object"
-                        ? v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName).GetProperty("value").GetDecimal()
-                        : (decimal?)null) == target),
-
-            "gt" => query.Where(v =>
-                (EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName)) == "number"
-                    ? v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName).GetDecimal()
-                    : EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName)) == "object"
-                        ? v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName).GetProperty("value").GetDecimal()
-                        : (decimal?)null) > target),
-
-            "gte" => query.Where(v =>
-                (EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName)) == "number"
-                    ? v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName).GetDecimal()
-                    : EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName)) == "object"
-                        ? v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName).GetProperty("value").GetDecimal()
-                        : (decimal?)null) >= target),
-
-            "lt" => query.Where(v =>
-                (EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName)) == "number"
-                    ? v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName).GetDecimal()
-                    : EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName)) == "object"
-                        ? v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName).GetProperty("value").GetDecimal()
-                        : (decimal?)null) < target),
-
-            "lte" => query.Where(v =>
-                (EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName)) == "number"
-                    ? v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName).GetDecimal()
-                    : EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName)) == "object"
-                        ? v.ValueJsonb!.RootElement.GetProperty(outerName).GetProperty(innerName).GetProperty("value").GetDecimal()
-                        : (decimal?)null) <= target),
-
-            _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
-        };
     }
 
     private static IQueryable<AttributeValue> ApplyJsonbStringFilter(

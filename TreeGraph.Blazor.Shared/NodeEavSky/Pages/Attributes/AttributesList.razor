@@ -149,13 +149,6 @@ else
                     </MudChip>
                 </MudTd>
                 <MudTd>
-                    @if (context.UnitId is not null)
-                    {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Warning"
-                                 Class="mr-1">
-                            单位: @context.UnitAbbreviation
-                        </MudChip>
-                    }
                     @if (context.RefCompositeTypeId is not null)
                     {
                         <MudChip T="string" Size="Size.Small" Color="Color.Dark"

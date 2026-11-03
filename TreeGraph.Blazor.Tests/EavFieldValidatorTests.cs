@@ -12,7 +12,6 @@ namespace TreeGraph.Blazor.Tests;
 /// FieldValidationRulesTests 覆盖）：
 ///   - 必填检查 + single_choice 默认值放行
 ///   - int 拒绝小数（EavFieldValidator 独有）
-///   - NumericInput 的 UnitId 与属性定义一致性
 ///   - 组合类型递归
 ///   - date / time / json 的解析失败
 ///   - IsEmpty 对空数组的处理
@@ -31,7 +30,6 @@ public class EavFieldValidatorTests
         JsonElement? rule = null,
         JsonElement? allowedValues = null,
         CompositeTypeSchemaDto? composite = null,
-        string? unitId = null,
         OptionSetSchemaDto? optionSet = null)
         => new(
             AttributeName: "field",
@@ -44,7 +42,6 @@ public class EavFieldValidatorTests
             AllowedValues: allowedValues,
             ValidationRule: rule,
             CompositeType: composite,
-            UnitId: unitId,
             OptionSet: optionSet);
 
     private static CompositeTypeSchemaDto Composite(
@@ -91,7 +88,7 @@ public class EavFieldValidatorTests
     {
         var errors = _validator.Validate(Attr("int"), 3.14m);
         Assert.Single(errors);
-        Assert.Contains("int 类型（无单位）不接受小数", errors[0].Message);
+        Assert.Contains("int 类型不接受小数", errors[0].Message);
     }
 
     [Fact]
@@ -106,7 +103,7 @@ public class EavFieldValidatorTests
     {
         var errors = _validator.Validate(Attr("int"), "3.14");
         Assert.Single(errors);
-        Assert.Contains("int 类型（无单位）不接受小数", errors[0].Message);
+        Assert.Contains("int 类型不接受小数", errors[0].Message);
     }
 
     // ============================================================
@@ -176,36 +173,11 @@ public class EavFieldValidatorTests
     }
 
     // ============================================================
-    // NumericInput 的 UnitId 与属性定义一致性
+    // 裸数值
     // ============================================================
 
     [Fact]
-    public void NumericInput_WhenAttrHasUnit_WithDifferentUnitId_ReturnsError()
-    {
-        var value = new NumericInput { Value = 5m, UnitId = "unit-cm" };
-
-        var errors = _validator.Validate(
-            Attr("decimal", unitId: "unit-kg"),
-            value);
-
-        Assert.Single(errors);
-        Assert.Contains("单位与属性定义不一致", errors[0].Message);
-    }
-
-    [Fact]
-    public void NumericInput_WhenAttrHasUnit_WithMatchingUnitId_Passes()
-    {
-        var value = new NumericInput { Value = 5m, UnitId = "unit-kg" };
-
-        var errors = _validator.Validate(
-            Attr("decimal", unitId: "unit-kg"),
-            value);
-
-        Assert.Empty(errors);
-    }
-
-    [Fact]
-    public void NumericInput_BareDecimal_NoUnit_Passes()
+    public void NumericInput_BareDecimal_Passes()
     {
         var errors = _validator.Validate(Attr("decimal"), 5m);
         Assert.Empty(errors);

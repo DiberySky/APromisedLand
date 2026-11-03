@@ -95,15 +95,6 @@ public class InodeJsonTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetAllAsJson_InvalidUnits_Returns400()
-    {
-        var inodeId = NewInodeId();
-        var resp = await Client.GetAsync(
-            $"/api/inode/{inodeId}/json?units=xxx");
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
-    }
-
-    [Fact]
     public async Task GetAllAsJson_EmptyInode_ReturnsEmptyEntities()
     {
         var inodeId = NewInodeId();

@@ -100,7 +100,7 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         DataType: "string", RefCompositeTypeId: null, IsArray: false,
         IsRequired: false, IsSearchable: true, IsSortable: true,
         DisplayOrder: 1, DefaultValue: null, AllowedValues: null,
-        ValidationRule: null, UnitId: null, UnitName: null, UnitAbbreviation: null,
+        ValidationRule: null,
         RefOptionSetId: null,
         OptionSetName: null, OptionSetDisplayName: null, IsDeleted: false);
 
@@ -122,7 +122,6 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         IsSearchable: true, IsSortable: true, Version: 1,
         DisplayOrder: 1, DefaultValue: null, CreatedAt: DateTimeOffset.UtcNow,
         UpdatedAt: DateTimeOffset.UtcNow, AllowedValues: null, ValidationRule: null,
-        UnitId: null, UnitName: null, UnitAbbreviation: null,
         RefCompositeTypeId: null, CompositeTypeName: null,
         CompositeTypeDisplayName: null, RefTableDefinitionId: null,
         TableName: null, TableDisplayName: null, IsRecordMode: false, RefOptionSetId: null,

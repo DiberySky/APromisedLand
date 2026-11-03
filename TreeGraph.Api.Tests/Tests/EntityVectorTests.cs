@@ -45,14 +45,12 @@ public class EntityVectorTests
                 e.Ignore(x => x.RefCompositeType);
                 e.Ignore(x => x.RefTableDefinition);
                 e.Ignore(x => x.RefOptionSet);
-                e.Ignore(x => x.Unit);
                 e.Ignore(x => x.AllowedValues);
                 e.Ignore(x => x.ValidationRule);
             });
             mb.Entity<AttributeValue>(e =>
             {
                 e.HasKey(x => x.ValueId);
-                e.Ignore(x => x.Unit);
                 e.Ignore(x => x.Attribute);
                 e.Ignore(x => x.ValueFileMeta);
                 e.Ignore(x => x.ValueJsonb);

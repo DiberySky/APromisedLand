@@ -330,7 +330,6 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id").HasMaxLength(36);
             e.Property(x => x.RefTableDefinitionId).HasColumnName("ref_table_definition_id").HasMaxLength(36);
             e.Property(x => x.RefOptionSetId).HasColumnName("ref_option_set_id").HasMaxLength(36);
-            e.Property(x => x.UnitId).HasColumnName("unit_id").HasMaxLength(36);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
@@ -345,9 +344,6 @@ public class TreeGraphDbContext : DbContext
             e.HasOne(x => x.RefCompositeType)
                 .WithMany().HasForeignKey(x => x.RefCompositeTypeId)
                 .OnDelete(DeleteBehavior.Restrict);
-
-            e.HasOne(x => x.Unit).WithMany()
-                .HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
 
             e.HasOne(x => x.RefTableDefinition).WithMany()
                 .HasForeignKey(x => x.RefTableDefinitionId).OnDelete(DeleteBehavior.Restrict);
@@ -385,7 +381,6 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.ValueJsonb).HasColumnName("value_jsonb").HasColumnType("jsonb");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-            e.Property(x => x.UnitId).HasColumnName("unit_id").HasMaxLength(36);
 
             e.HasIndex(x => new { x.EntityId, x.AttributeId })
                 .IsUnique().HasDatabaseName("uq_av_entity_attr");
@@ -422,8 +417,6 @@ public class TreeGraphDbContext : DbContext
 
             e.HasOne(x => x.Attribute).WithMany()
                 .HasForeignKey(x => x.AttributeId).OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(x => x.Unit).WithMany()
-                .HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 
@@ -494,13 +487,9 @@ public class TreeGraphDbContext : DbContext
 
         mb.Entity<CompositeFieldDefinition>(e =>
         {
-            // CHECK：int / decimal 才能绑单位；single_choice 才能绑选项集
+            // CHECK：single_choice 才能绑选项集
             e.ToTable("composite_field_definitions", t =>
             {
-                t.HasCheckConstraint(
-                    "ck_composite_field_decimal_unit",
-                    "data_type IN ('int', 'decimal') OR unit_id IS NULL");
-
                 // ★ #8：single_choice 才能绑选项集
                 t.HasCheckConstraint(
                     "ck_composite_field_single_choice_optionset",
@@ -519,8 +508,6 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
             e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id").HasMaxLength(36);
 
-            // ★ #4：单位外键列（指向 unit_trees 节点）
-            e.Property(x => x.UnitId).HasColumnName("unit_id").HasMaxLength(36);
             // ★ #8：选项集外键列
             e.Property(x => x.RefOptionSetId).HasColumnName("ref_option_set_id").HasMaxLength(36);
 
@@ -542,10 +529,6 @@ public class TreeGraphDbContext : DbContext
                 .HasForeignKey(x => x.CompositeTypeId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.RefCompositeType).WithMany()
                 .HasForeignKey(x => x.RefCompositeTypeId).OnDelete(DeleteBehavior.Restrict);
-
-            // ★ #4：单位外键（Restrict）
-            e.HasOne(x => x.Unit).WithMany()
-                .HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
 
             // ★ #8：选项集外键（Restrict）
             e.HasOne(x => x.RefOptionSet).WithMany()
@@ -632,13 +615,7 @@ public class TreeGraphDbContext : DbContext
 
         mb.Entity<CustomTableColumn>(e =>
         {
-            // CHECK：int / decimal 才能绑单位
-            e.ToTable("custom_table_columns", t =>
-            {
-                t.HasCheckConstraint(
-                    "ck_custom_table_column_numeric_unit",
-                    "data_type IN ('int', 'decimal') OR unit_id IS NULL");
-            });
+            e.ToTable("custom_table_columns");
 
             e.HasKey(x => x.ColumnId);
             e.Property(x => x.ColumnId)
@@ -660,7 +637,6 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.DefaultValue).HasColumnName("default_value").HasMaxLength(500);
             e.Property(x => x.ValidationRule).HasColumnName("validation_rule").HasColumnType("jsonb");
             e.Property(x => x.AllowedValues).HasColumnName("allowed_values").HasColumnType("jsonb");
-            e.Property(x => x.UnitId).HasColumnName("unit_id").HasMaxLength(36);
 
             e.HasIndex(x => new { x.TableDefinitionId, x.ColumnName })
                 .IsUnique().HasDatabaseName("uq_custom_table_column");
@@ -670,8 +646,6 @@ public class TreeGraphDbContext : DbContext
                 .HasForeignKey(x => x.TableDefinitionId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.RefCompositeType).WithMany()
                 .HasForeignKey(x => x.RefCompositeTypeId).OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(x => x.Unit).WithMany()
-                .HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
         });
 
         mb.Entity<CustomTableRow>(e =>

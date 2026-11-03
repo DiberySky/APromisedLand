@@ -66,31 +66,12 @@ public class EavController : ControllerBase
     }
 
     [HttpGet("schema")]
-    public async Task<IActionResult> GetSchema(string entityType, CancellationToken ct)
+    public IActionResult GetSchema(string entityType)
     {
         var defs = _attrCache.GetDefinitions(entityType);
 
-        // 单位名称投影（unit_trees 节点，仅作展示；含组合内字段的单位）
-        var unitIds = defs.Select(d => d.UnitId)
-            .Where(id => id is not null).Select(id => id!)
-            .ToList();
-
-        foreach (var d in defs.Where(d => d.RefCompositeTypeId is not null))
-            CollectFieldUnitIds(d.RefCompositeTypeId!, unitIds);
-
-        unitIds = unitIds.Distinct().ToList();
-        // ★ Name 是 UnitTree 的 [NotMapped] 读穿透属性（Node.Name），必须投影 Node，
-        //   否则字典值恒为 null（实体录入界面的单位后缀会丢失）。
-        var unitNames = unitIds.Count == 0
-            ? new Dictionary<string, string>()
-            : (await _db.UnitTrees
-                .Where(u => unitIds.Contains(u.Id))
-                .Select(u => new { u.Id, u.Node!.Name })
-                .AsNoTracking()
-                .ToListAsync(ct))
-              .ToDictionary(x => x.Id, x => x.Name ?? string.Empty);
-
-        var schema = defs.Select(d => ToSchemaDto(d, unitNames)).ToList();
+        // ★ 方案A：单位不再结构化下放，仅以 "-单位" 命名约定出现在 DisplayName
+        var schema = defs.Select(ToSchemaDto).ToList();
         return Ok(new { EntityType = entityType, Attributes = schema });
     }
 
@@ -381,28 +362,11 @@ public class EavController : ControllerBase
 
     // ---------- Schema 映射 ----------
 
-    /// <summary>递归收集组合类型字段上的单位 Id（含嵌套组合）。</summary>
-    private void CollectFieldUnitIds(string compositeTypeId, List<string> unitIds)
-    {
-        var ct = _compositeCache.GetType(compositeTypeId);
-        foreach (var f in ct.Fields.Where(f => !f.IsDeleted))
-        {
-            if (f.UnitId is { } uid) unitIds.Add(uid);
-            if (f.DataType == EavDataTypes.Composite && f.RefCompositeTypeId is { } rid)
-                CollectFieldUnitIds(rid, unitIds);
-        }
-    }
-
-    private AttributeSchemaDto ToSchemaDto(
-        AttributeDefinition d, IReadOnlyDictionary<string, string> unitNames)
+    private AttributeSchemaDto ToSchemaDto(AttributeDefinition d)
     {
         CompositeTypeSchemaDto? composite = null;
         if (d.RefCompositeTypeId is not null)
-            composite = BuildCompositeSchema(d.RefCompositeTypeId, unitNames);
-
-        string? unitName = null;
-        if (d.UnitId is { } uid)
-            unitNames.TryGetValue(uid, out unitName);
+            composite = BuildCompositeSchema(d.RefCompositeTypeId);
 
         OptionSetSchemaDto? optionSet = null;
         if (d.DataType == EavDataTypes.SingleChoice && d.RefOptionSetId is { } osid)
@@ -424,37 +388,26 @@ public class EavController : ControllerBase
             d.IsRequired, d.IsSearchable, d.IsSortable, d.DisplayOrder,
             d.AllowedValues?.RootElement.Clone(),
             d.ValidationRule?.RootElement.Clone(),
-            composite, d.UnitId, unitName, optionSet,
+            composite, optionSet,
             d.RefTableDefinitionId, d.IsRecordMode);
     }
 
-    /// <summary>
-    /// 递归构造组合类型 Schema。
-    ///
-    /// ★ #4：字段的 UnitId / UnitName 一并下放（仅 decimal 字段可能非空）。
-    /// </summary>
-    private CompositeTypeSchemaDto BuildCompositeSchema(
-        string compositeTypeId, IReadOnlyDictionary<string, string> unitNames)
+    /// <summary>递归构造组合类型 Schema。</summary>
+    private CompositeTypeSchemaDto BuildCompositeSchema(string compositeTypeId)
     {
         var ct = _compositeCache.GetType(compositeTypeId);
 
         var fields = ct.Fields
             .Where(f => !f.IsDeleted)
             .OrderBy(f => f.DisplayOrder)
-            .Select(f => BuildFieldSchema(f, unitNames))
+            .Select(BuildFieldSchema)
             .ToList();
 
         return new CompositeTypeSchemaDto(ct.TypeName, fields);
     }
 
-    private CompositeFieldSchemaDto BuildFieldSchema(
-        CompositeFieldDefinition f, IReadOnlyDictionary<string, string> unitNames)
+    private CompositeFieldSchemaDto BuildFieldSchema(CompositeFieldDefinition f)
     {
-        // ★ #4：单位名称投影
-        string? unitName = null;
-        if (f.UnitId is { } uid)
-            unitNames.TryGetValue(uid, out unitName);
-
         // ★ #8：选项集
         OptionSetSchemaDto? optionSet = null;
         if (f.DataType == EavDataTypes.SingleChoice && f.RefOptionSetId is { } osid)
@@ -476,12 +429,10 @@ public class EavController : ControllerBase
             f.IsArray, f.IsRequired, f.IsSearchable, f.DisplayOrder,
             f.RefCompositeTypeId,
             f.DataType == EavDataTypes.Composite && f.RefCompositeTypeId is { } rid
-                ? BuildCompositeSchema(rid, unitNames)
+                ? BuildCompositeSchema(rid)
                 : null,
             f.ValidationRule?.RootElement.Clone(),
             f.AllowedValues?.RootElement.Clone(),
-            f.UnitId,
-            unitName,
             optionSet);   // ★ #8
     }
 
@@ -550,20 +501,12 @@ public class EavController : ControllerBase
         };
     }
 
-    private static NumericValue ParseNumericJson(JsonElement elem)
+    private static decimal ParseNumericJson(JsonElement elem)
     {
+        // ★ 方案A：数值只接受裸数字（无 { value, unitId } 对象形态）
         if (elem.ValueKind == JsonValueKind.Number)
-            return new NumericValue(elem.GetDecimal(), null);
+            return elem.GetDecimal();
 
-        if (elem.ValueKind == JsonValueKind.Object)
-        {
-            var value = elem.GetProperty("value").GetDecimal();
-            string? unitId = elem.TryGetProperty("unitId", out var u)
-                             && u.ValueKind == JsonValueKind.String
-                ? u.GetString()
-                : null;
-            return new NumericValue(value, unitId);
-        }
         throw new ArgumentException("数值格式错误");
     }
 
@@ -592,8 +535,8 @@ public class EavController : ControllerBase
     }
 
     /// <summary>
-    /// ★ #4：组合内 decimal 字段支持带单位对象 {value, unitId}；
-    /// 其它字段保持原逻辑。
+    /// 组合字段 JSON → 运行时值。
+    /// ★ 方案A：decimal 字段只接受裸数字。
     /// </summary>
     private object? JsonElementToValue(JsonElement elem, CompositeFieldDefinition field)
     {
@@ -603,17 +546,6 @@ public class EavController : ControllerBase
         {
             using var nested = JsonDocument.Parse(elem.GetRawText());
             return CompositeFromDoc(nested, field.RefCompositeTypeId!);
-        }
-
-        // decimal 且带单位对象：返回 NumericValue 让下游统一处理
-        if (field.DataType == EavDataTypes.Decimal && elem.ValueKind == JsonValueKind.Object)
-        {
-            var v = elem.GetProperty("value").GetDecimal();
-            string? unitId = elem.TryGetProperty("unitId", out var u)
-                             && u.ValueKind == JsonValueKind.String
-                ? u.GetString()
-                : null;
-            return new NumericValue(v, unitId);
         }
 
         return field.DataType switch

@@ -50,6 +50,14 @@
                       Class="mb-3"
                       HelperText="用户在界面上看到的名字" />
 
+        @* int / decimal：单位仅为命名约定（显示名以「-单位」结尾） *@
+        @if (_createForm.DataType is "int" or "decimal")
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                如需标注计量单位，请以「-单位」追加到显示名，例如：长度-米
+            </MudAlert>
+        }
+
         @* 内部标识（AttributeName，可空：留空由服务端自动生成） *@
         <NamingTextField @bind-Value="_createForm.AttributeName"
                          SourceText="@_createForm.DisplayName"
@@ -59,7 +67,7 @@
                          Margin="Margin.Dense"
                          HelperText="命名规则：字母开头，仅字母/数字/下划线；点尾部魔棒按显示名称生成建议" />
 
-        @* 数据类型 + 小数精度 + 计量单位：同行排列（单位仅 int/decimal，精度仅 decimal） *@
+        @* 数据类型 + 小数精度：同行排列（精度仅 decimal） *@
         <div class="d-flex align-start gap-2 mb-3">
             <MudSelect T="string"
                        Value="_createForm.DataType"
@@ -83,16 +91,6 @@
                                   Margin="Margin.Dense"
                                   Min="0" Max="10" Step="1"
                                   Style="flex: 1 1 0;" />
-            }
-
-            @* int / decimal：单位（只读文本 + 单位树选择对话框） *@
-            @if (_createForm.DataType is "decimal" or "int")
-            {
-                <div style="flex: 1 1 0;">
-                    <UnitTreeField @bind-UnitId="_createForm.UnitId"
-                                   Margin="Margin.Dense"
-                                   @bind-UnitName="_createForm.UnitName" />
-                </div>
             }
         </div>
 
@@ -290,7 +288,6 @@
     private void OnCreateDataTypeChanged(string dt)
     {
         _createForm.DataType = dt;
-        if (dt is not ("decimal" or "int")) { _createForm.UnitId = null; _createForm.UnitName = null; }
         // decimal：精度默认 2（可改可清空）；切走则清空
         if (dt != "decimal") _createForm.Precision = null;
         else _createForm.Precision ??= 2;
@@ -356,7 +353,6 @@
                 IsSearchable = f.IsSearchable,
                 IsSortable = f.IsSortable,
                 DisplayOrder = f.DisplayOrder,
-                UnitId = f.UnitId,
                 // decimal 精度 → ValidationRule.precision
                 ValidationRule = f.Precision is int p
                     ? System.Text.Json.JsonSerializer.SerializeToElement(new { precision = p })
@@ -391,8 +387,6 @@
         public bool IsSearchable { get; set; }
         public bool IsSortable { get; set; }
         public int DisplayOrder { get; set; }
-        public string? UnitId { get; set; }
-        public string? UnitName { get; set; }
         /// <summary>decimal 小数精度（0–10，null 不限制）→ ValidationRule.precision</summary>
         public int? Precision { get; set; }
         public string? RefCompositeTypeId { get; set; }

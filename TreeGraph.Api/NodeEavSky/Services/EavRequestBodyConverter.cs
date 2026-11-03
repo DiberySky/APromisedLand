@@ -104,20 +104,12 @@ public static class EavRequestBodyConverter
         };
     }
 
-    private static NumericValue ParseNumeric(JsonElement elem)
+    private static decimal ParseNumeric(JsonElement elem)
     {
+        // ★ 方案A：数值只接受裸数字（无 { value, unitId } 对象形态）
         if (elem.ValueKind == JsonValueKind.Number)
-            return new NumericValue(elem.GetDecimal(), null);
+            return elem.GetDecimal();
 
-        if (elem.ValueKind == JsonValueKind.Object)
-        {
-            var value = elem.GetProperty("value").GetDecimal();
-            string? unitId = elem.TryGetProperty("unitId", out var u)
-                             && u.ValueKind == JsonValueKind.String
-                ? u.GetString()
-                : null;
-            return new NumericValue(value, unitId);
-        }
         throw new ArgumentException("数值格式错误");
     }
 

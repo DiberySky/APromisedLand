@@ -25,66 +25,23 @@
 }
 else if (Attribute.DataType == "int")
 {
-    @* ★ int 有单位时走 NumericInput 路径（单位只读展示）；无单位仍用 long? *@
-    @if (!string.IsNullOrEmpty(Attribute.UnitId))
-    {
-        var numeric = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-        <NumberInputField T="decimal?"
-                          Label="@DisplayLabel"
-                          Value="@numeric.Value"
-                          ValueChanged="@(v =>
-                          {
-                              var n = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-                              n.Value = v ?? 0;
-                              n.UnitId = Attribute.UnitId;
-                              ValueChanged.InvokeAsync(n);
-                          })"
-                          Required="@Attribute.IsRequired"
-                          Error="@HasSelfErrors"
-                          ErrorText="@SelfErrorText"
-                          Suffix="@Attribute.UnitName" />
-    }
-    else
-    {
-        <NumberInputField T="long?"
-                          Label="@DisplayLabel"
-                          Value="@LongValue"
-                          ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                          Required="@Attribute.IsRequired"
-                          Error="@HasSelfErrors"
-                          ErrorText="@SelfErrorText" />
-    }
+    <NumberInputField T="long?"
+                      Label="@DisplayLabel"
+                      Value="@LongValue"
+                      ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                      Required="@Attribute.IsRequired"
+                      Error="@HasSelfErrors"
+                      ErrorText="@SelfErrorText" />
 }
 else if (Attribute.DataType == "decimal")
 {
-    @if (!string.IsNullOrEmpty(Attribute.UnitId))
-    {
-        var numeric = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-        <NumberInputField T="decimal?"
-                          Label="@DisplayLabel"
-                          Value="@numeric.Value"
-                          ValueChanged="@(v =>
-                          {
-                              var n = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-                              n.Value = v ?? 0;
-                              n.UnitId = Attribute.UnitId;
-                              ValueChanged.InvokeAsync(n);
-                          })"
-                          Required="@Attribute.IsRequired"
-                          Error="@HasSelfErrors"
-                          ErrorText="@SelfErrorText"
-                          Suffix="@Attribute.UnitName" />
-    }
-    else
-    {
-        <NumberInputField T="decimal?"
-                          Label="@DisplayLabel"
-                          Value="@DecimalValue"
-                          ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                          Required="@Attribute.IsRequired"
-                          Error="@HasSelfErrors"
-                          ErrorText="@SelfErrorText" />
-    }
+    <NumberInputField T="decimal?"
+                      Label="@DisplayLabel"
+                      Value="@DecimalValue"
+                      ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                      Required="@Attribute.IsRequired"
+                      Error="@HasSelfErrors"
+                      ErrorText="@SelfErrorText" />
 }
 else if (Attribute.DataType == "bool")
 {

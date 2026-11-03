@@ -163,10 +163,6 @@
                                                 </MudChip>
                                             </td>
                                             <td>
-                                                @if (c.UnitId is not null)
-                                                {
-                                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="mr-1">单位</MudChip>
-                                                }
                                                 @if (c.RefCompositeTypeId is not null)
                                                 {
                                                     <MudChip T="string" Size="Size.Small" Color="Color.Dark">组合: @GetCompositeTypeName(c.RefCompositeTypeId)</MudChip>

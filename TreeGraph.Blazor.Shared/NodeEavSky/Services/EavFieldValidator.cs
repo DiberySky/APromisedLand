@@ -137,24 +137,12 @@ public class EavFieldValidator : IEavFieldValidator
     /// <summary>
     /// 顶层数值属性校验。
     ///
-    /// ★ int 无单位：拒绝小数（写入 ValueInt 会截断）
-    /// ★ int 有单位：允许小数（写 ValueDecimal）
-    /// ★ 单位固定由属性定义绑定，前端只读展示，不做可用范围校验
+    /// ★ int 恒为整数：拒绝小数（写入 ValueInt 会截断）
     /// </summary>
     private void ValidateNumericAttribute(
         object value, AttributeSchemaDto attr, string path,
         List<FieldValidationError> errors)
     {
-        // 单位归属：若属性定义了单位，NumericInput 的单位必须与定义一致
-        if (value is NumericInput ni
-            && !string.IsNullOrEmpty(attr.UnitId)
-            && ni.UnitId != attr.UnitId)
-        {
-            errors.Add(new FieldValidationError(
-                path, "单位与属性定义不一致"));
-            return;
-        }
-
         var d = ToDecimal(value);
         if (d is null)
         {
@@ -162,12 +150,9 @@ public class EavFieldValidator : IEavFieldValidator
             return;
         }
 
-        // ★ int 无单位时才拒绝小数
-        if (attr.DataType == "int"
-            && string.IsNullOrEmpty(attr.UnitId)
-            && d.Value != Math.Truncate(d.Value))
+        if (attr.DataType == "int" && d.Value != Math.Truncate(d.Value))
         {
-            errors.Add(new FieldValidationError(path, "int 类型（无单位）不接受小数"));
+            errors.Add(new FieldValidationError(path, "int 类型不接受小数"));
             return;
         }
 
@@ -266,9 +251,7 @@ public class EavFieldValidator : IEavFieldValidator
     /// <summary>
     /// 组合内叶子字段校验：value 保证非空。
     ///
-    /// ★ int 无单位：拒绝小数（写入 ValueInt 会截断）
-    /// ★ int 有单位：允许小数（写 ValueDecimal）
-    /// ★ 单位固定由字段定义绑定，前端只读展示，不做可用范围校验
+    /// ★ int 恒为整数：拒绝小数（写入 ValueInt 会截断）
     /// </summary>
     private void ValidateLeafField(
         CompositeFieldSchemaDto field, object value, string path,
@@ -285,33 +268,6 @@ public class EavFieldValidator : IEavFieldValidator
             case "int":
             case "decimal":
             {
-                // 组合内 decimal 带单位（NumericInput 负载）
-                if (value is NumericInput ni)
-                {
-                    if (!string.IsNullOrEmpty(field.UnitId)
-                        && ni.UnitId != field.UnitId)
-                    {
-                        errors.Add(new FieldValidationError(
-                            path, "单位与字段定义不一致"));
-                        break;
-                    }
-
-                    // ★ int 无单位时才拒绝小数
-                    if (field.DataType == "int"
-                        && string.IsNullOrEmpty(field.UnitId)
-                        && ni.Value != Math.Truncate(ni.Value))
-                    {
-                        errors.Add(new FieldValidationError(
-                            path, "int 类型（无单位）不接受小数"));
-                        break;
-                    }
-
-                    if (field.ValidationRule is not null)
-                        ValidateNumericRules(ni.Value, field.ValidationRule, path, errors);
-                    break;
-                }
-
-                // 裸数值路径
                 var num = ToDecimal(value);
                 if (num is null)
                 {
@@ -319,13 +275,11 @@ public class EavFieldValidator : IEavFieldValidator
                     break;
                 }
 
-                // ★ int 无单位时才拒绝小数
                 if (field.DataType == "int"
-                    && string.IsNullOrEmpty(field.UnitId)
                     && num.Value != Math.Truncate(num.Value))
                 {
                     errors.Add(new FieldValidationError(
-                        path, "int 类型（无单位）不接受小数"));
+                        path, "int 类型不接受小数"));
                     break;
                 }
 
