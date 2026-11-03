@@ -30,10 +30,10 @@
            SubmitButtonText="创建"
            OnSubmitClick="Submit">
     <ToolBarContent>
-        @* 显示目标图空间名（只读上下文，与其他弹窗工具栏一致） *@
-        @if (!string.IsNullOrWhiteSpace(SpaceName))
+        @* 当前节点名（打开参数带入），明确「为谁新建关系」 *@
+        @if (!string.IsNullOrWhiteSpace(NodeName))
         {
-            <MudText Typo="Typo.subtitle1" Color="Color.Info">@SpaceName</MudText>
+            <MudText Typo="Typo.subtitle1" Color="Color.Info">@NodeName</MudText>
         }
         <MudSpacer/>
     </ToolBarContent>
@@ -168,6 +168,9 @@
 
     /// <summary>打开参数：目标图空间显示名（仅展示）。</summary>
     [Parameter] public string? SpaceName { get; set; }
+
+    /// <summary>打开参数：当前节点显示名（工具栏上下文）。</summary>
+    [Parameter] public string? NodeName { get; set; }
 
     /// <summary>打开参数：空间类型（Dynamic/Type/Unit/Knowledge），决定树搜索对应的树实体。</summary>
     [Parameter] public string? SpaceType { get; set; }

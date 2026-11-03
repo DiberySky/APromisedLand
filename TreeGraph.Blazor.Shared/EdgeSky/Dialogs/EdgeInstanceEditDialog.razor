@@ -1,0 +1,431 @@
+@* EdgeInstanceEditDialog.razor — 编辑已有节点关系（边实例）的属性。
+   边以五元组（空间/类型/起点/rank/终点）定位，五元组本身不可变，故仅编辑属性；
+   提交走 PATCH 部分更新（对齐 UPDATE EDGE SET），空值落 NULL。
+   属性区按所选边类型的 Schema 动态渲染，字段类型与 EdgeInstanceCreateDialog 保持一致。 *@
+@namespace TreeGraph.Blazor.Shared.EdgeSky.Dialogs
+
+@using System.Text.Json
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.EdgeSky.Services
+@using TreeGraph.Blazor.Shared.LineSky.Services
+@using TreeGraph.Blazor.Shared.TreeEavSky.Services
+@using TreeGraph.Shared.EdgeSky
+@using TreeGraph.Shared.EdgeSky.Dtos
+@using TreeGraph.Shared.TreeEavSky.Abstractions
+@using TreeGraph.Shared.TreeEavSky.Entities
+
+@inject EdgeApiClient Api
+@inject LineManageApiClient LineApi
+@inject LineNodeManageApiClient LineNodeApi
+@inject IServiceProvider Services
+@inject ISnackbar Snackbar
+
+<DialogSky Title="编辑关系"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+           SubmitButtonDisabled="@_submitting"
+           OnSubmitClick="Submit">
+    <ToolBarContent>
+        @* 当前节点名（打开参数带入）；缺省时退回关系类型名 *@
+        @if (!string.IsNullOrWhiteSpace(NodeName))
+        {
+            <MudText Typo="Typo.subtitle1" Color="Color.Info">@NodeName</MudText>
+        }
+        else if (EdgeType is not null)
+        {
+            <MudText Typo="Typo.subtitle1" Color="Color.Info">@TypeLabel(EdgeType)</MudText>
+        }
+        <MudSpacer />
+    </ToolBarContent>
+    <DialogContent>
+        <MudStack Spacing="2">
+            @* 对端节点（首行）：只读展示，与新建关系对话框保持一致 *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <MudTextField T="string"
+                              Value="@PeerName"
+                              Label="对端节点"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Size="Size.Small"
+                              ReadOnly="true"
+                              HelperText="@PeerHelperText"
+                              Style="flex: 1;" />
+            </MudStack>
+
+            <MudTextField T="string"
+                          Value="@DirectionText"
+                          Label="方向"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Size="Size.Small"
+                          ReadOnly="true"
+                          HelperText="出向：本节点 → 对端；入向：对端 → 本节点" />
+
+            <MudTextField T="string"
+                          Value="@(EdgeType is null ? string.Empty : TypeLabel(EdgeType))"
+                          Label="关系类型"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Size="Size.Small"
+                          ReadOnly="true"
+                          HelperText="属性区按该关系类型的 Schema 动态生成" />
+
+            <MudTextField T="string"
+                          Value="@(Edge?.Rank.ToString() ?? string.Empty)"
+                          Label="等级 (rank)"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Size="Size.Small"
+                          ReadOnly="true"
+                          HelperText="五元组标识，不可在此修改" />
+
+            @if (EdgeType is { Props.Count: 0 })
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                    该关系类型无属性，无需编辑。
+                </MudAlert>
+            }
+            else if (EdgeType is not null)
+            {
+                <MudText Typo="Typo.subtitle2" Class="mt-1">属性</MudText>
+                @foreach (var p in EdgeType.Props.OrderBy(p => p.DisplayOrder))
+                {
+                    var label = PropLabel(p);
+                    var required = !p.Nullable;
+                    @switch (p.DataType)
+                    {
+                        case EdgePropDataTypes.String:
+                            <MudTextField T="string" Label="@label" Variant="Variant.Outlined"
+                                          Margin="Margin.Dense" Required="@required"
+                                          Immediate="true"
+                                          Value="@GetText(p.PropName)"
+                                          ValueChanged="@((string? v) => SetText(p.PropName, v))" />
+                            break;
+                        case EdgePropDataTypes.Int:
+                            <NumberInputField T="long?" Label="@label" Margin="Margin.Dense"
+                                              Value="@GetLong(p.PropName)"
+                                              ValueChanged="@(v => SetLong(p.PropName, v))" />
+                            break;
+                        case EdgePropDataTypes.Double:
+                            <NumberInputField T="decimal?" Label="@label" Margin="Margin.Dense"
+                                              Step="@(0.1m)"
+                                              Value="@GetDecimal(p.PropName)"
+                                              ValueChanged="@(v => SetDecimal(p.PropName, v))" />
+                            break;
+                        case EdgePropDataTypes.Bool:
+                            <BoolFieldSky Label="@label"
+                                          Value="@GetBool(p.PropName)"
+                                          ValueChanged="@((bool v) => SetBool(p.PropName, v))"
+                                          TrueLabel="是" FalseLabel="否" />
+                            break;
+                        case EdgePropDataTypes.Date:
+                            <MudDatePicker Label="@label" Variant="Variant.Outlined"
+                                           Margin="Margin.Dense" Required="@required"
+                                           Date="@GetDate(p.PropName)"
+                                           DateChanged="@((DateTime? d) => SetDate(p.PropName, d))" />
+                            break;
+                        default: // TIMESTAMP 及其它：文本输入（epoch 或 ISO 8601）
+                            <MudTextField T="string" Label="@label" Variant="Variant.Outlined"
+                                          Margin="Margin.Dense" Required="@required"
+                                          Immediate="true"
+                                          HelperText="epoch 秒/毫秒整数，或 ISO 8601（如 2026-10-29T12:00:00Z）"
+                                          Value="@GetText(p.PropName)"
+                                          ValueChanged="@((string? v) => SetText(p.PropName, v))" />
+                            break;
+                    }
+                }
+            }
+        </MudStack>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>所属图空间 Id。</summary>
+    [Parameter] public string SpaceId { get; set; } = string.Empty;
+
+    /// <summary>本节点 Id（用于判定方向与对端，对齐新建关系对话框的上下文）。</summary>
+    [Parameter] public string NodeId { get; set; } = string.Empty;
+
+    /// <summary>当前节点显示名（工具栏上下文）。</summary>
+    [Parameter] public string? NodeName { get; set; }
+
+    /// <summary>该边的类型定义（含属性 Schema）。</summary>
+    [Parameter] public EdgeTypeDto? EdgeType { get; set; }
+
+    /// <summary>待编辑的边实例（五元组 + 现有属性）。</summary>
+    [Parameter] public EdgeDto? Edge { get; set; }
+
+    private readonly Dictionary<string, string> _texts = new();
+    private readonly Dictionary<string, long?> _longs = new();
+    private readonly Dictionary<string, decimal?> _decimals = new();
+    private readonly Dictionary<string, bool> _bools = new();
+    private readonly Dictionary<string, DateTime?> _dates = new();
+    private bool _submitting;
+
+    /// <summary>本节点是否为起点（决定方向文案与对端取哪一个）。</summary>
+    private bool IsOutgoing => Edge is not null && Edge.SrcVid == NodeId;
+
+    private string DirectionText => IsOutgoing ? "出向（本节点为起点）" : "入向（本节点为终点）";
+
+    private string PeerName
+        => Edge is null
+            ? string.Empty
+            : (IsOutgoing
+                ? NameOf(Edge.DstVid, Edge.DstName)
+                : NameOf(Edge.SrcVid, Edge.SrcName));
+
+    /// <summary>对端节点 Id（出向取终点，入向取起点）。</summary>
+    private string PeerId
+        => Edge is null ? string.Empty : (IsOutgoing ? Edge.DstVid : Edge.SrcVid);
+
+    /// <summary>对端节点的位置路径（根 &gt; 父 &gt; 当前）；解析中/失败时退回节点名。</summary>
+    private string? PeerHelperText => Edge is null ? null : (_peerPath ?? PeerName);
+
+    private string? _peerPath;
+    private string? _peerPathLoadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _texts.Clear();
+        _longs.Clear();
+        _decimals.Clear();
+        _bools.Clear();
+        _dates.Clear();
+
+        InitPropValues();
+        await LoadPeerPathAsync();
+    }
+
+    private void InitPropValues()
+    {
+        if (Edge?.Props is not { } props || EdgeType is null) return;
+
+        foreach (var p in EdgeType.Props)
+        {
+            if (!props.TryGetValue(p.PropName, out var v) || v.ValueKind == JsonValueKind.Null) continue;
+
+            switch (p.DataType)
+            {
+                case EdgePropDataTypes.String:
+                    _texts[p.PropName] = v.ValueKind == JsonValueKind.String
+                        ? v.GetString() ?? string.Empty
+                        : v.ToString();
+                    break;
+                case EdgePropDataTypes.Int:
+                    if (v.TryGetInt64(out var l)) _longs[p.PropName] = l;
+                    break;
+                case EdgePropDataTypes.Double:
+                    if (v.ValueKind == JsonValueKind.Number) _decimals[p.PropName] = (decimal)v.GetDouble();
+                    break;
+                case EdgePropDataTypes.Bool:
+                    _bools[p.PropName] = v.ValueKind == JsonValueKind.True;
+                    break;
+                case EdgePropDataTypes.Date:
+                    if (v.ValueKind == JsonValueKind.String && DateTime.TryParse(v.GetString(), out var date))
+                        _dates[p.PropName] = date;
+                    break;
+                default:
+                    _texts[p.PropName] = v.ValueKind == JsonValueKind.String
+                        ? v.GetString() ?? string.Empty
+                        : v.ToString();
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 解析对端节点路径（与新建关系对话框一致的「根 &gt; 父 &gt; 当前」）：
+    /// 先按 api/edge/node-space/{id} 取对端宿主类型，树实体沿 ParentId 上溯拼名；
+    /// 线路节点拼「线路名 &gt; 节点名」，线路直接取线路名；失败退回节点名。
+    /// </summary>
+    private async Task LoadPeerPathAsync()
+    {
+        var peerId = PeerId;
+        if (Edge is null || string.IsNullOrEmpty(peerId) || peerId == _peerPathLoadedFor) return;
+        _peerPathLoadedFor = peerId;
+
+        var fallback = PeerName;
+        try
+        {
+            var space = await Api.GetNodeSpaceAsync(peerId);
+            _peerPath = space?.NodeHostType switch
+            {
+                "UnitTree" => await DescribeTreePathAsync<UnitTree>(peerId, fallback),
+                "CategoryTree" => await DescribeTreePathAsync<CategoryTree>(peerId, fallback),
+                "KnowledgeTree" => await DescribeTreePathAsync<KnowledgeTree>(peerId, fallback),
+                "SpaceTree" => await DescribeTreePathAsync<SpaceTree>(peerId, fallback),
+                "LineNode" => await DescribeLineNodePathAsync(peerId, fallback),
+                "Line" => (await LineApi.GetByIdAsync(peerId))?.Name ?? fallback,
+                _ => fallback
+            };
+        }
+        catch (Exception)
+        {
+            // 路径仅为展示辅助信息，失败不影响编辑
+            _peerPath = fallback;
+        }
+    }
+
+    /// <summary>树实体节点：从当前节点沿 ParentId 上溯，拼出「根 &gt; 父 &gt; 当前」。</summary>
+    private async Task<string> DescribeTreePathAsync<TItem>(string nodeId, string fallback)
+        where TItem : class, ITreeNodeBase<TItem>, new()
+    {
+        var api = Services.GetService(typeof(TreeApiClient<TItem>)) as TreeApiClient<TItem>;
+        if (api is null) return fallback;
+
+        var node = await api.GetNodeByIdAsync(nodeId);
+        if (node is null) return fallback;
+
+        var parts = new List<string> { node.Text ?? fallback };
+        var parentId = node.ParentId;
+        while (!string.IsNullOrEmpty(parentId))
+        {
+            var parent = await api.GetNodeByIdAsync(parentId);
+            if (parent is null) break;
+            parts.Insert(0, parent.Text ?? parent.Id);
+            parentId = parent.ParentId;
+        }
+
+        return string.Join(" > ", parts);
+    }
+
+    /// <summary>线路节点：拼「所属线路名 &gt; 节点名」。</summary>
+    private async Task<string> DescribeLineNodePathAsync(string nodeId, string fallback)
+    {
+        var node = await LineNodeApi.GetByIdAsync(nodeId);
+        if (node is null) return fallback;
+
+        var line = node.LineId is null ? null : await LineApi.GetByIdAsync(node.LineId);
+        var lineName = string.IsNullOrWhiteSpace(line?.Name) ? node.LineId : line!.Name;
+        return string.IsNullOrWhiteSpace(lineName) ? node.Name : $"{lineName} > {node.Name}";
+    }
+
+    private static string TypeLabel(EdgeTypeDto t)
+        => string.IsNullOrWhiteSpace(t.DisplayName) ? t.Name : $"{t.DisplayName}（{t.Name}）";
+
+    private static string PropLabel(EdgeTypePropDto p)
+    {
+        var name = string.IsNullOrWhiteSpace(p.DisplayName) ? p.PropName : $"{p.DisplayName}（{p.PropName}）";
+        return p.Nullable ? name : $"{name} *";
+    }
+
+    private static string NameOf(string id, string? name)
+        => string.IsNullOrWhiteSpace(name) ? id : name!;
+
+    private string? GetText(string name) => _texts.GetValueOrDefault(name);
+    private void SetText(string name, string? v) => _texts[name] = v ?? string.Empty;
+
+    private long? GetLong(string name) => _longs.GetValueOrDefault(name);
+    private void SetLong(string name, long? v) => _longs[name] = v;
+
+    private decimal? GetDecimal(string name) => _decimals.GetValueOrDefault(name);
+    private void SetDecimal(string name, decimal? v) => _decimals[name] = v;
+
+    private bool GetBool(string name) => _bools.GetValueOrDefault(name, false);
+    private void SetBool(string name, bool v) => _bools[name] = v;
+
+    private DateTime? GetDate(string name) => _dates.GetValueOrDefault(name);
+    private void SetDate(string name, DateTime? v) => _dates[name] = v;
+
+    private void Submit() => _ = SubmitAsync();
+
+    private async Task SubmitAsync()
+    {
+        if (_submitting) return;
+        if (Edge is null || EdgeType is null) return;
+
+        _submitting = true;
+        try
+        {
+            var props = new Dictionary<string, JsonElement?>();
+            foreach (var p in EdgeType.Props.OrderBy(p => p.DisplayOrder))
+            {
+                var (value, error) = BuildPropValue(p);
+                if (error is not null)
+                {
+                    Snackbar.Add($"属性【{PropLabel(p)}】无效：{error}", Severity.Error);
+                    return;
+                }
+                if (value is null && !p.Nullable)
+                {
+                    Snackbar.Add($"属性【{PropLabel(p)}】为 NOT NULL，必须填写", Severity.Error);
+                    return;
+                }
+                props[p.PropName] = value;
+            }
+
+            var (ok, err) = await Api.PatchEdgeAsync(
+                SpaceId, Edge.EdgeType, Edge.SrcVid, Edge.Rank, Edge.DstVid,
+                new PatchEdgeRequest { Props = props });
+
+            if (!ok)
+            {
+                Snackbar.Add($"保存失败：{err ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("关系已更新", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    /// <summary>按 Schema 类型把当前输入转换为 json 字面量；null = 未填写（PATCH 时落 NULL）。</summary>
+    private (JsonElement? Value, string? Error) BuildPropValue(EdgeTypePropDto p)
+    {
+        try
+        {
+            switch (p.DataType)
+            {
+                case EdgePropDataTypes.String:
+                {
+                    var s = _texts.GetValueOrDefault(p.PropName);
+                    return string.IsNullOrEmpty(s)
+                        ? (null, null)
+                        : (JsonSerializer.SerializeToElement(s), null);
+                }
+                case EdgePropDataTypes.Int:
+                {
+                    var v = _longs.GetValueOrDefault(p.PropName);
+                    return v is null ? (null, null) : (JsonSerializer.SerializeToElement(v.Value), null);
+                }
+                case EdgePropDataTypes.Double:
+                {
+                    var v = _decimals.GetValueOrDefault(p.PropName);
+                    return v is null ? (null, null) : (JsonSerializer.SerializeToElement(v.Value), null);
+                }
+                case EdgePropDataTypes.Bool:
+                    return (JsonSerializer.SerializeToElement(GetBool(p.PropName)), null);
+                case EdgePropDataTypes.Date:
+                {
+                    var d = _dates.GetValueOrDefault(p.PropName);
+                    return d is null
+                        ? (null, null)
+                        : (JsonSerializer.SerializeToElement(d.Value.ToString("yyyy-MM-dd")), null);
+                }
+                default: // TIMESTAMP
+                {
+                    var s = _texts.GetValueOrDefault(p.PropName);
+                    if (string.IsNullOrWhiteSpace(s)) return (null, null);
+
+                    if (long.TryParse(s.Trim(), out var epoch))
+                        return (JsonSerializer.SerializeToElement(epoch), null);
+
+                    if (DateTimeOffset.TryParse(s.Trim(), out var dto))
+                        return (JsonSerializer.SerializeToElement(dto), null);
+
+                    return (null, "期望 epoch 整数或 ISO 8601 时间");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            return (null, ex.Message);
+        }
+    }
+}

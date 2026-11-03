@@ -8,9 +8,16 @@
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Blazor.Shared.EdgeSky.Dialogs
 @using TreeGraph.Blazor.Shared.EdgeSky.Services
+@using TreeGraph.Blazor.Shared.LineSky.Services
+@using TreeGraph.Blazor.Shared.TreeEavSky.Services
 @using TreeGraph.Shared.EdgeSky.Dtos
+@using TreeGraph.Shared.TreeEavSky.Abstractions
+@using TreeGraph.Shared.TreeEavSky.Entities
 
 @inject EdgeApiClient Api
+@inject LineManageApiClient LineApi
+@inject LineNodeManageApiClient LineNodeApi
+@inject IServiceProvider Services
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
@@ -24,27 +31,6 @@
 }
 else if (!_loading && _space is not null)
 {
-    @if (AllowManage)
-    {
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2 flex-wrap">
-            <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Outlined.Workspaces">
-                @_space.SpaceName
-            </MudChip>
-            <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
-                           Size="Size.Small" Color="Color.Default"
-                           Disabled="@_loading"
-                           OnClick="@(async () => await ReloadAsync())"
-                           title="刷新" />
-            <MudSpacer />
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
-                       StartIcon="@Icons.Material.Outlined.AddLink"
-                       Disabled="@(_loading || _types.Count == 0)"
-                       OnClick="OpenCreateAsync">
-                新建关系
-            </MudButton>
-        </MudStack>
-    }
-
     @if (_types.Count == 0)
     {
         <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mb-2">
@@ -52,33 +38,56 @@ else if (!_loading && _space is not null)
         </MudAlert>
     }
 
-    <MudTabs Elevation="0" Rounded="true" PanelClass="pt-2">
-        <MudTabPanel>
-            <TabContent>
-                <span class="d-inline-flex align-items-center gap-1">
-                    出向<MudIcon Icon="@Icons.Material.Outlined.ArrowRightAlt" Size="Size.Small" />
-                </span>
-            </TabContent>
-            <ChildContent>
-                @EdgeTable(_out, true)
-            </ChildContent>
-        </MudTabPanel>
-        <MudTabPanel>
-            <TabContent>
-                <span class="d-inline-flex align-items-center gap-1">
-                    <MudIcon Icon="@Icons.Material.Outlined.ArrowRightAlt" Size="Size.Small" />入向
-                </span>
-            </TabContent>
-            <ChildContent>
-                @EdgeTable(_in, false)
-            </ChildContent>
-        </MudTabPanel>
+    @* 「新建关系」按钮（Variant.Text，图标 + 文字）置于 Tab 头部区域内，靠右贴边、右侧留白 24px *@
+    <MudTabs Elevation="0" Rounded="true" PanelClass="pt-2"
+             HeaderPosition="TabHeaderPosition.After"
+             HeaderClass="d-flex align-center justify-end ms-auto">
+        <Header>
+            @if (AllowManage)
+            {
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Info"
+                           Size="Size.Small"
+                           StartIcon="@Icons.Material.Outlined.AddLink"
+                           Disabled="@(_loading || _types.Count == 0)"
+                           OnClick="OpenCreateAsync"
+                           Class="me-5 flex-shrink-0"
+                           Style="white-space: nowrap;">
+                    新建关系
+                </MudButton>
+            }
+        </Header>
+        <ChildContent>
+            <MudTabPanel>
+                <TabContent>
+                    <span class="d-inline-flex align-items-center gap-1">
+                        出向<MudIcon Icon="@Icons.Material.Outlined.ArrowRightAlt" Size="Size.Small" />
+                    </span>
+                </TabContent>
+                <ChildContent>
+                    @EdgeTable(_out, true)
+                </ChildContent>
+            </MudTabPanel>
+            <MudTabPanel>
+                <TabContent>
+                    <span class="d-inline-flex align-items-center gap-1">
+                        <MudIcon Icon="@Icons.Material.Outlined.ArrowRightAlt" Size="Size.Small" />入向
+                    </span>
+                </TabContent>
+                <ChildContent>
+                    @EdgeTable(_in, false)
+                </ChildContent>
+            </MudTabPanel>
+        </ChildContent>
     </MudTabs>
 }
 
 @code {
     /// <summary>宿主节点 Id（= nodes.id）。</summary>
     [Parameter, EditorRequired] public string NodeId { get; set; } = default!;
+
+    /// <summary>当前节点显示名（传给新建/编辑关系对话框的工具栏上下文）。</summary>
+    [Parameter] public string? NodeName { get; set; }
 
     /// <summary>是否允许管理（新建/删除关系、显示空间名与刷新）。只读视图传 false。</summary>
     [Parameter] public bool AllowManage { get; set; } = true;
@@ -150,6 +159,7 @@ else if (!_loading && _space is not null)
             { x => x.SpaceName, _space.SpaceName },
             { x => x.SpaceType, _space.SpaceType },
             { x => x.NodeId, NodeId },
+            { x => x.NodeName, NodeName },
             { x => x.Types, _types }
         };
 
@@ -183,6 +193,42 @@ else if (!_loading && _space is not null)
         await ReloadAsync();
     }
 
+    /// <summary>编辑已有关系：按边类型 Schema 打开属性编辑对话框，保存走 PATCH。</summary>
+    private async Task OpenEditAsync(EdgeDto edge)
+    {
+        if (_space is null) return;
+
+        var type = _types.FirstOrDefault(t => t.Name == edge.EdgeType);
+        if (type is null)
+        {
+            Snackbar.Add($"未找到关系类型「{edge.EdgeType}」的 Schema，无法编辑", Severity.Warning);
+            return;
+        }
+
+        var parameters = new DialogParameters<EdgeInstanceEditDialog>
+        {
+            { x => x.SpaceId, _space.SpaceId },
+            { x => x.NodeId, NodeId },
+            { x => x.NodeName, NodeName },
+            { x => x.EdgeType, type },
+            { x => x.Edge, edge }
+        };
+
+        var dialog = await DialogService.ShowExAsync<EdgeInstanceEditDialog>(
+            string.Empty, parameters,
+            new DialogOptionsEx
+            {
+                MaxWidth = MaxWidth.Small,
+                FullWidth = true,
+                MaximizeButton = true,
+                Position = DialogPosition.TopCenter,
+                BackdropClick = false
+            });
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+            await ReloadAsync();
+    }
+
     private async Task DeleteAsync(EdgeDto edge)
     {
         if (_space is null) return;
@@ -205,15 +251,13 @@ else if (!_loading && _space is not null)
         await ReloadAsync();
     }
 
-    /// <summary>单张边表格（出边/入边共用）：类型 / 起止 / rank / 属性摘要 / 删除。</summary>
+    /// <summary>单张边表格（出边/入边共用）：类型 / 起止 / 操作（删除、编辑、展开详情）。</summary>
     private RenderFragment EdgeTable(IReadOnlyList<EdgeDto> items, bool outgoing) => @<MudTable T="EdgeDto" Items="@items"
                                                                                               Hover="true" Bordered="true" Dense="true"
                                                                                               Breakpoint="Breakpoint.Sm">
         <HeaderContent>
             <MudTh>类型</MudTh>
             <MudTh>起止</MudTh>
-            <MudTh Style="width: 1%; white-space: nowrap;">rank</MudTh>
-            <MudTh>属性</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap;"></MudTh>
         </HeaderContent>
         <RowTemplate>
@@ -228,14 +272,6 @@ else if (!_loading && _space is not null)
                     <MudText Typo="Typo.body2">@NameOf(context.DstVid, context.DstName)</MudText>
                 </MudStack>
             </MudTd>
-            <MudTd DataLabel="rank">
-                <MudChip T="string" Size="Size.Small" Color="Color.Default">@context.Rank</MudChip>
-            </MudTd>
-            <MudTd DataLabel="属性">
-                <MudText Typo="Typo.caption" Color="Color.Default">
-                    @(PropsSummary(context) ?? "—")
-                </MudText>
-            </MudTd>
             <MudTd DataLabel="操作" Style="text-align: right;">
                 @if (AllowManage)
                 {
@@ -244,9 +280,100 @@ else if (!_loading && _space is not null)
                                    Disabled="@_loading"
                                    OnClick="@(async () => await DeleteAsync(context))"
                                    title="删除该关系" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                   Size="Size.Small" Color="Color.Primary"
+                                   Disabled="@_loading"
+                                   OnClick="@(() => OpenEditAsync(context))"
+                                   title="编辑该关系" />
                 }
+                @* 二级列表：展开只读的「关系详情」（对齐编辑关系对话框内容） *@
+                <MudIconButton Icon="@(IsExpanded(context) ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)"
+                               Size="Size.Small" Color="Color.Info"
+                               OnClick="@(async () => await ToggleExpandAsync(context, outgoing))"
+                               title="查看关系详情" />
             </MudTd>
         </RowTemplate>
+        <ChildRowContent>
+            @if (IsExpanded(context))
+            {
+                <MudTr>
+                    <td colspan="3" style="padding: 0;">
+                        @* 二级列表：灰底作 8px 边框，内层两张表整体留空 8px。
+                           深色主题下 --mud-palette-background-grey 接近纯黑，改用 surface 保证灰边可见 *@
+                        <MudPaper Elevation="0" Class="pa-2"
+                                  Style="background: var(--mud-palette-surface);">
+                            @* 二级列表：编辑关系对话框内容的只读呈现；底色纯黑，与外层表格拉开层级 *@
+                            <MudSimpleTable Dense="true" Bordered="true" Hover="true"
+                                            Style="overflow-x: auto; background-color: #000;">
+                                <thead>
+                                    <tr>
+                                        <th Style="width: 1%; white-space: nowrap;">字段</th>
+                                        <th>值</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td Style="white-space: nowrap;">对端节点</td>
+                                        <td>@PeerPathOf(context, outgoing)</td>
+                                    </tr>
+                                    <tr>
+                                        <td Style="white-space: nowrap;">方向</td>
+                                        <td>@(outgoing ? "出向（本节点为起点）" : "入向（本节点为终点）")</td>
+                                    </tr>
+                                    <tr>
+                                        <td Style="white-space: nowrap;">关系类型</td>
+                                        <td>
+                                            @TypeLabel(context.EdgeType)
+                                            <MudText Typo="Typo.caption" Color="Color.Default">@context.EdgeType</MudText>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td Style="white-space: nowrap;">等级 (rank)</td>
+                                        <td>@context.Rank</td>
+                                    </tr>
+                                </tbody>
+                            </MudSimpleTable>
+
+                            @* 关系属性值：折叠面板（默认收起），按边类型 Schema 逐条列出 *@
+                            <MudExpansionPanels Elevation="0" Class="mt-2">
+                                <MudExpansionPanel IsInitiallyExpanded="false">
+                                    <TitleContent>
+                                        <MudText Typo="Typo.subtitle2">关系属性值</MudText>
+                                    </TitleContent>
+                                    <ChildContent>
+                                        @if (DetailProps(context) is { Count: > 0 } detailProps)
+                                        {
+                                            <MudSimpleTable Dense="true" Bordered="true" Hover="true"
+                                                            Style="overflow-x: auto; background-color: #000;">
+                                                <thead>
+                                                    <tr>
+                                                        <th Style="width: 1%; white-space: nowrap;">属性</th>
+                                                        <th>值</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var p in detailProps)
+                                                    {
+                                                        <tr>
+                                                            <td Style="white-space: nowrap;">@p.Label</td>
+                                                            <td>@p.Value</td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </MudSimpleTable>
+                                        }
+                                        else
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Default">未填写属性值</MudText>
+                                        }
+                                    </ChildContent>
+                                </MudExpansionPanel>
+                            </MudExpansionPanels>
+                        </MudPaper>
+                    </td>
+                </MudTr>
+            }
+        </ChildRowContent>
         <NoRecordsContent>
             <MudText Typo="Typo.caption" Color="Color.Default" Class="py-2">
                 @(outgoing ? "该节点暂无出向关系" : "该节点暂无入向关系")
@@ -262,8 +389,144 @@ else if (!_loading && _space is not null)
     private static string NameOf(string id, string? name)
         => string.IsNullOrWhiteSpace(name) ? id : name!;
 
-    private static string? PropsSummary(EdgeDto edge)
-        => edge.Props is { Count: > 0 } props
-            ? string.Join("，", props.Select(kv => $"{kv.Key}={kv.Value}"))
-            : null;
+    // ---------- 二级列表（关系详情，只读） ----------
+
+    /// <summary>当前展开查看详情的边（键 = 五元组）；同一时刻只展开一条。</summary>
+    private string? _expandedEdgeKey;
+
+    /// <summary>对端节点路径缓存（键 = 对端节点 Id），展开时按需解析。</summary>
+    private readonly Dictionary<string, string> _peerPaths = new();
+
+    private static string EdgeKey(EdgeDto e)
+        => $"{e.EdgeType}|{e.SrcVid}|{e.Rank}|{e.DstVid}";
+
+    private bool IsExpanded(EdgeDto e) => _expandedEdgeKey == EdgeKey(e);
+
+    private async Task ToggleExpandAsync(EdgeDto edge, bool outgoing)
+    {
+        var key = EdgeKey(edge);
+        if (_expandedEdgeKey == key)
+        {
+            _expandedEdgeKey = null;
+            return;
+        }
+
+        _expandedEdgeKey = key;
+        await LoadPeerPathAsync(PeerIdOf(edge, outgoing));
+    }
+
+    /// <summary>对端节点显示名（出向取终点，入向取起点）。</summary>
+    private static string PeerOf(EdgeDto edge, bool outgoing)
+        => outgoing ? NameOf(edge.DstVid, edge.DstName) : NameOf(edge.SrcVid, edge.SrcName);
+
+    /// <summary>对端节点 Id。</summary>
+    private static string PeerIdOf(EdgeDto edge, bool outgoing)
+        => outgoing ? edge.DstVid : edge.SrcVid;
+
+    /// <summary>对端节点路径（未解析完成时退回节点名）。</summary>
+    private string PeerPathOf(EdgeDto edge, bool outgoing)
+    {
+        var peerId = PeerIdOf(edge, outgoing);
+        return _peerPaths.GetValueOrDefault(peerId) ?? PeerOf(edge, outgoing);
+    }
+
+    /// <summary>
+    /// 解析对端节点路径（「根 &gt; 父 &gt; 当前」，与编辑关系对话框一致）：
+    /// 先按 api/edge/node-space/{id} 取宿主类型，树实体沿 ParentId 上溯拼名；
+    /// 线路节点拼「线路名 &gt; 节点名」，线路取线路名。
+    /// </summary>
+    private async Task LoadPeerPathAsync(string peerId)
+    {
+        if (string.IsNullOrEmpty(peerId) || _peerPaths.ContainsKey(peerId)) return;
+
+        try
+        {
+            var space = await Api.GetNodeSpaceAsync(peerId);
+            var path = space?.NodeHostType switch
+            {
+                "UnitTree" => await DescribeTreePathAsync<UnitTree>(peerId),
+                "CategoryTree" => await DescribeTreePathAsync<CategoryTree>(peerId),
+                "KnowledgeTree" => await DescribeTreePathAsync<KnowledgeTree>(peerId),
+                "SpaceTree" => await DescribeTreePathAsync<SpaceTree>(peerId),
+                "LineNode" => await DescribeLineNodePathAsync(peerId),
+                "Line" => (await LineApi.GetByIdAsync(peerId))?.Name,
+                _ => null
+            };
+
+            if (!string.IsNullOrWhiteSpace(path))
+                _peerPaths[peerId] = path;
+        }
+        catch (Exception)
+        {
+            // 路径仅为展示辅助信息，失败退回节点名
+        }
+    }
+
+    private async Task<string?> DescribeTreePathAsync<TItem>(string nodeId)
+        where TItem : class, ITreeNodeBase<TItem>, new()
+    {
+        var api = Services.GetService(typeof(TreeApiClient<TItem>)) as TreeApiClient<TItem>;
+        if (api is null) return null;
+
+        var node = await api.GetNodeByIdAsync(nodeId);
+        if (node is null) return null;
+
+        var parts = new List<string> { node.Text ?? node.Id };
+        var parentId = node.ParentId;
+        while (!string.IsNullOrEmpty(parentId))
+        {
+            var parent = await api.GetNodeByIdAsync(parentId);
+            if (parent is null) break;
+            parts.Insert(0, parent.Text ?? parent.Id);
+            parentId = parent.ParentId;
+        }
+
+        return string.Join(" > ", parts);
+    }
+
+    private async Task<string?> DescribeLineNodePathAsync(string nodeId)
+    {
+        var node = await LineNodeApi.GetByIdAsync(nodeId);
+        if (node is null) return null;
+
+        var line = node.LineId is null ? null : await LineApi.GetByIdAsync(node.LineId);
+        var lineName = string.IsNullOrWhiteSpace(line?.Name) ? node.LineId : line!.Name;
+        return string.IsNullOrWhiteSpace(lineName) ? node.Name : $"{lineName} > {node.Name}";
+    }
+
+    /// <summary>按边类型 Schema 列出属性名与值（只读展示）；Schema 缺失时回退实际存储的属性键。</summary>
+    private List<(string Label, string Value)> DetailProps(EdgeDto edge)
+    {
+        var result = new List<(string Label, string Value)>();
+        if (edge.Props is not { Count: > 0 } props) return result;
+
+        var schema = _types.FirstOrDefault(t => t.Name == edge.EdgeType)?.Props;
+        if (schema is not null)
+        {
+            foreach (var p in schema.OrderBy(p => p.DisplayOrder))
+            {
+                if (!props.TryGetValue(p.PropName, out var v)) continue;
+                var label = string.IsNullOrWhiteSpace(p.DisplayName) ? p.PropName : p.DisplayName!;
+                result.Add((label, FormatValue(v)));
+            }
+        }
+
+        // Schema 未覆盖（如内置边类型缺定义）时，按实际属性键兜底展示
+        if (result.Count == 0)
+        {
+            foreach (var (key, v) in props)
+                result.Add((key, FormatValue(v)));
+        }
+
+        return result;
+    }
+
+    private static string FormatValue(System.Text.Json.JsonElement v) => v.ValueKind switch
+    {
+        System.Text.Json.JsonValueKind.Null or System.Text.Json.JsonValueKind.Undefined => "—",
+        System.Text.Json.JsonValueKind.True => "是",
+        System.Text.Json.JsonValueKind.False => "否",
+        System.Text.Json.JsonValueKind.String => v.GetString() ?? "—",
+        _ => v.ToString()
+    };
 }

@@ -13,89 +13,121 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
+<style>
+    /* 关系绑定一级列表：表格底色设为纯黑（对齐节点操作/线路维护对话框） */
+    .lne-root .mud-table-container,
+    .lne-root .mud-table-root,
+    .lne-root .mud-table-row,
+    .lne-root .mud-table-cell {
+        background-color: #000;
+    }
+</style>
+
 <DialogSky Title="设置修改"
            SubmitButtonVisible="true"
            SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
            SubmitButtonDisabled="@_submitting"
            OnSubmitClick="UpdateAsync">
     <ToolBarContent>
-        @* 显示所属线路名（与只读宿主「节点操作」一致） *@
-        <MudText Typo="Typo.subtitle1" Class="mud-text-secondary">@LineName</MudText>
+        @* 显示所属线路名（与 Tree「设置修改」工具栏同一格式） *@
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">@LineName</MudText>
         <MudSpacer/>
     </ToolBarContent>
     <DialogContent>
-        <MudContainer Class="pt-0 pb-4">
+        <MudContainer Class="pt-0 pb-4 lne-root">
             @* KeepPanelsAlive：非激活页也保持渲染，属性区组件引用（提交时保存属性）不因切页丢失 *@
             <MudTabs Elevation="0" Rounded="true" KeepPanelsAlive="true">
-                <MudTabPanel Text="基本信息" Icon="@Icons.Material.Outlined.Info" IconSize="Size.Small">
-                    <MudStack Spacing="2">
-                        <MudTextField @bind-Value="_form.Name"
-                                      Label="名称"
-                                      Variant="Variant.Outlined"
-                                      Size="Size.Small" />
-                        <MudTextField @bind-Value="_form.Description"
-                                      Label="描述"
-                                      Variant="Variant.Outlined"
-                                      Lines="3"
-                                      Size="Size.Small" />
-                        @* 前驱节点：线路节点可能很多，改用搜索对话框选择。
-                           尾部放大镜打开选择器；清除按钮在只读态下 Clearable 不显示，改为行尾显式图标。 *@
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                            <MudTextField T="string"
-                                          Value="@_predecessorLabel"
-                                          Label="前驱节点（清空并保存 = 断开连接）"
+                @* 页签头部自绘「图标 + 文字」，与 Tree「设置修改」保持同一格式 *@
+                <MudTabPanel>
+                    <TabContent>
+                        <span class="d-inline-flex align-items-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" />基本信息
+                        </span>
+                    </TabContent>
+                    <ChildContent>
+                        <MudStack Spacing="2">
+                            <MudTextField @bind-Value="_form.Name"
+                                          Label="名称"
                                           Variant="Variant.Outlined"
-                                          Size="Size.Small"
-                                          ReadOnly="true"
-                                          Adornment="Adornment.End"
-                                          AdornmentIcon="@Icons.Material.Outlined.Search"
-                                          IconSize="Size.Small"
-                                          OnAdornmentClick="OpenPickerAsync"
-                                          Style="flex: 1;" />
-                            @if (!string.IsNullOrEmpty(_form.PredecessorId))
+                                          Size="Size.Small" />
+                            <MudTextField @bind-Value="_form.Description"
+                                          Label="描述"
+                                          Variant="Variant.Outlined"
+                                          Lines="3"
+                                          Size="Size.Small" />
+                            @* 前驱节点：线路节点可能很多，改用搜索对话框选择。
+                               尾部放大镜打开选择器；清除按钮在只读态下 Clearable 不显示，改为行尾显式图标。 *@
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudTextField T="string"
+                                              Value="@_predecessorLabel"
+                                              Label="前驱节点（清空并保存 = 断开连接）"
+                                              Variant="Variant.Outlined"
+                                              Size="Size.Small"
+                                              ReadOnly="true"
+                                              Adornment="Adornment.End"
+                                              AdornmentIcon="@Icons.Material.Outlined.Search"
+                                              IconSize="Size.Small"
+                                              OnAdornmentClick="OpenPickerAsync"
+                                              Style="flex: 1;" />
+                                @if (!string.IsNullOrEmpty(_form.PredecessorId))
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Clear"
+                                                   Color="Color.Warning"
+                                                   Title="清除前驱（保存后断开连接）"
+                                                   Size="Size.Small"
+                                                   OnClick="ConfirmClearPredecessor" />
+                                }
+                            </MudStack>
+                            @* 段边类型：仅在更换前驱时显示（为新连接指定，已移除默认边类型，后端强制必填）。
+                               日常维护既有连接的边类型走「关系绑定」。 *@
+                            @if (PredecessorChanged)
                             {
-                                <MudIconButton Icon="@Icons.Material.Outlined.Clear"
-                                               Color="Color.Warning"
-                                               Title="清除前驱（保存后断开连接）"
-                                               Size="Size.Small"
-                                               OnClick="ConfirmClearPredecessor" />
+                                <MudSelect T="string"
+                                           @bind-Value="_selectedEdgeType"
+                                           Label="关系类型（边）"
+                                           Variant="Variant.Outlined"
+                                           Size="Size.Small">
+                                    @foreach (var t in _edgeTypes)
+                                    {
+                                        <MudSelectItem Value="@t.Name">@(t.DisplayName ?? t.Name)</MudSelectItem>
+                                    }
+                                </MudSelect>
                             }
                         </MudStack>
-                        @* 段边类型：仅在更换前驱时显示（为新连接指定，已移除默认边类型，后端强制必填）。
-                           日常维护既有连接的边类型走「关系绑定」。 *@
-                        @if (PredecessorChanged)
+                    </ChildContent>
+                </MudTabPanel>
+
+                <MudTabPanel>
+                    <TabContent>
+                        <span class="d-inline-flex align-items-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" />属性绑定
+                        </span>
+                    </TabContent>
+                    <ChildContent>
+                        @* 属性区：线路节点是 iNode 宿主，可关注属性定义并填写属性 *@
+                        @if (Node is not null)
                         {
-                            <MudSelect T="string"
-                                       @bind-Value="_selectedEdgeType"
-                                       Label="关系类型（边）"
-                                       Variant="Variant.Outlined"
-                                       Size="Size.Small">
-                                @foreach (var t in _edgeTypes)
-                                {
-                                    <MudSelectItem Value="@t.Name">@(t.DisplayName ?? t.Name)</MudSelectItem>
-                                }
-                            </MudSelect>
+                            <NodeAttributeItemsSky @ref="_attrItems"
+                                                   NodeId="@Node.Id"
+                                                   ReadOnly="false"
+                                                   AllowManage="true" />
                         }
-                    </MudStack>
+                    </ChildContent>
                 </MudTabPanel>
 
-                <MudTabPanel Text="属性绑定" Icon="@Icons.Material.Outlined.Link" IconSize="Size.Small">
-                    @* 属性区：线路节点是 iNode 宿主，可关注属性定义并填写属性 *@
-                    @if (Node is not null)
-                    {
-                        <NodeAttributeItemsSky @ref="_attrItems"
-                                               NodeId="@Node.Id"
-                                               ReadOnly="false"
-                                               AllowManage="true" />
-                    }
-                </MudTabPanel>
-
-                <MudTabPanel Text="关系绑定" Icon="@Icons.Material.Outlined.Share" IconSize="Size.Small">
-                    @* 关系绑定：线路节点是 iNode 宿主，可维护出/入边 *@
-                    @if (Node is not null)
-                    {
-                        <NodeRelationBindingsSky NodeId="@Node.Id" />
-                    }
+                <MudTabPanel>
+                    <TabContent>
+                        <span class="d-inline-flex align-items-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Outlined.Share" Size="Size.Small" />关系绑定
+                        </span>
+                    </TabContent>
+                    <ChildContent>
+                        @* 关系绑定：线路节点是 iNode 宿主，可维护出/入边 *@
+                        @if (Node is not null)
+                        {
+                            <NodeRelationBindingsSky NodeId="@Node.Id" NodeName="@Node.Name" />
+                        }
+                    </ChildContent>
                 </MudTabPanel>
             </MudTabs>
         </MudContainer>

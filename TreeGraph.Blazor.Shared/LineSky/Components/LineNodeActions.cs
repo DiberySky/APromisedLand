@@ -49,6 +49,16 @@ public static class LineNodeActions
         BackdropClick = false
     };
 
+    /// <summary>「节点内容」宿主对话框选项：顶部居中打开。</summary>
+    private static readonly DialogOptionsEx HostOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        MaximizeButton = true,
+        Position = DialogPosition.TopCenter,
+        BackdropClick = false
+    };
+
     /// <summary>
     /// 宿主操作模式（对齐 TreeNodeActionsDialog 编排）：
     /// 打开 LineNodeActionsDialog 宿主 → 按钮仅返回动作 → 本循环分发执行；
@@ -83,7 +93,7 @@ public static class LineNodeActions
                 { x => x.ShowLineManage, showLineManage }
             };
             var dialog = await dialogService.ShowExAsync<LineNodeActionsDialog>(
-                "节点内容", parameters, NestedOptions);
+                "节点内容", parameters, HostOptions);
             var result = await dialog.Result;
 
             if (result is not { Canceled: false } || result.Data is not LineNodeHostAction action)
@@ -139,7 +149,7 @@ public static class LineNodeActions
             { x => x.LineName, lineName ?? "" }
         };
         var dialog = await dialogService.ShowExAsync<LineNodeEditDialog>(
-            "设置修改", parameters, NestedOptions);
+            "设置修改", parameters, HostOptions);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
