@@ -21,6 +21,16 @@
 @inject MessageService Message
 @inject IDialogService DialogService
 
+<style>
+    /* 绑定属性列表：表格底色设为纯黑 */
+    .nai-bind-table .mud-table-container,
+    .nai-bind-table .mud-table-root,
+    .nai-bind-table .mud-table-row,
+    .nai-bind-table .mud-table-cell {
+        background-color: #000;
+    }
+</style>
+
 @* ======== 绑定属性：expand 包裹的表格维护（对齐 EntityTypes 属性定义管理）。
      仅管理模式显示；「节点操作」等只读查看页不显示该维护部件。 ======== *@
 @if (!ReadOnly)
@@ -42,7 +52,7 @@
                       Breakpoint="Breakpoint.Sm"
                       Loading="@_loading"
                       LoadingProgressColor="Color.Primary"
-                      Class="pb-2">
+                      Class="pb-2 nai-bind-table">
                 <HeaderContent>
                     <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">排序</MudTh>
                     <MudTh>绑定名</MudTh>
@@ -103,8 +113,9 @@
                     {
                         <MudTr>
                             <td colspan="4" style="padding: 0;">
-                                <MudPaper Elevation="0" Class="pa-3"
-                                          Style="background: var(--mud-palette-background-grey);">
+                                @* 二级明细：灰底 paper 作外框，内层黑色表格留 8px 边距 *@
+                                <MudPaper Elevation="0" Class="pa-2"
+                                          Style="background: var(--mud-palette-surface);">
                                     @if (_attrsLoading)
                                     {
                                         <MudProgressLinear Indeterminate="true" Color="Color.Info" />
@@ -121,7 +132,7 @@
                                         else
                                         {
                                             <MudSimpleTable Dense="true" Bordered="true" Hover="true"
-                                                            Style="overflow-x: auto;">
+                                                            Style="overflow-x: auto; background-color: #000;">
                                                 <thead>
                                                     <tr>
                                                         <th>显示名</th>
