@@ -10,23 +10,16 @@
            SubmitButtonVisible="false"
            CancelButtonVisible="true"
            CancelButtonText="关闭">
+    <ToolBarContent>
+        @* 表格定义名（表结构加载完成后显示） *@
+        @if (_tableDef is not null)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Info">
+                @_tableDef.DisplayName (@_tableDef.TableName)
+            </MudText>
+        }
+    </ToolBarContent>
     <DialogContent>
-        <div class="d-flex align-center mb-3">
-            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">行数据</MudText>
-            <MudSpacer />
-            @if (!ReadOnly)
-            {
-                <MudButton Size="Size.Small"
-                           Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           StartIcon="@Icons.Material.Outlined.Add"
-                           OnClick="@(() => OpenEditDialogAsync(null))"
-                           Disabled="@(_tableDef is null || _activeColumns.Count == 0)">
-                    添加行
-                </MudButton>
-            }
-        </div>
-
         @if (_loading)
         {
             <MudProgressLinear Indeterminate="true" />
@@ -55,14 +48,23 @@
                     {
                         <MudTh Style="width:56px">序号</MudTh>
                     }
-                    @foreach (var col in _activeColumns)
+                    @foreach (var col in _visibleColumns)
                     {
                         <MudTh>@col.DisplayName</MudTh>
                     }
-                    @if (!ReadOnly)
-                    {
-                        <MudTh Style="width:96px;text-align:right">操作</MudTh>
-                    }
+                    @* 操作列：非只读含 delete/edit/展开，只读仅含展开 *@
+                    <MudTh Style="width:128px;text-align:right">
+                        @if (!ReadOnly)
+                        {
+                            @* 列头 + 图标即「添加行」入口 *@
+                            <MudIconButton Icon="@Icons.Material.Outlined.Add"
+                                           Size="Size.Small"
+                                           Color="Color.Success"
+                                           Title="添加行"
+                                           OnClick="@(() => OpenEditDialogAsync(null))"
+                                           Disabled="@(_tableDef is null || _activeColumns.Count == 0)" />
+                        }
+                    </MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     @if (!RecordMode)
@@ -71,26 +73,59 @@
                             @(_rows.IndexOf(context) + 1)
                         </MudTd>
                     }
-                    @foreach (var col in _activeColumns)
+                    @foreach (var col in _visibleColumns)
                     {
                         <MudTd DataLabel="@col.DisplayName">
                             @FormatCell(context, col.ColumnName)
                         </MudTd>
                     }
-                    @if (!ReadOnly)
-                    {
-                        <MudTd DataLabel="操作" Style="text-align:right">
-                            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
-                                           Size="Size.Small"
-                                           Color="Color.Primary"
-                                           OnClick="@(() => OpenEditDialogAsync(context))" />
+                    @* 操作列：delete/edit 仅非只读；展开/收起明细始终可用 *@
+                    <MudTd DataLabel="操作" Style="text-align:right">
+                        @if (!ReadOnly)
+                        {
                             <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                            Size="Size.Small"
                                            Color="Color.Error"
                                            OnClick="@(() => DeleteRowAsync(context))" />
-                        </MudTd>
-                    }
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                           Size="Size.Small"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => OpenEditDialogAsync(context))" />
+                        }
+                        <MudIconButton Icon="@(_expandedRow == context
+                                                   ? Icons.Material.Outlined.ExpandLess
+                                                   : Icons.Material.Outlined.ExpandMore)"
+                                       Size="Size.Small"
+                                       Color="Color.Info"
+                                       Title="展开/收起全部字段"
+                                       OnClick="@(() => ToggleExpand(context))" />
+                    </MudTd>
                 </RowTemplate>
+                @* 展开的二级明细行：命中展开行时渲染，每列一行只读展示全部字段 *@
+                <ChildRowContent>
+                    @if (_expandedRow == context)
+                    {
+                        <MudTr>
+                            <td colspan="@TotalColumnCount" class="pa-0">
+                                <MudSimpleTable Dense="true" Hover="false" Bordered="false"
+                                                Striped="false" Elevation="0" Style="background:#000">
+                                    <tbody>
+                                        @foreach (var col in _activeColumns)
+                                        {
+                                            <tr>
+                                                <td class="mud-text-secondary"
+                                                    style="width:40%;white-space:nowrap;padding-left:32px">
+                                                    @col.DisplayName
+                                                </td>
+                                                <td>@FormatCell(context, col.ColumnName)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </MudSimpleTable>
+                            </td>
+                        </MudTr>
+                    }
+                </ChildRowContent>
                 <NoRecordsContent>
                     <MudText Align="Align.Center" Class="py-8">暂无行数据</MudText>
                 </NoRecordsContent>
@@ -110,6 +145,10 @@
     [Parameter] public bool ReadOnly { get; set; }
     /// <summary>记录模式（record 类型）：屏蔽序号列。</summary>
     [Parameter] public bool RecordMode { get; set; }
+    /// <summary>表格定义（可选）。打开方同步预载传入，保证工具栏首渲染即显示定义名
+    /// （DialogSky 工具栏动态内容冻结在初始渲染，异步加载的值到不了标题区）；
+    /// 未传入时由本组件按 <see cref="RefTableDefinitionId"/> 自载。</summary>
+    [Parameter] public CustomTableDetailDto? TableDefinition { get; set; }
 
     private CustomTableDetailDto? _tableDef;
     private List<CustomTableRowValue> _rows = new();
@@ -117,19 +156,45 @@
     private bool _loading;
     private string? _loadError;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    /// <summary>网格直接展示的列数上限；超出的列进二级详情弹窗。</summary>
+    private const int MaxGridColumns = 3;
+
+    /// <summary>网格直接展示的列（前 3 个活动列）。</summary>
+    private List<CustomTableColumnDto> _visibleColumns =>
+        _activeColumns.Take(MaxGridColumns).ToList();
+
+    /// <summary>当前展开明细的行；null 表示全部收起。</summary>
+    private CustomTableRowValue? _expandedRow;
+
+    /// <summary>明细子行需横跨的列数（序号 + 数据列 + 操作列，操作列始终渲染）。</summary>
+    private int TotalColumnCount =>
+        (RecordMode ? 0 : 1) + _visibleColumns.Count + 1;
+
+    /// <summary>切换行明细展开/收起（同时只展开一行）。</summary>
+    private void ToggleExpand(CustomTableRowValue row)
+        => _expandedRow = _expandedRow == row ? null : row;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 工具栏冻结在首渲染：同步消费打开方预传的定义，首帧即有内容
+        _tableDef = TableDefinition;
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
         _loading = true;
         try
         {
-            var (tableDef, defError) = await Api.GetCustomTableWithErrorAsync(RefTableDefinitionId);
-            _tableDef = tableDef;
             if (_tableDef is null)
             {
-                _loadError = BuildLoadError("表结构", defError);
-                return;
+                var (tableDef, defError) = await Api.GetCustomTableWithErrorAsync(RefTableDefinitionId);
+                _tableDef = tableDef;
+                if (_tableDef is null)
+                {
+                    _loadError = BuildLoadError("表结构", defError);
+                    return;
+                }
             }
 
             _activeColumns = _tableDef.Columns
@@ -190,7 +255,7 @@
 
         var options = new DialogOptionsEx
         {
-            MaxWidth = MaxWidth.Medium,
+            MaxWidth = MaxWidth.Small,
             FullWidth = true,
             MaximizeButton = true,
             BackdropClick = false

@@ -90,6 +90,12 @@
     {
         if (!_available) return;
 
+        // 预载表定义：同步传入弹窗，工具栏首渲染即可显示定义名。
+        // 每次打开都重新拉取（不缓存）：表结构可能被改动，过期定义会导致
+        // 行字段按旧列名过滤显示为空，且编辑保存时按旧列集整行覆盖落库造成数据丢失。
+        // 失败时传 null，弹窗按 RefTableDefinitionId 自载（工具栏留空但功能不受影响）
+        var tableDef = await Api.GetCustomTableAsync(Attr.RefTableDefinitionId!);
+
         var parameters = new DialogParameters<TableRowManageDialog>
         {
             { x => x.EntityType, EntityType },
@@ -98,7 +104,8 @@
             { x => x.DisplayName, Attr.DisplayName },
             { x => x.RefTableDefinitionId, Attr.RefTableDefinitionId! },
             { x => x.ReadOnly, ReadOnly },
-            { x => x.RecordMode, RecordMode }
+            { x => x.RecordMode, RecordMode },
+            { x => x.TableDefinition, tableDef }
         };
 
         var options = new DialogOptionsEx

@@ -7,6 +7,7 @@
 @inject ISnackbar Snackbar
 
 <DialogSky Title="@(_isEdit ? "编辑行" : "新增行")"
+           ContentClass="mud-theme-dark px-8"
            SubmitButtonVisible="true"
            SubmitButtonText="@(_saving ? "保存中..." : "保存")"
            SubmitButtonDisabled="@_saving"
@@ -19,14 +20,14 @@
             </MudAlert>
         }
 
-        <MudGrid>
+        <MudGrid Spacing="1">
             @foreach (var col in _activeColumns)
             {
                 var colCaptured = col;
                 var errorText = _errors.TryGetValue(col.ColumnName, out var list)
                     ? string.Join("；", list) : null;
 
-                <MudItem xs="12" md="@(IsWideColumn(col.DataType) ? 12 : 6)">
+                <MudItem xs="12">
                     @switch (col.DataType)
                     {
                         case EavDataTypes.Int:
@@ -493,15 +494,14 @@
         {
             JsonValueKind.Null => null,
             JsonValueKind.String => je.GetString(),
-            JsonValueKind.Number => je.TryGetInt64(out var l) ? l : je.GetDecimal(),
+            // 任一分支显式转 object：否则条件运算符把 long 统一成 decimal，
+            // GetLong 的 long/int 模式匹配不上，int 字段回显为空
+            JsonValueKind.Number => je.TryGetInt64(out var l) ? (object)l : je.GetDecimal(),
             JsonValueKind.True => true,
             JsonValueKind.False => false,
             _ => value   // Object / Array 保持 JsonElement
         };
     }
-
-    private static bool IsWideColumn(string dataType)
-        => dataType is EavDataTypes.Composite or EavDataTypes.Json or EavDataTypes.File;
 
     private static string ColLabel(CustomTableColumnDto col)
         => col.IsRequired ? $"{col.DisplayName} *" : col.DisplayName;
