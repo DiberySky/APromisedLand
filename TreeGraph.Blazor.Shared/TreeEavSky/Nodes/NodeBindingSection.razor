@@ -15,6 +15,9 @@
 
 <style>
     /* 属性绑定折叠面板：内容区及内部表单组件底色均设为纯黑 */
+    .nbs-expansion .mud-expand-panel-content {
+        padding-top: 8px;
+    }
     .nbs-expansion .mud-collapse-container,
     .nbs-expansion .mud-expand-panel-content,
     .nbs-expansion .mud-input-control,
@@ -68,14 +71,12 @@
             </div>
             @if (!ReadOnly)
             {
-                <MudStack Row Class="pb-3" Justify="Justify.FlexEnd">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                               Size="Size.Small"
-                               StartIcon="@Icons.Material.Outlined.Save"
-                               OnClick="@SubmitAsync">
-                        保存
-                    </MudButton>
-                </MudStack>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           Size="Size.Small" Class="w-100"
+                           StartIcon="@Icons.Material.Outlined.Save"
+                           OnClick="@SubmitAsync">
+                    保存
+                </MudButton>
             }
         }
     </ChildContent>

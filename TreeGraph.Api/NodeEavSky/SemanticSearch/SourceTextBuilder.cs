@@ -57,7 +57,7 @@ public sealed class SourceTextBuilder
     /// <summary>
     /// 为指定 iNode 构造宿主文本（节点 + 实体分离）。
     /// 返回：NodeText（纯节点名）+ EntityTexts（各实体独立文本）。
-    /// 宿主范围：4 棵宿主树（空间/单位/分类/知识）+ 线路 + 线路节点，均创建节点向量。
+    /// 宿主范围：5 棵宿主树（空间/单位/分类/知识/EAV）+ 线路 + 线路节点，均创建节点向量。
     /// </summary>
     public async Task<NodeSourceText?> BuildAsync(string inodeId, CancellationToken ct = default)
     {
@@ -73,23 +73,26 @@ public sealed class SourceTextBuilder
             .AsNoTracking()
             .Include(x => x.Node)
             .FirstOrDefaultAsync(n => n.Id == inodeId, ct);
-        var unit = space is null
+        var eav = space is null
+            ? await _db.EavTrees.AsNoTracking().Include(x => x.Node).FirstOrDefaultAsync(n => n.Id == inodeId, ct)
+            : null;
+        var unit = space is null && eav is null
             ? await _db.UnitTrees.AsNoTracking().Include(x => x.Node).FirstOrDefaultAsync(n => n.Id == inodeId, ct)
             : null;
-        var category = space is null && unit is null
+        var category = space is null && eav is null && unit is null
             ? await _db.CategoryTrees.AsNoTracking().Include(x => x.Node).FirstOrDefaultAsync(n => n.Id == inodeId, ct)
             : null;
-        var knowledge = space is null && unit is null && category is null
+        var knowledge = space is null && eav is null && unit is null && category is null
             ? await _db.KnowledgeTrees.AsNoTracking().Include(x => x.Node).FirstOrDefaultAsync(n => n.Id == inodeId, ct)
             : null;
-        var lineNode = space is null && unit is null && category is null && knowledge is null
+        var lineNode = space is null && eav is null && unit is null && category is null && knowledge is null
             ? await _db.Nodes.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId && n.HostType == "LineNode", ct)
             : null;
-        var line = space is null && unit is null && category is null && knowledge is null && lineNode is null
+        var line = space is null && eav is null && unit is null && category is null && knowledge is null && lineNode is null
             ? await _db.Lines.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId, ct)
             : null;
 
-        if (space is null && unit is null && category is null &&
+        if (space is null && eav is null && unit is null && category is null &&
             knowledge is null && lineNode is null && line is null && entityMounts.Count == 0)
             return null; // 既无实体也不在任何宿主 → 删除向量
 
@@ -101,9 +104,9 @@ public sealed class SourceTextBuilder
         // 空间节点本身不建向量；其余宿主取业务显示名
         var nodeName = isSpaceNode
             ? null
-            : space?.Name ?? unit?.Name ?? category?.Name ?? knowledge?.Name ?? lineNode?.Name ?? line?.Name;
+            : space?.Name ?? eav?.Name ?? unit?.Name ?? category?.Name ?? knowledge?.Name ?? lineNode?.Name ?? line?.Name;
 
-        // 祖先链：4 棵宿主树内沿 ParentId 上溯；线路节点以所属线路为唯一"祖先"
+        // 祖先链：5 棵宿主树内沿 ParentId 上溯；线路节点以所属线路为唯一"祖先"
         var ancestorNames = new List<string>();
         var ancestorIds = new List<string>();
         if (nodeName is not null)
@@ -111,6 +114,9 @@ public sealed class SourceTextBuilder
             if (space is not null)
                 (ancestorNames, ancestorIds) =
                     await BuildAncestorChainAsync(_db.SpaceTrees, space.ParentId, ct);
+            else if (eav is not null)
+                (ancestorNames, ancestorIds) =
+                    await BuildAncestorChainAsync(_db.EavTrees, eav.ParentId, ct);
             else if (unit is not null)
                 (ancestorNames, ancestorIds) =
                     await BuildAncestorChainAsync(_db.UnitTrees, unit.ParentId, ct);
@@ -146,12 +152,13 @@ public sealed class SourceTextBuilder
 
         // 4. 宿主类型与归属空间（检索按 space_id 过滤）
         var hostType = space is not null ? "space_tree"
+            : eav is not null ? "eav_tree"
             : unit is not null ? "unit_tree"
             : category is not null ? "category_tree"
             : knowledge is not null ? "knowledge_tree"
             : line is not null ? "line"
             : "line_node";
-        var spaceId = await ResolveSpaceIdAsync(space, unit, category, knowledge, inodeId, ct);
+        var spaceId = await ResolveSpaceIdAsync(space, eav, unit, category, knowledge, inodeId, ct);
 
         // 5. 构造各实体独立文本（v3：前置宿主 path_view，实体可被路径语义命中）
         // 前缀用 EAV 等号格式（name = value），与节点向量文案分离
@@ -180,12 +187,14 @@ public sealed class SourceTextBuilder
     /// <summary>
     /// 解析节点向量的归属空间（payload space_id，供按空间检索过滤）：
     ///   空间树节点 → 自身或最近的空间祖先（Id ∈ spaces）；
+    ///   EAV 树节点 → 无空间归属，归 "default"（仅全局检索可见）；
     ///   单位/分类/知识树节点 → 对应类型空间（当前每类型单空间假设，与对账 ResolveScope 口径一致）；
     ///   线路节点 → 无空间归属，归 "default"（仅全局检索可见）。
     /// 无对应空间时归 "default"。
     /// </summary>
     private async Task<string> ResolveSpaceIdAsync(
         SpaceTree? space,
+        EavTree? eav,
         UnitTree? unit,
         CategoryTree? category,
         KnowledgeTree? knowledge,
@@ -220,7 +229,7 @@ public sealed class SourceTextBuilder
             : category is not null ? SpaceType.Type
             : knowledge is not null ? SpaceType.Knowledge
             : null;
-        if (spaceType is null) return "default"; // 线路节点
+        if (spaceType is null) return "default"; // EAV 树节点 / 线路节点
 
         return await _db.Spaces.AsNoTracking()
             .Where(s => s.Type == spaceType.Value)

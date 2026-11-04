@@ -62,6 +62,7 @@ builder.Services.AddScoped<ITreeClientService<UnitTree>, UnitTreeClientService>(
 builder.Services.AddScoped<ITreeClientService<CategoryTree>, CategoryTreeClientService>();
 builder.Services.AddScoped<ITreeClientService<KnowledgeTree>, KnowledgeTreeClientService>();
 builder.Services.AddScoped<ITreeClientService<SpaceTree>, SpaceTreeClientService>();
+builder.Services.AddScoped<ITreeClientService<EavTree>, EavTreeClientService>();
 
 // ★ 通用响应式模块（ResponsiveView / ResponsiveSplit 的 ViewportService）。
 builder.Services.AddResponsive();

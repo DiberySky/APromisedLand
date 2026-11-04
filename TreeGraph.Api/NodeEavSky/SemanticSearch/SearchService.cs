@@ -98,6 +98,8 @@ public sealed class SearchService
         // 批量反查空间树节点（含全部祖先，BFS 逐层加载）
         var inodeIds = filtered.Select(h => h.InodeId).Distinct().ToList();
         var nodes = await LoadSpaceNodesWithAncestorsAsync(inodeIds, ct);
+        // 批量反查 EAV 树节点（含全部祖先）
+        var eavNodes = await LoadEavNodesWithAncestorsAsync(inodeIds, ct);
         // 非空间树宿主（单位/分类/知识树/线路节点）的名称反查
         var hostNames = await LoadHostNamesAsync(inodeIds, ct);
         // PG 兜底路径（payload path 缺失时回填，覆盖单位/分类/知识树/线路节点）
@@ -123,6 +125,23 @@ public sealed class SearchService
                         InodeId: h.InodeId,
                         HostType: "SpaceTree",
                         NodeName: node.Name,
+                        ParentName: parentName,
+                        Path: hasPayloadPath ? h.Path : pgPath,
+                        RootId: hasPayloadPath && h.PathIds is { Count: > 0 }
+                            ? h.PathIds[0]
+                            : rootId,
+                        Score: (float)Math.Round(h.Score, 4),
+                        MatchKind: isEntity ? "Entity" : "Node",
+                        EntityType: entityType);
+                }
+
+                if (eavNodes.TryGetValue(h.InodeId, out var eavNode))
+                {
+                    var (pgPath, parentName, rootId) = BuildEavPath(eavNode, eavNodes);
+                    return new SemanticSearchItemDto(
+                        InodeId: h.InodeId,
+                        HostType: "EavTree",
+                        NodeName: eavNode.Name,
                         ParentName: parentName,
                         Path: hasPayloadPath ? h.Path : pgPath,
                         RootId: hasPayloadPath && h.PathIds is { Count: > 0 }
@@ -243,6 +262,7 @@ public sealed class SearchService
         await LoadTree(_db.UnitTrees);
         await LoadTree(_db.CategoryTrees);
         await LoadTree(_db.KnowledgeTrees);
+        await LoadTree(_db.EavTrees);
 
         // 线路节点：无层级，路径即自身名称，根为自身
         foreach (var n in await _db.Nodes.AsNoTracking()
@@ -254,7 +274,7 @@ public sealed class SearchService
     }
 
     /// <summary>
-    /// 单位/分类/知识树内的后代展开（实体抑制用；线路节点无父子结构，不展开）。
+    /// 单位/分类/知识/EAV 树内的后代展开（实体抑制用；线路节点无父子结构，不展开）。
     /// </summary>
     private async Task<List<string>> LoadTreeDescendantIdsAsync(
         IReadOnlyCollection<string> rootIds, CancellationToken ct)
@@ -263,6 +283,7 @@ public sealed class SearchService
         result.AddRange(await ExpandTreeDescendantsAsync(rootIds, _db.UnitTrees, ct));
         result.AddRange(await ExpandTreeDescendantsAsync(rootIds, _db.CategoryTrees, ct));
         result.AddRange(await ExpandTreeDescendantsAsync(rootIds, _db.KnowledgeTrees, ct));
+        result.AddRange(await ExpandTreeDescendantsAsync(rootIds, _db.EavTrees, ct));
         return result;
     }
 
@@ -329,9 +350,45 @@ public sealed class SearchService
     }
 
     /// <summary>
-    /// 加载若干节点的全部后代节点 Id（BFS 逐层向下，用于节点命中后的子树实体过滤）。
-    /// 不含传入的根 Id 本身。
+    /// 加载 EAV 树目标节点及其全部祖先（BFS 逐层，层数 = 树高）。
+    /// 返回以 Id 为键的字典，含目标与祖先节点。
     /// </summary>
+    private async Task<Dictionary<string, EavTree>> LoadEavNodesWithAncestorsAsync(
+        List<string> inodeIds, CancellationToken ct)
+    {
+        var map = await _db.EavTrees
+            .AsNoTracking()
+            .Include(n => n.Node)
+            .Where(n => inodeIds.Contains(n.Id))
+            .ToDictionaryAsync(n => n.Id, ct);
+
+        var frontier = map.Values
+            .Select(n => n.ParentId)
+            .Where(pid => pid is not null && !map.ContainsKey(pid))
+            .Distinct()
+            .ToList();
+
+        while (frontier.Count > 0)
+        {
+            var parents = await _db.EavTrees
+                .AsNoTracking()
+                .Include(n => n.Node)
+                .Where(n => frontier.Contains(n.Id))
+                .ToListAsync(ct);
+
+            foreach (var p in parents)
+                map[p.Id] = p;
+
+            frontier = parents
+                .Select(p => p.ParentId)
+                .Where(pid => pid is not null && !map.ContainsKey(pid))
+                .Distinct()
+                .ToList();
+        }
+
+        return map;
+    }
+
     private async Task<List<string>> LoadDescendantIdsAsync(
         IReadOnlyCollection<string> rootIds, CancellationToken ct)
     {
@@ -377,10 +434,32 @@ public sealed class SearchService
         return (string.Join(" / ", line), parentName, current.Id);
     }
 
+    /// <summary>
+    /// 由 EAV 树祖先链构造 (Path, ParentName, RootId)（口径与 <see cref="BuildPath"/> 一致）。
+    /// </summary>
+    public static (string Path, string? ParentName, string RootId) BuildEavPath(
+        EavTree node, IReadOnlyDictionary<string, EavTree> nodes)
+    {
+        var line = new List<string> { node.Name };
+        string? parentName = null;
+        var current = node;
+
+        while (current.ParentId is not null &&
+               nodes.TryGetValue(current.ParentId, out var parent))
+        {
+            parentName ??= parent.Name;
+            line.Insert(0, parent.Name);
+            current = parent;
+        }
+
+        return (string.Join(" / ", line), parentName, current.Id);
+    }
+
     /// <summary>Qdrant payload 的 snake_case 宿主类型 → 前端契约 HostType。</summary>
     private static string MapHostType(string payloadHostType) => payloadHostType switch
     {
         "space_tree" => "SpaceTree",
+        "eav_tree" => "EavTree",
         "unit_tree" => "UnitTree",
         "category_tree" => "CategoryTree",
         "knowledge_tree" => "KnowledgeTree",

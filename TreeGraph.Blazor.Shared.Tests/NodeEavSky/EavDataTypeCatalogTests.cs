@@ -5,7 +5,7 @@ using Xunit;
 namespace TreeGraph.Blazor.Shared.Tests.NodeEavSky;
 
 /// <summary>
-/// EavDataTypes 目录不变量：13 个类型的层级/引用/宿主规则是唯一权威，
+/// EavDataTypes 目录不变量：14 个类型的层级/引用/宿主规则是唯一权威，
 /// 这些测试锁住「容器不进容器」「single_choice 不进表列」等核心规则，
 /// 防止后续改动把规则改散。
 /// </summary>
@@ -18,7 +18,7 @@ public class EavDataTypeCatalogTests
     };
 
     [Fact]
-    public void Catalog_CoversAllThirteenConstants()
+    public void Catalog_CoversAllFourteenConstants()
     {
         var constants = typeof(EavDataTypes)
             .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
@@ -26,9 +26,9 @@ public class EavDataTypeCatalogTests
             .Select(f => (string)f.GetValue(null)!)
             .ToArray();
 
-        Assert.Equal(13, constants.Length);
-        Assert.Equal(13, EavDataTypes.Catalog.Count);
-        Assert.Equal(13, EavDataTypes.All.Count);
+        Assert.Equal(14, constants.Length);
+        Assert.Equal(14, EavDataTypes.Catalog.Count);
+        Assert.Equal(14, EavDataTypes.All.Count);
         foreach (var c in constants)
             Assert.True(EavDataTypes.Catalog.ContainsKey(c), $"目录缺少常量: {c}");
     }
@@ -48,7 +48,7 @@ public class EavDataTypeCatalogTests
     }
 
     [Fact]
-    public void Containers_AreTopLevelOnly_AndRequireRef()
+    public void Containers_AreTopLevelOnly()
     {
         var composite = EavDataTypes.InfoOf(EavDataTypes.Composite);
         Assert.Equal(EavTypeLayer.Container, composite.Layer);
@@ -60,11 +60,21 @@ public class EavDataTypeCatalogTests
         Assert.Equal(EavRefKind.TableDefinition, table.Ref);
         Assert.Equal(EavHost.TopLevel, table.Hosts);
 
+        // property_tree：实例容器——引用运行时 rootNode，无类型定义引用
+        var propertyTree = EavDataTypes.InfoOf(EavDataTypes.PropertyTree);
+        Assert.Equal(EavTypeLayer.Container, propertyTree.Layer);
+        Assert.Equal(EavRefKind.None, propertyTree.Ref);
+        Assert.Equal(EavHost.TopLevel, propertyTree.Hosts);
+
         // 容器不进容器
-        Assert.DoesNotContain(EavDataTypes.Composite, EavDataTypes.CompositeFieldAllowed);
-        Assert.DoesNotContain(EavDataTypes.Composite, EavDataTypes.TableColumnAllowed);
-        Assert.DoesNotContain(EavDataTypes.Table, EavDataTypes.CompositeFieldAllowed);
-        Assert.DoesNotContain(EavDataTypes.Table, EavDataTypes.TableColumnAllowed);
+        foreach (var c in new[]
+                 {
+                     EavDataTypes.Composite, EavDataTypes.Table, EavDataTypes.PropertyTree
+                 })
+        {
+            Assert.DoesNotContain(c, EavDataTypes.CompositeFieldAllowed);
+            Assert.DoesNotContain(c, EavDataTypes.TableColumnAllowed);
+        }
     }
 
     [Fact]
@@ -99,10 +109,11 @@ public class EavDataTypeCatalogTests
     }
 
     [Fact]
-    public void IsContainer_OnlyForCompositeAndTable()
+    public void IsContainer_ForCompositeTableAndPropertyTree()
     {
         Assert.True(EavDataTypes.IsContainer(EavDataTypes.Composite));
         Assert.True(EavDataTypes.IsContainer(EavDataTypes.Table));
+        Assert.True(EavDataTypes.IsContainer(EavDataTypes.PropertyTree));
         Assert.False(EavDataTypes.IsContainer(EavDataTypes.String));
         Assert.False(EavDataTypes.IsContainer("nonexistent"));
     }
@@ -110,7 +121,7 @@ public class EavDataTypeCatalogTests
     [Fact]
     public void OptionsFor_MatchesCatalogHosts_AndHasLabels()
     {
-        Assert.Equal(13, EavDataTypeLabels.OptionsFor(EavHost.TopLevel).Count);
+        Assert.Equal(14, EavDataTypeLabels.OptionsFor(EavHost.TopLevel).Count);
         Assert.Equal(9, EavDataTypeLabels.OptionsFor(EavHost.CompositeField).Count);
         Assert.Equal(8, EavDataTypeLabels.OptionsFor(EavHost.TableColumn).Count);
 

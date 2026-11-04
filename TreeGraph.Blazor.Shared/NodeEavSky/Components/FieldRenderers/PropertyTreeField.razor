@@ -1,0 +1,172 @@
+@* PropertyTreeField.razor
+   属性树（property_tree）字段：重构为独立 MudExpansionPanel，作为容器型属性在表单中的一级区块。
+   标题 = Attr.DisplayName + 「（属性树）」Chip；展开内容区 bg #000。
+   CRUD：
+     - 未挂载 → 名称输入 + 创建按钮（名为空前端守卫）
+     - 已挂载 → 行内改名（失焦/回车）+ 打开专属树 + 卸载（后端有子节点守卫）
+     - ReadOnly → 纯展示根名 *@
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@using TreeGraph.Blazor.Shared.TreeEavSky.Dialogs
+@inject BlazorService BlazorService
+
+<style>
+    /* 属性树 expand：对齐宿主 NodeBindingSection 样式 */
+    .ptf-panel .mud-expand-panel-content {
+        background-color: #000;
+        border: 4px solid #2a2a2a;
+        border-radius: 4px;
+        padding-top: 8px;
+    }
+    .ptf-panel .mud-collapse-container,
+    .ptf-panel .mud-input-control,
+    .ptf-panel .mud-input,
+    .ptf-panel .mud-field {
+        background-color: #000;
+    }
+</style>
+
+<MudExpansionPanel Elevation="0" Outlined="true" Class="ptf-panel mb-2"
+                   Expanded="false"
+                   ExpandIcon="@Icons.Material.Outlined.ExpandMore"
+                   CollapseIcon="@Icons.Material.Outlined.ExpandLess">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+            <MudIcon Icon="@Icons.Material.Outlined.AccountTree" Color="Color.Info" Size="Size.Small" />
+            <MudText Typo="Typo.subtitle2">@Attr.DisplayName</MudText>
+            <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
+                属性树
+            </MudChip>
+            @if (Attr.IsRequired)
+            {
+                <MudText Typo="Typo.caption" Class="ml-1"
+                         Style="color: var(--mud-palette-error);">*</MudText>
+            }
+        </MudStack>
+    </TitleContent>
+    <ChildContent>
+        @if (HasRoot)
+        {
+            <MudStack Spacing="2">
+                @* 只读态：展示根名；编辑态：行内改名 + 打开 + 卸载 *@
+                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                    @if (ReadOnly)
+                    {
+                        <MudText Typo="Typo.body2">@Value!.Name</MudText>
+                        <MudSpacer />
+                        <MudIconButton Icon="@Icons.Material.Outlined.AccountTree"
+                                       Color="Color.Primary" Size="Size.Small"
+                                       OnClick="OpenTreeAsync"
+                                       title="打开属性树" />
+                    }
+                    else
+                    {
+                        <MudTextField T="string" @bind-Value="_editName" Label="属性树名称"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Immediate="true" Class="flex-grow-1"
+                                      OnBlur="CommitRenameAsync" OnKeyDown="OnRenameKeyDown" />
+                        <MudTooltip Text="打开属性树">
+                            <MudIconButton Icon="@Icons.Material.Outlined.AccountTree"
+                                           Color="Color.Primary" Size="Size.Small"
+                                           OnClick="OpenTreeAsync" />
+                        </MudTooltip>
+                        <MudTooltip Text="卸载属性树">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                           Color="Color.Error" Size="Size.Small"
+                                           OnClick="UnmountAsync" />
+                        </MudTooltip>
+                    }
+                </MudStack>
+            </MudStack>
+        }
+        else
+        {
+            <MudStack Spacing="2">
+                @if (ReadOnly)
+                {
+                    <MudText Typo="Typo.body2"
+                             Style="color: var(--mud-palette-text-secondary);">
+                        未挂载属性树
+                    </MudText>
+                }
+                else
+                {
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudTextField T="string" @bind-Value="_newName"
+                                      Label="属性树名称"
+                                      Placeholder="输入名称后创建"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Immediate="true" Class="flex-grow-1"
+                                      OnKeyDown="OnCreateKeyDown" />
+                        <MudButton Variant="Variant.Outlined" Color="Color.Success"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Outlined.Add"
+                                   Disabled="@(string.IsNullOrWhiteSpace(_newName))"
+                                   OnClick="CreateTreeAsync">
+                            创建属性树
+                        </MudButton>
+                    </MudStack>
+                }
+            </MudStack>
+        }
+    </ChildContent>
+</MudExpansionPanel>
+
+@code {
+    [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
+
+    /// <summary>挂载值 { rootId, name }；null 或 rootId 空表示未挂载。</summary>
+    [Parameter] public PropertyTreeValue? Value { get; set; }
+    [Parameter] public EventCallback<PropertyTreeValue?> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+
+    private string? _newName;
+    private string? _editName;
+    private string? _loadedRootId;
+
+    private bool HasRoot => !string.IsNullOrWhiteSpace(Value?.RootId);
+
+    protected override void OnParametersSet()
+    {
+        // 换树/外部回填时同步行内编辑框；同一棵树不覆盖用户正在输入的内容
+        if (Value?.RootId != _loadedRootId)
+        {
+            _loadedRootId = Value?.RootId;
+            _editName = Value?.Name;
+        }
+    }
+
+    /// <summary>创建：提交 { rootId: null, name }，后端建专属根（名为空被按钮禁用拦截）。</summary>
+    private Task CreateTreeAsync()
+        => string.IsNullOrWhiteSpace(_newName)
+            ? Task.CompletedTask
+            : ValueChanged.InvokeAsync(new PropertyTreeValue(null, _newName.Trim()));
+
+    /// <summary>行内改名：失焦/回车提交 { rootId, 新名 }；名为空回退现名，未变化不提交。</summary>
+    private Task CommitRenameAsync()
+    {
+        if (!HasRoot) return Task.CompletedTask;
+        if (string.IsNullOrWhiteSpace(_editName))
+        {
+            _editName = Value!.Name;
+            return Task.CompletedTask;
+        }
+        var name = _editName.Trim();
+        return name == Value!.Name
+            ? Task.CompletedTask
+            : ValueChanged.InvokeAsync(new PropertyTreeValue(Value!.RootId, name));
+    }
+
+    private Task UnmountAsync() => ValueChanged.InvokeAsync(null);
+
+    private Task OnRenameKeyDown(KeyboardEventArgs e)
+        => e.Key is "Enter" ? CommitRenameAsync() : Task.CompletedTask;
+
+    private Task OnCreateKeyDown(KeyboardEventArgs e)
+        => e.Key is "Enter" ? CreateTreeAsync() : Task.CompletedTask;
+
+    /// <summary>打开：按 RootId 弹专属属性树对话框。</summary>
+    private Task OpenTreeAsync()
+        => HasRoot
+            ? BlazorService.ShowEavTreeDialogPageByRootIdAsync(Value!.RootId!, Attr.DisplayName)
+            : Task.CompletedTask;
+}

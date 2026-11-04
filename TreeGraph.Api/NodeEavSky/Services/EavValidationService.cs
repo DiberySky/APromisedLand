@@ -35,6 +35,20 @@ public class EavValidationService
         if (def.DataType == EavDataTypes.SingleChoice)
             return ValidateSingleChoice(def, value);
 
+        // property_tree：值为 PropertyTreeValue { rootId, name }（null 已由上方必填检查拦截）。
+        // 名称必填/根节点存在性由写侧 ApplyPropertyTreeAsync 保证，此处仅校验值类型。
+        if (def.DataType == EavDataTypes.PropertyTree)
+        {
+            if (value is null) return new ValidationResult(true, errors);
+            if (value is not PropertyTreeValue)
+            {
+                errors.Add(new(def.AttributeName,
+                    "属性树值格式错误，应为对象 { rootId?, name? }"));
+                return new ValidationResult(false, errors);
+            }
+            return new ValidationResult(true, errors);
+        }
+
         // 必填校验
         if (def.IsRequired && value is null)
         {

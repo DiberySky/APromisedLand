@@ -70,6 +70,13 @@
                                        ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
 
+                    case EavDataTypes.PropertyTree:
+                        <PropertyTreeField Attr="attr"
+                                           ReadOnly="@ReadOnly"
+                                           Value="GetPropertyTree(attr.AttributeName)"
+                                           ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                        break;
+
                     case EavDataTypes.Composite:
                         <CompositeField Attr="attr"
                                         ReadOnly="@ReadOnly"
@@ -202,6 +209,10 @@
             ? v as TreeGraph.Shared.NodeEavSky.Dtos.EavLocationValue
             : null;
 
+    // property_tree：挂载值 { rootId, name }（编辑后为 PropertyTreeValue；初次加载由 ConvertElement 写入）
+    private PropertyTreeValue? GetPropertyTree(string key)
+        => _values.TryGetValue(key, out var v) ? v as PropertyTreeValue : null;
+
     // json 类型：以原文本编辑（StringField 兜底）
     private string? GetJsonText(string key)
         => _values.TryGetValue(key, out var v) ? v?.ToString() : null;
@@ -236,6 +247,8 @@
         {
             EavDataTypes.String => elem.ValueKind == JsonValueKind.String
                 ? elem.GetString() : elem.GetRawText(),
+            // property_tree：{ rootId, name } 对象
+            EavDataTypes.PropertyTree => ConvertPropertyTree(elem),
             EavDataTypes.Int or EavDataTypes.Decimal => ConvertNumeric(elem),
             EavDataTypes.Bool => elem.ValueKind == JsonValueKind.True,
             EavDataTypes.Datetime => elem.TryGetDateTime(out var dt)
@@ -257,6 +270,18 @@
             EavDataTypes.Json => elem.GetRawText(),
             _ => null
         };
+    }
+
+    /// <summary>属性树：把后端返回的 { rootId, name } 转为 PropertyTreeValue；无 rootId 视为未挂载。</summary>
+    private static PropertyTreeValue? ConvertPropertyTree(JsonElement elem)
+    {
+        if (elem.ValueKind != JsonValueKind.Object) return null;
+        var rootId = elem.TryGetProperty("rootId", out var r) && r.ValueKind == JsonValueKind.String
+            ? r.GetString() : null;
+        if (string.IsNullOrWhiteSpace(rootId)) return null;
+        var name = elem.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String
+            ? n.GetString() : null;
+        return new PropertyTreeValue(rootId, name);
     }
 
     /// <summary>位置：把后端返回的 { latitude, longitude, label?, address?, coordinateSystem? } 转为 EavLocationValue。</summary>

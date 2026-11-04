@@ -125,7 +125,7 @@ builder.Services.AddScoped<IInodeOwnerGuard, TreeGraph.Api.LineSky.Services.Line
 builder.Services.AddSingleton<ILineTemplate, RailwayFeedingTemplate>();
 builder.Services.AddScoped<LineTemplateRegistry>();
 
-// ★ TreeEavSky：计量单位树 / 分类树 / 空间树（表 unit_trees、category_trees、space_trees，
+// ★ TreeEavSky：计量单位树 / 分类树 / 空间树 / EAV 树（表 unit_trees、category_trees、space_trees、eav_trees，
 //   前两棵随迁移 HasData 播种；自 DiberyTreeService clone，响应信封由 ApiEnvelopeFilter 统一包装）
 builder.Services.AddScoped<TreeGraph.Api.TreeEavSky.Services.ITreeService<
     TreeGraph.Shared.TreeEavSky.Entities.UnitTree>,
@@ -139,6 +139,9 @@ builder.Services.AddScoped<TreeGraph.Api.TreeEavSky.Services.ITreeService<
 builder.Services.AddScoped<TreeGraph.Api.TreeEavSky.Services.ITreeService<
     TreeGraph.Shared.TreeEavSky.Entities.SpaceTree>,
     TreeGraph.Api.TreeEavSky.Services.SpaceTreeService>();
+builder.Services.AddScoped<TreeGraph.Api.TreeEavSky.Services.ITreeService<
+    TreeGraph.Shared.TreeEavSky.Entities.EavTree>,
+    TreeGraph.Api.TreeEavSky.Services.EavTreeService>();
 
 var app = builder.Build();
 

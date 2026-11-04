@@ -78,4 +78,24 @@ public class SearchServicePathTests
         Assert.Equal("空间树", parentName);
         Assert.Equal("r", rootId);
     }
+
+    private static EavTree EavNode(string id, string name, string? parentId)
+        => new() { Id = id, Name = name, ParentId = parentId };
+
+    [Fact]
+    public void Eav树_三级祖先链_路径含本节点_父名与根Id正确()
+    {
+        var nodes = new Dictionary<string, EavTree>
+        {
+            ["r"] = EavNode("r", "EAV 树", null),
+            ["d"] = EavNode("d", "生产部", "r"),
+            ["m"] = EavNode("m", "注塑机 A-101", "d")
+        };
+
+        var (path, parentName, rootId) = SearchService.BuildEavPath(nodes["m"], nodes);
+
+        Assert.Equal("EAV 树 / 生产部 / 注塑机 A-101", path);
+        Assert.Equal("生产部", parentName);
+        Assert.Equal("r", rootId);
+    }
 }

@@ -49,7 +49,7 @@
         <ChildContent>
             <MudTable T="InodeBindingDto" Items="_bindings" Hover="true" Bordered="true"
                       Dense="true"
-                      Breakpoint="Breakpoint.Sm"
+                      Breakpoint="Breakpoint.None"
                       Loading="@_loading"
                       LoadingProgressColor="Color.Primary"
                       Class="pb-2 nai-bind-table">
@@ -152,17 +152,27 @@
                                                                 </MudChip>
                                                             </td>
                                                             <td>
-                                                                @if (a.RefOptionSetId is not null)
+                                                                @if (a.RefOptionSetId is null
+                                                                     && a.RefCompositeTypeId is null
+                                                                     && a.RefTableDefinitionId is null)
                                                                 {
-                                                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Class="mr-1">选项: @(a.OptionSetDisplayName ?? a.OptionSetName)</MudChip>
+                                                                    @* 标量 / 特殊叶子 / 属性树（实例容器）在类型层无引用 *@
+                                                                    <span style="opacity: .5;">—</span>
                                                                 }
-                                                                @if (a.RefCompositeTypeId is not null)
+                                                                else
                                                                 {
-                                                                    <MudChip T="string" Size="Size.Small" Color="Color.Dark" Class="mr-1">组合: @(a.CompositeTypeDisplayName ?? a.CompositeTypeName)</MudChip>
-                                                                }
-                                                                @if (a.RefTableDefinitionId is not null)
-                                                                {
-                                                                    <MudChip T="string" Size="Size.Small" Color="Color.Info">表: @(a.TableDisplayName ?? a.TableName)</MudChip>
+                                                                    @if (a.RefOptionSetId is not null)
+                                                                    {
+                                                                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Class="mr-1">选项: @(a.OptionSetDisplayName ?? a.OptionSetName)</MudChip>
+                                                                    }
+                                                                    @if (a.RefCompositeTypeId is not null)
+                                                                    {
+                                                                        <MudChip T="string" Size="Size.Small" Color="Color.Dark" Class="mr-1">组合: @(a.CompositeTypeDisplayName ?? a.CompositeTypeName)</MudChip>
+                                                                    }
+                                                                    @if (a.RefTableDefinitionId is not null)
+                                                                    {
+                                                                        <MudChip T="string" Size="Size.Small" Color="Color.Info">表: @(a.TableDisplayName ?? a.TableName)</MudChip>
+                                                                    }
                                                                 }
                                                             </td>
                                                         </tr>
@@ -415,13 +425,12 @@
     {
         var parameters = new DialogParameters
         {
-            { nameof(BindingCreateDialog.NodeId), NodeId },
-            { nameof(BindingCreateDialog.DialogContext),
-              "为该节点新建命名绑定：同一类型可建多条绑定，每条绑定拥有独立的属性数据。" }
+            { nameof(BindingCreateDialog.NodeId), NodeId }
         };
 
         var dialog = await DialogService.ShowAsync<BindingCreateDialog>(
-            "新建绑定", parameters);
+            "新建绑定", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         var result = await dialog.Result;
 
         if (result?.Canceled != false
@@ -453,7 +462,8 @@
         };
 
         var dialog = await DialogService.ShowAsync<BindingNameDialog>(
-            "重命名绑定", parameters);
+            "重命名绑定", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         var result = await dialog.Result;
 
         if (result?.Canceled != false || result.Data is not string name)

@@ -45,6 +45,7 @@ public class TreeMoveIntegrationTests : IntegrationTestBase
     [InlineData("/UnitTree")]
     [InlineData("/CategoryTree")]
     [InlineData("/SpaceTree")]
+    [InlineData("/EavTree")]
     public async Task Move_ToNonRootParent_Works(string tree)
     {
         var parent = await CreateNodeAsync(tree, $"P_{Guid.NewGuid():N}", null);
@@ -67,6 +68,7 @@ public class TreeMoveIntegrationTests : IntegrationTestBase
     [InlineData("/UnitTree")]
     [InlineData("/CategoryTree")]
     [InlineData("/SpaceTree")]
+    [InlineData("/EavTree")]
     public async Task Move_WithoutNewParent_Returns400(string tree)
     {
         var node = await CreateNodeAsync(tree, $"N_{Guid.NewGuid():N}", null);
@@ -81,6 +83,7 @@ public class TreeMoveIntegrationTests : IntegrationTestBase
     [InlineData("/UnitTree")]
     [InlineData("/CategoryTree")]
     [InlineData("/SpaceTree")]
+    [InlineData("/EavTree")]
     public async Task Move_ToOwnDescendant_Returns400(string tree)
     {
         var parent = await CreateNodeAsync(tree, $"P_{Guid.NewGuid():N}", null);
@@ -98,6 +101,7 @@ public class TreeMoveIntegrationTests : IntegrationTestBase
     [InlineData("/UnitTree")]
     [InlineData("/CategoryTree")]
     [InlineData("/SpaceTree")]
+    [InlineData("/EavTree")]
     public async Task Create_UnderLeafParent_Returns400(string tree)
     {
         var leaf = await CreateNodeAsync(
@@ -120,6 +124,7 @@ public class TreeMoveIntegrationTests : IntegrationTestBase
     [InlineData("/UnitTree")]
     [InlineData("/CategoryTree")]
     [InlineData("/SpaceTree")]
+    [InlineData("/EavTree")]
     public async Task Move_UnderLeafParent_Returns400(string tree)
     {
         var leaf = await CreateNodeAsync(

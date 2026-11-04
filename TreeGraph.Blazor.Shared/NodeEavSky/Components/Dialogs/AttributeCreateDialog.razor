@@ -26,7 +26,7 @@
         {
             <MudSelect T="string"
                        Value="_createForm.EntityType"
-                       ValueChanged="@(v => _createForm.EntityType = v)"
+                       ValueChanged="OnEntityTypeChanged"
                        Label="属性定义"
                        Variant="Variant.Outlined"
                        Margin="Margin.Dense"
@@ -212,9 +212,19 @@
     /// <summary>选项集本地副本（同上）。</summary>
     private IReadOnlyList<OptionSetSummaryDto>? _optionSets;
 
-    /// <summary>顶层属性可用类型（目录派生：全部 13 种）。</summary>
-    private static readonly IReadOnlyList<(string Value, string Label)> DataTypeOptions =
+    /// <summary>顶层属性可用类型全集（目录派生）。</summary>
+    private static readonly IReadOnlyList<(string Value, string Label)> AllDataTypeOptions =
         EavDataTypeLabels.OptionsFor(EavHost.TopLevel);
+
+    /// <summary>
+    /// 当前属性定义可用的数据类型下拉项。
+    /// 树节点宿主（SpaceTree/UnitTree/CategoryTree/KnowledgeTree/EavTree）过滤掉 property_tree，
+    /// 避免「树节点的属性又是一棵树」套娃（与后端 EavMetadataController 拦截一致）。
+    /// </summary>
+    private IReadOnlyList<(string Value, string Label)> DataTypeOptions =>
+        TreeHostTypes.IsTreeHost(_createForm.EntityType)
+            ? AllDataTypeOptions.Where(o => o.Value != EavDataTypes.PropertyTree).ToArray()
+            : AllDataTypeOptions;
 
     /// <summary>
     /// 数据类型 HelperText：int / decimal 时提示计量单位命名约定
@@ -287,6 +297,15 @@
             .FirstOrDefault(et => et.EntityType == EntityType) is { } match
             ? GetDisplayName(match)
             : EntityType ?? string.Empty;
+
+    /// <summary>切换属性定义：切到树节点宿主时，若已选 property_tree（将被过滤），重置为 string。</summary>
+    private void OnEntityTypeChanged(string entityType)
+    {
+        _createForm.EntityType = entityType;
+        if (TreeHostTypes.IsTreeHost(entityType)
+            && _createForm.DataType == EavDataTypes.PropertyTree)
+            OnCreateDataTypeChanged(EavDataTypes.String);
+    }
 
     private void OnCreateDataTypeChanged(string dt)
     {

@@ -10,8 +10,8 @@ public sealed record HostType(
 /// <summary>
 /// 宿主类型清单。
 ///
-/// 四棵树（SpaceTree/UnitTree/CategoryTree/KnowledgeTree）与通用节点（Node）的类型名由各宿主服务
-/// 硬编码写入 nodes.host_type。创建属性时这些类型无需在 entity_type_catalog 登记即可使用；
+/// 四棵树（SpaceTree/UnitTree/CategoryTree/KnowledgeTree）、EAV 树（EavTree）与通用节点（Node）的类型名
+/// 由各宿主服务硬编码写入 nodes.host_type。创建属性时这些类型无需在 entity_type_catalog 登记即可使用；
 /// 列表端点会把它们并入候选，保证属性管理页能选到宿主类型。其余用途仅为显示名映射。
 /// </summary>
 public static class HostTypeCatalog
@@ -22,7 +22,8 @@ public static class HostTypeCatalog
         new("UnitTree", "单位树", "内置 Inode 宿主：单位树节点（属性挂载用）", 1),
         new("CategoryTree", "分类树", "内置 Inode 宿主：分类树节点（属性挂载用）", 2),
         new("KnowledgeTree", "知识树", "内置 Inode 宿主：知识树节点（属性挂载用）", 3),
-        new("Node", "通用节点", "内置 Inode 宿主：无归属通用节点（属性挂载用）", 4)
+        new("EavTree", "EAV 树", "内置 Inode 宿主：EAV 树节点（属性挂载用）", 4),
+        new("Node", "通用节点", "内置 Inode 宿主：无归属通用节点（属性挂载用）", 5)
     ];
 
     private static readonly Dictionary<string, HostType> ByName =
@@ -30,6 +31,14 @@ public static class HostTypeCatalog
 
     /// <summary>是否为内置宿主类型（宿主类型不要求目录登记）。</summary>
     public static bool Contains(string entityType) => ByName.ContainsKey(entityType);
+
+    /// <summary>
+    /// 是否为树节点宿主（四棵树 + EAV 树；不含通用节点 Node）。
+    /// 树节点禁止挂载 property_tree 属性——避免「树节点的属性又是一棵树」套娃。
+    /// 集合唯一权威在 <see cref="TreeGraph.Shared.NodeEavSky.TreeHostTypes"/>（前后端共用）。
+    /// </summary>
+    public static bool IsTreeHost(string entityType)
+        => TreeGraph.Shared.NodeEavSky.TreeHostTypes.IsTreeHost(entityType);
 
     /// <summary>按类型名取内置宿主类型；非宿主类型返回 null。</summary>
     public static HostType? Find(string entityType)

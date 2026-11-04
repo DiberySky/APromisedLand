@@ -49,6 +49,7 @@ public sealed class SubtreeService
             "UnitTree" => await LoadRawUnitTreeAsync(rootId, maxDepth, maxNodes, ct),
             "CategoryTree" => await LoadRawCategoryTreeAsync(rootId, maxDepth, maxNodes, ct),
             "KnowledgeTree" => await LoadRawKnowledgeTreeAsync(rootId, maxDepth, maxNodes, ct),
+            "EavTree" => await LoadRawEavTreeAsync(rootId, maxDepth, maxNodes, ct),
             _ => new List<RawNode>()
         };
 
@@ -163,6 +164,24 @@ public sealed class SubtreeService
             """, rootId, maxDepth, maxNodes)
             .ToListAsync(ct);
 
+    private Task<List<RawNode>> LoadRawEavTreeAsync(
+        string rootId, int maxDepth, int maxNodes, CancellationToken ct)
+        => _db.Database.SqlQueryRaw<RawNode>("""
+            WITH RECURSIVE subtree AS (
+                SELECT t.id, t.parent_id, 0 AS depth
+                FROM eav_trees t WHERE t.id = {0}
+                UNION ALL
+                SELECT c.id, c.parent_id, s.depth + 1
+                FROM eav_trees c
+                JOIN subtree s ON c.parent_id = s.id
+                WHERE s.depth < {1}
+            )
+            SELECT s.id AS "Id", COALESCE(n.name, '') AS "Name", s.parent_id AS "ParentId", s.depth AS "Depth"
+            FROM subtree s LEFT JOIN nodes n ON n.id = s.id
+            ORDER BY s.depth, n.name LIMIT {2}
+            """, rootId, maxDepth, maxNodes)
+            .ToListAsync(ct);
+
     // ═══════════════════════════════════════════════════════
     // 批量加载 EAV（返回 nodeId → 渲染文本）
     // ═══════════════════════════════════════════════════════
@@ -239,12 +258,27 @@ public sealed class SubtreeService
             .AsNoTracking()
             .ToDictionaryAsync(l => l.AttributeId, ct);
 
+        // property_tree：挂载关系走 eav_tree_roots 映射表（attributeId → 根节点名，join nodes）
+        var treeRootRows = await _db.EavTreeRoots
+            .Where(x => x.EntityId == entityId)
+            .AsNoTracking()
+            .Select(x => new { x.AttributeId, x.Id })
+            .ToListAsync(ct);
+        var treeRootIds = treeRootRows.Select(r => r.Id).ToList();
+        var treeRootNames = await _db.Nodes
+            .Where(n => treeRootIds.Contains(n.Id))
+            .AsNoTracking()
+            .ToDictionaryAsync(n => n.Id, n => n.Name, ct);
+        var treeRoots = treeRootRows.ToDictionary(
+            r => r.AttributeId,
+            r => treeRootNames.GetValueOrDefault(r.Id) ?? "属性树");
+
         var lines = new List<string>();
 
         foreach (var def in defs)
         {
             var text = await FormatAttributeAsync(
-                def, values, locations,
+                def, values, locations, treeRoots,
                 entityId, entityType, ct);
 
             if (!string.IsNullOrWhiteSpace(text))
@@ -262,6 +296,7 @@ public sealed class SubtreeService
         AttributeDefinition def,
         Dictionary<string, AttributeValue> values,
         Dictionary<string, LocationAttributeValue> locations,
+        Dictionary<string, string> treeRoots,
         string entityId, string entityType,
         CancellationToken ct)
     {
@@ -282,6 +317,11 @@ public sealed class SubtreeService
             if (def.RefTableDefinitionId is null) return null;
             return await FormatTableAsync(entityId, entityType, def, ct);
         }
+
+        // property_tree：映射表，已挂载则显示根节点名（截断）
+        if (def.DataType == EavDataTypes.PropertyTree)
+            return treeRoots.TryGetValue(def.AttributeId, out var rootName)
+                ? Truncate(rootName, MaxAttrValueLen) : null;
 
         // 其余走 AttributeValue
         if (!values.TryGetValue(def.AttributeId, out var v)) return null;
@@ -457,6 +497,11 @@ public sealed class SubtreeService
                         .Include(x => x.Node)
                         .FirstOrDefaultAsync(x => x.Id == current, ct);
                     name = kt?.Name; parentId = kt?.ParentId; break;
+                case "EavTree":
+                    var et = await _db.EavTrees.AsNoTracking()
+                        .Include(x => x.Node)
+                        .FirstOrDefaultAsync(x => x.Id == current, ct);
+                    name = et?.Name; parentId = et?.ParentId; break;
             }
 
             if (name is null) break;

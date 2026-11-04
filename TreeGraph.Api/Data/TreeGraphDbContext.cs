@@ -27,11 +27,15 @@ public class TreeGraphDbContext : DbContext
     public DbSet<InodeEntityType> InodeEntityTypes => Set<InodeEntityType>();
     public DbSet<InodeEntity> InodeEntities => Set<InodeEntity>();
 
-    // TreeEavSky：计量单位树 / 分类树 / 知识树 / 空间树
+    // TreeEavSky：计量单位树 / 分类树 / 知识树 / 空间树 / EAV 树
     public DbSet<UnitTree> UnitTrees => Set<UnitTree>();
     public DbSet<CategoryTree> CategoryTrees => Set<CategoryTree>();
     public DbSet<KnowledgeTree> KnowledgeTrees => Set<KnowledgeTree>();
     public DbSet<SpaceTree> SpaceTrees => Set<SpaceTree>();
+    public DbSet<EavTree> EavTrees => Set<EavTree>();
+
+    // NodeEavSky：property_tree 映射表（(EAV 实体, 属性) → 专属 eav_trees rootNode）
+    public DbSet<EavTreeRoot> EavTreeRoots => Set<EavTreeRoot>();
 
     // 空间（独立简单实体）
     public DbSet<Space> Spaces => Set<Space>();
@@ -69,6 +73,8 @@ public class TreeGraphDbContext : DbContext
         ConfigureCategoryTrees(mb);
         ConfigureKnowledgeTrees(mb);
         ConfigureSpaceTrees(mb);
+        ConfigureEavTrees(mb);
+        ConfigureEavTreeRoots(mb);
         ConfigureSpaces(mb);
         ConfigureLines(mb);
         ConfigureLineTerminals(mb);
@@ -185,6 +191,63 @@ public class TreeGraphDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
 
             e.HasIndex(x => x.ParentId).HasDatabaseName("ix_space_trees_parent");
+        });
+    }
+
+    private static void ConfigureEavTrees(ModelBuilder mb)
+    {
+        mb.Entity<EavTree>(e =>
+        {
+            e.ToTable("eav_trees");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36);
+            e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(x => x.CanHaveChildren).HasColumnName("can_have_children");
+            e.Property(x => x.SortOrder).HasColumnName("sort_order");
+            e.Property(x => x.HasChildren).HasColumnName("has_children");
+
+            e.HasOne(x => x.Parent)
+                .WithMany()
+                .HasForeignKey(x => x.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // 共享主键：宿主 Id 即 nodes.id，名称唯一真源在 nodes（R2 Name 收编）
+            e.HasOne(x => x.Node)
+                .WithOne()
+                .HasForeignKey<EavTree>(x => x.Id)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(x => x.ParentId).HasDatabaseName("ix_eav_trees_parent");
+        });
+    }
+
+    // ============================================================
+    // NodeEavSky：property_tree 映射表
+    // ============================================================
+    private static void ConfigureEavTreeRoots(ModelBuilder mb)
+    {
+        mb.Entity<EavTreeRoot>(e =>
+        {
+            e.ToTable("eav_tree_roots");
+            e.HasKey(x => x.Id);
+            // 共享主键：id 即 rootNode.Id（nodes.id / eav_trees.id）
+            e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36);
+            e.Property(x => x.EntityId).HasColumnName("entity_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.BindingId).HasColumnName("binding_id").HasMaxLength(36);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+
+            // 删除绑定须先经 DeleteEntityAsync 守卫清理映射与根节点，Restrict 防绕过
+            e.HasOne(x => x.Binding)
+                .WithMany()
+                .HasForeignKey(x => x.BindingId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(x => new { x.EntityId, x.AttributeId })
+                .IsUnique().HasDatabaseName("uq_etr_entity_attr");
+
+            e.HasIndex(x => x.BindingId).HasDatabaseName("ix_etr_binding");
         });
     }
 

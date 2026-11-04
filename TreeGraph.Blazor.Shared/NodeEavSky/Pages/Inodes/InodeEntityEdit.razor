@@ -267,7 +267,8 @@ else
         };
 
         var dialog = await DialogService.ShowAsync<BindingNameDialog>(
-            "重命名绑定", parameters);
+            "重命名绑定", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         var result = await dialog.Result;
 
         if (result?.Canceled != false || result.Data is not string name)

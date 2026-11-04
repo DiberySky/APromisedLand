@@ -3,6 +3,7 @@ using MudBlazor.Extensions;
 using MudBlazor.Extensions.Components;
 using MudBlazor.Extensions.Options;
 using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Category;
+using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Eav;
 using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Knowledge;
 using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Space;
 using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Unit;
@@ -92,6 +93,40 @@ public class BlazorService(IDialogService dialogService)
 
         var dialog = await dialogService.ShowExAsync<KnowledgeTreeDialogPage>("知识注册",
             parameters, DialogOptions);
+
+        var result = await dialog.Result;
+    }
+
+    /// <summary>
+    /// 弹出 EAV 树对话框页（点击节点文本时递归弹窗，克隆自 ShowSpaceTreeDialogPageAsync）。
+    /// </summary>
+    public async Task ShowEavTreeDialogPageAsync(
+        TreeNodeItem<EavTree>? node = null)
+    {
+        var parameters = new DialogParameters<EavTreeDialogPage>
+        {
+            { x => x.ClickNode, node },
+        };
+
+        var dialog = await dialogService.ShowExAsync<EavTreeDialogPage>("EAV 注册",
+            parameters, DialogOptions);
+
+        var result = await dialog.Result;
+    }
+
+    /// <summary>
+    /// 按根节点 Id 弹出 EAV 树对话框页（供 property_tree 属性面板打开专属属性树）。
+    /// </summary>
+    public async Task ShowEavTreeDialogPageByRootIdAsync(string rootId, string? title = null)
+    {
+        var parameters = new DialogParameters<EavTreeDialogPage>
+        {
+            { x => x.RootId, rootId },
+            { x => x.Title, title },
+        };
+
+        var dialog = await dialogService.ShowExAsync<EavTreeDialogPage>(
+            title ?? "属性树", parameters, DialogOptions);
 
         var result = await dialog.Result;
     }

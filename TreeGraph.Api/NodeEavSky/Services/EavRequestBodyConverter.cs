@@ -67,6 +67,7 @@ public static class EavRequestBodyConverter
             EavDataTypes.Date => DateOnly.Parse(elem.GetString()!),
             EavDataTypes.Time => TimeOnly.Parse(elem.GetString()!),
             EavDataTypes.String => elem.GetString(),
+            EavDataTypes.PropertyTree => ParsePropertyTree(elem),
             EavDataTypes.SingleChoice => ParseSingleChoice(elem),
             EavDataTypes.Json => JsonDocument.Parse(elem.GetRawText()),
             EavDataTypes.File => JsonDocument.Parse(elem.GetRawText()),
@@ -111,6 +112,19 @@ public static class EavRequestBodyConverter
             return elem.GetDecimal();
 
         throw new ArgumentException("数值格式错误");
+    }
+
+    /// <summary>属性树：只收对象形态 { rootId?, name? }（null 由 ConvertElement 上游短路，表示卸载）。</summary>
+    public static PropertyTreeValue ParsePropertyTree(JsonElement elem)
+    {
+        if (elem.ValueKind != JsonValueKind.Object)
+            throw new ArgumentException("属性树（property_tree）值必须是对象 { rootId?, name? }");
+
+        var rootId = elem.TryGetProperty("rootId", out var r) && r.ValueKind == JsonValueKind.String
+            ? r.GetString() : null;
+        var name = elem.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String
+            ? n.GetString() : null;
+        return new PropertyTreeValue(rootId, name);
     }
 
     private static string? ParseSingleChoice(JsonElement elem)

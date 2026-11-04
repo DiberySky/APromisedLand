@@ -38,9 +38,10 @@ public enum EavHost
 public record EavDataTypeInfo(string Value, EavTypeLayer Layer, EavRefKind Ref, EavHost Hosts);
 
 /// <summary>
-/// EAV 数据类型目录：13 个类型的唯一权威定义，前后端规则全部由此派生。
+/// EAV 数据类型目录：14 个类型的唯一权威定义，前后端规则全部由此派生。
 /// 核心规则：
-///   - 容器不进容器：composite / table 仅顶层属性可用，禁止嵌套（无递归、无环）
+///   - 容器不进容器：composite / table / property_tree 仅顶层属性可用，禁止嵌套（无递归、无环）
+///   - 容器分两种引用对象：composite / table 引用类型定义，property_tree 引用运行时实例（专属 eav_trees rootNode）
 ///   - file / location 走独立存储通道，仅顶层
 ///   - single_choice 不进表列（表内枚举需求将来走表列接选项集的全链路方案）
 /// </summary>
@@ -65,11 +66,18 @@ public static class EavDataTypes
     /// </summary>
     public const string Location = "location";
 
+    /// <summary>
+    /// 属性树：引用类型。保存该属性时自动在 eav_trees 建专属 rootNode，
+    /// 值（ValueString）存该 rootNode Id；维护该属性即维护这棵一比一 EAV 树。
+    /// 删除守卫：rootNode 有子节点时禁止删属性/摘挂载。
+    /// </summary>
+    public const string PropertyTree = "property_tree";
+
     private const EavHost Everywhere = EavHost.TopLevel | EavHost.CompositeField | EavHost.TableColumn;
     private const EavHost TopOnly = EavHost.TopLevel;
     private const EavHost NoTableColumn = EavHost.TopLevel | EavHost.CompositeField;
 
-    /// <summary>13 个类型的元数据目录；插入顺序即前端下拉展示顺序。</summary>
+    /// <summary>14 个类型的元数据目录；插入顺序即前端下拉展示顺序。</summary>
     public static readonly IReadOnlyDictionary<string, EavDataTypeInfo> Catalog =
         new Dictionary<string, EavDataTypeInfo>(StringComparer.Ordinal)
         {
@@ -83,6 +91,7 @@ public static class EavDataTypes
             [SingleChoice] = new(SingleChoice, EavTypeLayer.RefLeaf,     EavRefKind.OptionSet,       NoTableColumn),
             [Location]     = new(Location,     EavTypeLayer.SpecialLeaf, EavRefKind.None,            TopOnly),
             [File]         = new(File,         EavTypeLayer.SpecialLeaf, EavRefKind.None,            TopOnly),
+            [PropertyTree] = new(PropertyTree, EavTypeLayer.Container,   EavRefKind.None,            TopOnly),
             [Composite]    = new(Composite,    EavTypeLayer.Container,   EavRefKind.CompositeType,   TopOnly),
             [Table]        = new(Table,        EavTypeLayer.Container,   EavRefKind.TableDefinition, TopOnly),
             [Json]         = new(Json,         EavTypeLayer.Scalar,      EavRefKind.None,            Everywhere),

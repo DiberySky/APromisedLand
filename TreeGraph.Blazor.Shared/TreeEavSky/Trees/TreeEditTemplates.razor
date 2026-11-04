@@ -1,4 +1,4 @@
-@* TreeEditTemplates.razor — 4 棵树共享的编辑模板（TreeNodeEditDialog 的 EditTemplate 内容区）。
+@* TreeEditTemplates.razor — 5 棵树共享的编辑模板（TreeNodeEditDialog 的 EditTemplate 内容区）。
    模板本体在 XxxTreeEditFields 组件内（@bind 生成的 CreateBinder 需要实例 this，
    不能直接放进 static 模板字段）；此处仅做薄包装，供对话框页与搜索页等树外场景复用。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Trees
@@ -20,4 +20,8 @@
     /// <summary>空间树编辑模板（名称/描述/允许包含子节点）。</summary>
     public static readonly RenderFragment<SpaceTree> SpaceEdit =
         context => @<SpaceTreeEditFields Model="context" />;
+
+    /// <summary>EAV 树编辑模板（名称/描述/允许包含子节点）。</summary>
+    public static readonly RenderFragment<EavTree> EavEdit =
+        context => @<EavTreeEditFields Model="context" />;
 }

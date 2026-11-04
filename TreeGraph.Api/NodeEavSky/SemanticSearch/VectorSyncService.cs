@@ -246,6 +246,8 @@ public sealed class VectorSynchronizer
             .Select(n => n.Id).ToListAsync(ct));
         hostNodeIds.AddRange(await _db.KnowledgeTrees.AsNoTracking()
             .Select(n => n.Id).ToListAsync(ct));
+        hostNodeIds.AddRange(await _db.EavTrees.AsNoTracking()
+            .Select(n => n.Id).ToListAsync(ct));
         hostNodeIds.AddRange(await _db.Nodes.AsNoTracking()
             .Where(n => n.HostType == "LineNode")
             .Select(n => n.Id).ToListAsync(ct));
@@ -555,6 +557,7 @@ public sealed class VectorSynchronizer
         result.AddRange(await ExpandDescendantsAsync([inodeId], _db.UnitTrees, ct));
         result.AddRange(await ExpandDescendantsAsync([inodeId], _db.CategoryTrees, ct));
         result.AddRange(await ExpandDescendantsAsync([inodeId], _db.KnowledgeTrees, ct));
+        result.AddRange(await ExpandDescendantsAsync([inodeId], _db.EavTrees, ct));
         // 线路改名 → 其下全部线路节点的「所属线路」行失效，按 LineId 级联
         result.AddRange(await _db.Nodes.AsNoTracking()
             .Where(n => n.HostType == "LineNode" && n.LineId == inodeId)
@@ -629,6 +632,8 @@ public sealed class VectorSynchronizer
                 ids.AddRange(await _db.CategoryTrees.AsNoTracking()
                     .Select(n => n.Id).ToListAsync(ct));
                 ids.AddRange(await _db.KnowledgeTrees.AsNoTracking()
+                    .Select(n => n.Id).ToListAsync(ct));
+                ids.AddRange(await _db.EavTrees.AsNoTracking()
                     .Select(n => n.Id).ToListAsync(ct));
                 return ids.ToHashSet(StringComparer.Ordinal);
 

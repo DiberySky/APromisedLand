@@ -220,6 +220,16 @@ public sealed class GraphSynchronizer
                 return new GraphNodeInfo(inodeId, row.Name, GraphNaming.KnowledgeTreeTag,
                     "KnowledgeTree", h?.IsArchived ?? false, h?.ParentId, null, SeedSpaceIds.Knowledge);
             }
+            case "EavTree":
+            {
+                // EAV 树不归属任何空间：SpaceId = null → 同步到全部空间（与自由 Node 同口径）
+                var parentId = await _db.EavTrees.AsNoTracking()
+                    .Where(n => n.Id == inodeId)
+                    .Select(n => n.ParentId)
+                    .FirstOrDefaultAsync(ct);
+                return new GraphNodeInfo(inodeId, row.Name, GraphNaming.EavTreeTag,
+                    "EavTree", false, parentId, null, null);
+            }
             case "LineNode":
             {
                 // R7：line_id 即 nodes.line_id（身份锚点）；parent_of 边指向所属 Line
@@ -543,6 +553,7 @@ public sealed class GraphSynchronizer
         List<TreeRow> UnitTrees,
         List<TreeRow> CategoryTrees,
         List<TreeRow> KnowledgeTrees,
+        List<TreeRow> EavTrees,
         List<(string Id, string? Name)> FreeNodes,
         List<LineRow> Lines,
         List<LineNodeRow> LineNodes,
@@ -579,6 +590,9 @@ public sealed class GraphSynchronizer
             .ToListAsync(ct);
         var knowledgeTrees = await _db.KnowledgeTrees.AsNoTracking()
             .Select(n => new TreeRow(n.Id, n.ParentId, n.IsArchived))
+            .ToListAsync(ct);
+        var eavTrees = await _db.EavTrees.AsNoTracking()
+            .Select(n => new TreeRow(n.Id, n.ParentId, false))
             .ToListAsync(ct);
 
         var freeNodes = await _db.Nodes.AsNoTracking()
@@ -623,7 +637,7 @@ public sealed class GraphSynchronizer
             .ToListAsync(ct);
 
         return new GraphContext(
-            nodeNames, spaceTrees, unitTrees, categoryTrees, knowledgeTrees,
+            nodeNames, spaceTrees, unitTrees, categoryTrees, knowledgeTrees, eavTrees,
             freeNodes, lines, lineNodes, connectsTo, semanticEdges);
     }
 
@@ -676,6 +690,8 @@ public sealed class GraphSynchronizer
                 AddTree(ctx.CategoryTrees, GraphNaming.CategoryTreeTag, "CategoryTree");
             if (spaceId == SeedSpaceIds.Knowledge)
                 AddTree(ctx.KnowledgeTrees, GraphNaming.KnowledgeTreeTag, "KnowledgeTree");
+            // EAV 树不归属空间：每个空间都写入（与自由 Node 同口径）
+            AddTree(ctx.EavTrees, GraphNaming.EavTreeTag, "EavTree");
         }
 
         if (includeFreeNodes)

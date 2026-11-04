@@ -888,6 +888,46 @@ namespace TreeGraph.Api.Data.Migrations
                     b.ToTable("custom_table_rows", (string)null);
                 });
 
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EavTreeRoot", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id");
+
+                    b.Property<string>("BindingId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("binding_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BindingId")
+                        .HasDatabaseName("ix_etr_binding");
+
+                    b.HasIndex("EntityId", "AttributeId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_etr_entity_attr");
+
+                    b.ToTable("eav_tree_roots", (string)null);
+                });
+
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EntityTypeDefinition", b =>
                 {
                     b.Property<string>("EntityTypeId")
@@ -1943,6 +1983,43 @@ namespace TreeGraph.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.EavTree", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("CanHaveChildren")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_have_children");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("HasChildren")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_children");
+
+                    b.Property<string>("ParentId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("parent_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId")
+                        .HasDatabaseName("ix_eav_trees_parent");
+
+                    b.ToTable("eav_trees", (string)null);
+                });
+
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.KnowledgeTree", b =>
                 {
                     b.Property<string>("Id")
@@ -2989,6 +3066,16 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Navigation("Table");
                 });
 
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EavTreeRoot", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.InodeEntity", "Binding")
+                        .WithMany()
+                        .HasForeignKey("BindingId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Binding");
+                });
+
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.LocationAttributeValue", b =>
                 {
                     b.HasOne("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", "Attribute")
@@ -3039,6 +3126,24 @@ namespace TreeGraph.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Node");
+                });
+
+            modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.EavTree", b =>
+                {
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", "Node")
+                        .WithOne()
+                        .HasForeignKey("TreeGraph.Shared.TreeEavSky.Entities.EavTree", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.EavTree", "Parent")
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Node");
+
+                    b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.KnowledgeTree", b =>

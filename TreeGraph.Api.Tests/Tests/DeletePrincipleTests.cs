@@ -237,6 +237,7 @@ public class DeletePrincipleTests : IntegrationTestBase
     [InlineData("/UnitTree")]
     [InlineData("/CategoryTree")]
     [InlineData("/SpaceTree")]
+    [InlineData("/EavTree")]
     public async Task TreeNodeDelete_WhenChildrenExist_Returns409(string tree)
     {
         var parentId = $"P_{Guid.NewGuid():N}";

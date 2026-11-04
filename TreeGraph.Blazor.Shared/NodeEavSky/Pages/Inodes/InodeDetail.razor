@@ -383,7 +383,8 @@ else
             { nameof(BindingNameDialog.HelperText), "同一类型下绑定名不可重复" }
         };
 
-        var dialog = await DialogService.ShowAsync<BindingNameDialog>(title, parameters);
+        var dialog = await DialogService.ShowAsync<BindingNameDialog>(title, parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         var result = await dialog.Result;
 
         if (result?.Canceled != false || result.Data is not string name)
@@ -479,13 +480,12 @@ else
     {
         var parameters = new DialogParameters
         {
-            { nameof(BindingCreateDialog.NodeId), InodeId },
-            { nameof(BindingCreateDialog.DialogContext),
-              "为该 iNode 新建命名绑定：同一类型可建多条绑定，每条绑定拥有独立的属性数据。" }
+            { nameof(BindingCreateDialog.NodeId), InodeId }
         };
 
         var dialog = await DialogService.ShowAsync<BindingCreateDialog>(
-            "新建绑定", parameters);
+            "新建绑定", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         var result = await dialog.Result;
 
         if (result?.Canceled != false

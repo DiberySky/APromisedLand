@@ -41,6 +41,7 @@ public static class GraphNaming
     public const string UnitTreeTag = "unit_tree";
     public const string CategoryTreeTag = "category_tree";
     public const string KnowledgeTreeTag = "knowledge_tree";
+    public const string EavTreeTag = "eav_tree";
     public const string LineNodeTag = "line_node";
 
     /// <summary>自由节点（nodes.host_type = "Node"，无宿主扩展表）。</summary>
@@ -51,7 +52,8 @@ public static class GraphNaming
 
     public static readonly string[] AllNodeTags =
     [
-        SpaceTreeTag, UnitTreeTag, CategoryTreeTag, KnowledgeTreeTag, LineNodeTag, NodeTag, LineTag
+        SpaceTreeTag, UnitTreeTag, CategoryTreeTag, KnowledgeTreeTag, EavTreeTag,
+        LineNodeTag, NodeTag, LineTag
     ];
 
     /// <summary>按 tag 声明属性列（schema 初始化与 ALTER 补列共用）。</summary>
@@ -62,6 +64,7 @@ public static class GraphNaming
             [UnitTreeTag] = ["name", "node_type", "is_archived"],
             [CategoryTreeTag] = ["name", "node_type", "is_archived"],
             [KnowledgeTreeTag] = ["name", "node_type", "is_archived"],
+            [EavTreeTag] = ["name", "node_type", "is_archived"],
             [LineNodeTag] =
             [
                 "name", "node_type", "is_archived",

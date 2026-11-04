@@ -41,13 +41,22 @@ public class EavReadService
             .AsNoTracking()
             .ToListAsync(ct);
 
+        // property_tree：挂载关系走 eav_tree_roots 映射表（值 = { rootId, name }）
+        var treeRoots = await _db.EavTreeRoots
+            .Where(x => x.EntityId == entityId)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var rootNames = await LoadRootNamesAsync(treeRoots.Select(x => x.Id), ct);
+
         var result = new DynamicEntity(entityId, entityType);
 
-        // ★ #3：填充 UpdatedAt（供乐观锁使用），需合并类型化值表与位置表
+        // ★ #3：填充 UpdatedAt（供乐观锁使用），需合并类型化值表、位置表与属性树映射表
         var valuesMax = rows.Count > 0 ? rows.Max(r => r.UpdatedAt) : (DateTimeOffset?)null;
         var locMax = locRows.Count > 0 ? locRows.Max(r => r.UpdatedAt) : (DateTimeOffset?)null;
+        var treeRootMax = treeRoots.Count > 0 ? treeRoots.Max(x => x.CreatedAt) : (DateTimeOffset?)null;
         DateTimeOffset? overallMax = null;
-        foreach (var m in new[] { valuesMax, locMax })
+        foreach (var m in new[] { valuesMax, locMax, treeRootMax })
         {
             if (m is { } v && (overallMax is null || v > overallMax)) overallMax = v;
         }
@@ -66,6 +75,16 @@ public class EavReadService
                 && def.DataType == EavDataTypes.Location)
             {
                 result.SetProperty(def.AttributeName, ToLocationValue(loc));
+            }
+        }
+
+        foreach (var tr in treeRoots)
+        {
+            if (defMap.TryGetValue(tr.AttributeId, out var def)
+                && def.DataType == EavDataTypes.PropertyTree)
+            {
+                result.SetProperty(def.AttributeName,
+                    new PropertyTreeValue(tr.Id, rootNames.GetValueOrDefault(tr.Id)));
             }
         }
 
@@ -90,8 +109,18 @@ public class EavReadService
             .AsNoTracking()
             .ToListAsync(ct);
 
+        // property_tree：挂载关系走 eav_tree_roots 映射表
+        var allTreeRoots = await _db.EavTreeRoots
+            .Where(x => ids.Contains(x.EntityId))
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var rootNames = await LoadRootNamesAsync(allTreeRoots.Select(x => x.Id), ct);
+
         var grouped = allRows.GroupBy(r => r.EntityId);
         var locGrouped = allLocRows.GroupBy(l => l.EntityId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+        var treeRootGrouped = allTreeRoots.GroupBy(x => x.EntityId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
         // ★ 保持输入 ids 的顺序——FilterEntityIdsAsync 已按业务键排好序，
@@ -100,9 +129,10 @@ public class EavReadService
             .Select((id, idx) => (id, idx))
             .ToDictionary(x => x.id, x => x.idx);
 
-        // 普通值表与位置表出现过的实体并集
+        // 普通值表、位置表与属性树映射表出现过的实体并集
         var allEntityIds = grouped.Select(g => g.Key)
             .Union(locGrouped.Keys)
+            .Union(treeRootGrouped.Keys)
             .ToList();
 
         return allEntityIds.Select(entityId =>
@@ -135,11 +165,39 @@ public class EavReadService
                 }
             }
 
+            if (treeRootGrouped.TryGetValue(entityId, out var roots))
+            {
+                var rootMax = roots.Max(x => x.CreatedAt);
+                maxUpdated = maxUpdated is null || rootMax > maxUpdated ? rootMax : maxUpdated;
+                foreach (var tr in roots)
+                {
+                    if (defMap.TryGetValue(tr.AttributeId, out var def)
+                        && def.DataType == EavDataTypes.PropertyTree)
+                    {
+                        entity.SetProperty(def.AttributeName,
+                            new PropertyTreeValue(tr.Id, rootNames.GetValueOrDefault(tr.Id)));
+                    }
+                }
+            }
+
             entity.UpdatedAt = maxUpdated;
             return entity;
         })
         .OrderBy(e => inputOrder.GetValueOrDefault(e.EntityId, int.MaxValue))
         .ToList();
+    }
+
+    /// <summary>批量取属性树根节点名（rootNode.Id → nodes.name），供 { rootId, name } 值组装。</summary>
+    private async Task<Dictionary<string, string?>> LoadRootNamesAsync(
+        IEnumerable<string> rootIds, CancellationToken ct)
+    {
+        var idList = rootIds.Distinct().ToList();
+        if (idList.Count == 0) return new Dictionary<string, string?>();
+
+        return await _db.Nodes
+            .Where(n => idList.Contains(n.Id))
+            .AsNoTracking()
+            .ToDictionaryAsync(n => n.Id, n => (string?)n.Name, ct);
     }
 
     private static EavLocationValue ToLocationValue(LocationAttributeValue l) => new()

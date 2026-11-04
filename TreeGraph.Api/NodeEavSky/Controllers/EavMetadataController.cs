@@ -70,6 +70,11 @@ public class EavMetadataController : ControllerBase
             is { } typeError)
             return typeError;
 
+        // ---- property_tree 禁挂树节点（避免「树节点的属性又是一棵树」套娃） ----
+        if (req.DataType == EavDataTypes.PropertyTree
+            && HostTypeCatalog.IsTreeHost(req.EntityType))
+            return BadRequest(new { error = "属性树（property_tree）不能应用到树节点" });
+
         // ---- 引用存在性 ----
         if (req.RefCompositeTypeId is { } cid
             && !await _db.CompositeTypes.AnyAsync(

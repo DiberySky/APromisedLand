@@ -7,6 +7,8 @@ using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.NodeEavSky;
 using TreeGraph.Shared.NodeEavSky.Dtos;
+using TreeGraph.Shared.NodeSky.Entities;
+using TreeGraph.Shared.TreeEavSky.Entities;
 
 namespace TreeGraph.Api.NodeEavSky.Services;
 
@@ -131,8 +133,12 @@ public class EavWriteService
             var currentMaxLocations = await _db.LocationAttributeValues
                 .Where(l => l.EntityId == entityId)
                 .MaxAsync(l => (DateTimeOffset?)l.UpdatedAt, ct);
+            // property_tree 挂载/卸载也改变实体状态：合并映射表 CreatedAt 上界
+            var currentMaxTreeRoots = await _db.EavTreeRoots
+                .Where(x => x.EntityId == entityId)
+                .MaxAsync(x => (DateTimeOffset?)x.CreatedAt, ct);
             DateTimeOffset? currentMax = null;
-            foreach (var m in new[] { currentMaxValues, currentMaxLocations })
+            foreach (var m in new[] { currentMaxValues, currentMaxLocations, currentMaxTreeRoots })
             {
                 if (m is { } v && (currentMax is null || v > currentMax)) currentMax = v;
             }
@@ -225,6 +231,15 @@ public class EavWriteService
                 continue;
             }
 
+            // property_tree：容器型，值不落 attribute_values，挂载关系走 eav_tree_roots 映射表。
+            // 显式提供即"挂载"（rootNode 不存在则自动建根）；显式 null 走删除守卫。
+            if (def.DataType == EavDataTypes.PropertyTree)
+            {
+                await ApplyPropertyTreeAsync(entityId, def, valueToWrite,
+                    audits, changedBy, correlationId, now, ct);
+                continue;
+            }
+
             existingMap.TryGetValue(def.AttributeId, out var existingValue);
 
             // 显式 null 走删除路径
@@ -302,6 +317,14 @@ public class EavWriteService
                         ApplyLocation(entityId, def, null,
                             existingLocationMap, audits, changedBy, correlationId, now);
                     }
+                    continue;
+                }
+
+                // property_tree 未提供：卸载（有子节点守卫拒删，空树连根清除）
+                if (def.DataType == EavDataTypes.PropertyTree)
+                {
+                    await ApplyPropertyTreeAsync(entityId, def, null,
+                        audits, changedBy, correlationId, now, ct);
                     continue;
                 }
 
@@ -390,6 +413,148 @@ public class EavWriteService
         if (string.IsNullOrWhiteSpace(rawJson)) return null;
         try { return JsonDocument.Parse(rawJson); }
         catch { return null; }
+    }
+
+    /// <summary>
+    /// property_tree：值不落 attribute_values，挂载关系存 eav_tree_roots 映射表
+    /// （映射 id 即 rootNode.Id，与 nodes / eav_trees 共享主键）。
+    /// 值为 <see cref="PropertyTreeValue"/> { rootId, name }：
+    ///   - 未挂载：name 必填建专属根（rootId 提供则挂载已有树并同步名）；
+    ///   - 已挂载：rootId 不同拒换根；name 非空且不同则行内改名（同步 nodes.name）；
+    ///   - 显式 null 即"卸载"：有子节点时守卫拒删，空树连根清除。
+    /// 与主写入在同一 SaveChanges 事务提交。
+    /// </summary>
+    private async Task ApplyPropertyTreeAsync(
+        string entityId, AttributeDefinition def, object? value,
+        List<AttributeAuditLog> audits,
+        string changedBy, string? correlationId, DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var mapping = await _db.EavTreeRoots
+            .FirstOrDefaultAsync(
+                x => x.EntityId == entityId && x.AttributeId == def.AttributeId, ct);
+
+        // ---- 卸载：删映射 + 空树连根清除 ----
+        if (value is null)
+        {
+            if (mapping is null) return;
+
+            var oldName = await _db.Nodes
+                .Where(n => n.Id == mapping.Id)
+                .Select(n => n.Name)
+                .FirstOrDefaultAsync(ct);
+
+            await GuardPropertyTreeDeleteAsync(def.AttributeName, mapping.Id, ct);
+            await RemovePropertyTreeRootAsync(mapping, ct);
+            audits.Add(CreateAudit(entityId, def,
+                oldName, null, "Delete", changedBy, correlationId, now));
+            return;
+        }
+
+        if (value is not PropertyTreeValue ptv)
+            throw new InvalidOperationException("property_tree 值类型错误");
+
+        var providedRootId = string.IsNullOrWhiteSpace(ptv.RootId) ? null : ptv.RootId.Trim();
+        var providedName = string.IsNullOrWhiteSpace(ptv.Name) ? null : ptv.Name.Trim();
+
+        // ---- 已挂载：换根拒绝；name 非空且不同则行内改名；否则幂等 ----
+        if (mapping is not null)
+        {
+            if (providedRootId is not null && providedRootId != mapping.Id)
+                throw new EavValidationException(new List<ValidationError>
+                    { new(def.AttributeName, "属性树已挂载，不能更换根节点；请先卸载") });
+
+            if (providedName is not null)
+            {
+                var node = await _db.Nodes
+                    .FirstOrDefaultAsync(n => n.Id == mapping.Id, ct);
+                if (node is not null && node.Name != providedName)
+                {
+                    audits.Add(CreateAudit(entityId, def,
+                        node.Name, providedName, "Update", changedBy, correlationId, now));
+                    node.Name = providedName;
+                }
+            }
+            return;
+        }
+
+        // ---- 挂载：rootId 提供则挂已有树（同步名）；否则 name 必填建专属根 ----
+        string rootId;
+        string? rootName;
+        if (providedRootId is not null)
+        {
+            var node = await _db.Nodes
+                .FirstOrDefaultAsync(n => n.Id == providedRootId && n.HostType == "EavTree", ct);
+            if (node is null)
+                throw new EavValidationException(new List<ValidationError>
+                    { new(def.AttributeName, "属性树根节点不存在") });
+
+            rootId = providedRootId;
+            if (providedName is not null && node.Name != providedName)
+                node.Name = providedName;
+            rootName = node.Name;
+        }
+        else
+        {
+            if (providedName is null)
+                throw new EavValidationException(new List<ValidationError>
+                    { new(def.AttributeName, "属性树名称不能为空") });
+
+            rootId = Guid.NewGuid().ToString();
+            rootName = providedName;
+
+            _db.Nodes.Add(new Node { Id = rootId, HostType = "EavTree", Name = rootName });
+            _db.EavTrees.Add(new EavTree
+            {
+                Id = rootId,
+                ParentId = null,
+                CanHaveChildren = true,
+                HasChildren = false
+            });
+        }
+
+        // binding_id 冗余列：非绑定宿主（无绑定行的 entityId）为 null
+        var bindingId = await _db.InodeEntities
+            .Where(x => x.EntityId == entityId)
+            .Select(x => (string?)x.BindingId)
+            .FirstOrDefaultAsync(ct);
+
+        _db.EavTreeRoots.Add(new EavTreeRoot
+        {
+            Id = rootId,
+            EntityId = entityId,
+            AttributeId = def.AttributeId,
+            BindingId = bindingId,
+            CreatedAt = now
+        });
+        audits.Add(CreateAudit(entityId, def,
+            null, rootName, "Insert", changedBy, correlationId, now));
+    }
+
+    /// <summary>卸载时连根清除：映射行 + 空树 rootNode（eav_trees / nodes 共享主键两行）。</summary>
+    private async Task RemovePropertyTreeRootAsync(EavTreeRoot mapping, CancellationToken ct)
+    {
+        _db.EavTreeRoots.Remove(mapping);
+
+        var root = await _db.EavTrees.FirstOrDefaultAsync(t => t.Id == mapping.Id, ct);
+        if (root is not null) _db.EavTrees.Remove(root);
+
+        var node = await _db.Nodes.FirstOrDefaultAsync(n => n.Id == mapping.Id, ct);
+        if (node is not null) _db.Nodes.Remove(node);
+    }
+
+    /// <summary>
+    /// property_tree 删除守卫：rootNode（eav_trees 根）有子节点时拒绝删除。
+    /// </summary>
+    private async Task GuardPropertyTreeDeleteAsync(
+        string attributeName, string? rootId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(rootId)) return;
+
+        var hasChildren = await _db.EavTrees.AnyAsync(t => t.ParentId == rootId, ct);
+        if (hasChildren)
+            throw new EavValidationException(new List<ValidationError>
+                { new(attributeName, "属性树存在子节点，不能删除；请先清空树内容") });
     }
 
     /// <summary>
@@ -646,7 +811,10 @@ public class EavWriteService
             .AnyAsync(r => r.ParentEntityType == entityType
                         && r.ParentEntityId == entityId, ct);
 
-        if (!hasValues && !hasLocations && !hasRows)
+        var hasTreeRoots = await _db.EavTreeRoots
+            .AnyAsync(x => x.EntityId == entityId, ct);
+
+        if (!hasValues && !hasLocations && !hasRows && !hasTreeRoots)
             return false;
 
         var strategy = _db.Database.CreateExecutionStrategy();
@@ -672,8 +840,8 @@ public class EavWriteService
                 foreach (var v in values)
                 {
                     if (!definitions.TryGetValue(v.AttributeId, out var def)) continue;
-                    if (def.DataType != EavDataTypes.File) continue;
-                    if (TryExtractFileDocId(v.ValueFileMeta, out var docId, out var ver))
+                    if (def.DataType == EavDataTypes.File
+                        && TryExtractFileDocId(v.ValueFileMeta, out var docId, out var ver))
                         pendingFileDeletes.Add((docId, ver));
                 }
 
@@ -699,6 +867,50 @@ public class EavWriteService
             }
 
             _db.AttributeValues.RemoveRange(values);
+
+            // property_tree：映射表 + 根节点级联清理（任一树有子节点则整单拒删）
+            var treeRoots = await _db.EavTreeRoots
+                .Where(x => x.EntityId == entityId)
+                .ToListAsync(ct);
+            if (treeRoots.Count > 0)
+            {
+                var ptDefs = _attrCache.GetDefinitions(entityType)
+                    .ToDictionary(d => d.AttributeId);
+
+                foreach (var m in treeRoots)
+                {
+                    ptDefs.TryGetValue(m.AttributeId, out var ptDef);
+                    await GuardPropertyTreeDeleteAsync(
+                        ptDef?.AttributeName ?? m.AttributeId, m.Id, ct);
+                }
+
+                var ptIds = treeRoots.Select(m => m.Id).ToList();
+                var ptNames = await _db.Nodes
+                    .Where(n => ptIds.Contains(n.Id))
+                    .ToDictionaryAsync(n => n.Id, n => n.Name, ct);
+
+                var ptAudits = new List<AttributeAuditLog>(treeRoots.Count);
+                foreach (var m in treeRoots)
+                {
+                    await RemovePropertyTreeRootAsync(m, ct);
+                    if (ptDefs.TryGetValue(m.AttributeId, out var ptDef))
+                    {
+                        ptAudits.Add(new AttributeAuditLog
+                        {
+                            EntityId = entityId,
+                            AttributeId = ptDef.AttributeId,
+                            AttributeName = ptDef.AttributeName,
+                            OldValue = ptNames.GetValueOrDefault(m.Id) ?? m.Id,
+                            NewValue = null,
+                            ChangeType = "Delete",
+                            ChangedBy = changedBy,
+                            ChangedAt = now,
+                            CorrelationId = correlationId
+                        });
+                    }
+                }
+                _db.AttributeAuditLogs.AddRange(ptAudits);
+            }
 
             // 删除位置坐标点（独立表）并写审计
             var locations = await _db.LocationAttributeValues
