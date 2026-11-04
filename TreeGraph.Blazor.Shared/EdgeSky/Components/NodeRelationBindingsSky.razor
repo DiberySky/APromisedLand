@@ -253,7 +253,7 @@ else if (!_loading && _space is not null)
     /// <summary>单张边表格（出边/入边共用）：类型 / 起止 / 操作（编辑、删除、展开详情）。</summary>
     private RenderFragment EdgeTable(IReadOnlyList<EdgeDto> items, bool outgoing) => @<MudTable T="EdgeDto" Items="@items"
                                                                                               Hover="true" Bordered="true" Dense="true"
-                                                                                              Breakpoint="Breakpoint.Sm">
+                                                                                              Breakpoint="Breakpoint.None">
         <HeaderContent>
             <MudTh>类型</MudTh>
             <MudTh>起止</MudTh>

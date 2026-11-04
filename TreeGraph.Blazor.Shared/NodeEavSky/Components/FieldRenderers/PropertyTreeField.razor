@@ -63,6 +63,7 @@
                         <MudTextField T="string" @bind-Value="_editName" Label="属性树名称"
                                       Variant="Variant.Outlined" Margin="Margin.Dense"
                                       Immediate="true" Class="flex-grow-1"
+                                      HelperText="@(_pendingName != null ? "点击对话框「保存」确认创建" : null)"
                                       OnBlur="CommitRenameAsync" OnKeyDown="OnRenameKeyDown" />
                         <MudTooltip Text="打开属性树">
                             <MudIconButton Icon="@Icons.Material.Outlined.AccountTree"
@@ -122,41 +123,69 @@
     private string? _newName;
     private string? _editName;
     private string? _loadedRootId;
+    private string? _pendingName;   // 点击创建后、真正提交前的临时名（RootId 后端回填）
 
-    private bool HasRoot => !string.IsNullOrWhiteSpace(Value?.RootId);
+    private bool HasRoot => !string.IsNullOrWhiteSpace(Value?.RootId) || _pendingName != null;
+
+    private string EffectiveName => _pendingName ?? Value?.Name ?? "";
 
     protected override void OnParametersSet()
     {
+        // 外部回填了真实 RootId → pending 完成，清掉临时状态
+        if (!string.IsNullOrWhiteSpace(Value?.RootId))
+        {
+            if (_pendingName != null)
+            {
+                _pendingName = null;
+                _newName = null;
+            }
+        }
+
         // 换树/外部回填时同步行内编辑框；同一棵树不覆盖用户正在输入的内容
         if (Value?.RootId != _loadedRootId)
         {
             _loadedRootId = Value?.RootId;
-            _editName = Value?.Name;
+            _editName = EffectiveName;
         }
     }
 
     /// <summary>创建：提交 { rootId: null, name }，后端建专属根（名为空被按钮禁用拦截）。</summary>
-    private Task CreateTreeAsync()
-        => string.IsNullOrWhiteSpace(_newName)
-            ? Task.CompletedTask
-            : ValueChanged.InvokeAsync(new PropertyTreeValue(null, _newName.Trim()));
+    private async Task CreateTreeAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newName)) return;
+        _pendingName = _newName.Trim();
+        _editName = _pendingName;
+        _newName = null;
+        await ValueChanged.InvokeAsync(new PropertyTreeValue(null, _pendingName));
+    }
 
-    /// <summary>行内改名：失焦/回车提交 { rootId, 新名 }；名为空回退现名，未变化不提交。</summary>
+    /// <summary>行内改名：失焦/回车提交；pending 阶段 RootId=null，已挂载阶段提交 { rootId, 新名 }。</summary>
     private Task CommitRenameAsync()
     {
         if (!HasRoot) return Task.CompletedTask;
         if (string.IsNullOrWhiteSpace(_editName))
         {
-            _editName = Value!.Name;
+            _editName = EffectiveName;
             return Task.CompletedTask;
         }
         var name = _editName.Trim();
-        return name == Value!.Name
-            ? Task.CompletedTask
-            : ValueChanged.InvokeAsync(new PropertyTreeValue(Value!.RootId, name));
+        if (name == EffectiveName) return Task.CompletedTask;
+
+        // pending 阶段还没有 RootId，提交 null 让后端建根时用新名
+        if (_pendingName != null)
+        {
+            _pendingName = name;
+            return ValueChanged.InvokeAsync(new PropertyTreeValue(null, name));
+        }
+        return ValueChanged.InvokeAsync(new PropertyTreeValue(Value!.RootId, name));
     }
 
-    private Task UnmountAsync() => ValueChanged.InvokeAsync(null);
+    private Task UnmountAsync()
+    {
+        _pendingName = null;
+        _newName = null;
+        return ValueChanged.InvokeAsync(null);
+    }
 
     private Task OnRenameKeyDown(KeyboardEventArgs e)
         => e.Key is "Enter" ? CommitRenameAsync() : Task.CompletedTask;

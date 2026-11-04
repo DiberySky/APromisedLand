@@ -29,8 +29,16 @@
            SubmitButtonDisabled="@_submitting"
            OnSubmitClick="UpdateAsync">
     <ToolBarContent>
-        @* 显示所属线路名（与 Tree「设置修改」工具栏同一格式） *@
-        <MudText Typo="Typo.body2" Class="mud-text-secondary">@LineName</MudText>
+        @* 显示所属线路名 + 当前节点名（与 Tree「设置修改」工具栏同一格式） *@
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">@LineName</MudText>
+            @if (Node is not null)
+            {
+                <MudIcon Icon="@Icons.Material.Outlined.ChevronRight" Size="Size.Small"
+                         Style="color: var(--mud-palette-text-secondary);" />
+                <MudText Typo="Typo.body2">@Node.Name</MudText>
+            }
+        </MudStack>
         <MudSpacer/>
     </ToolBarContent>
     <DialogContent>

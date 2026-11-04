@@ -15,15 +15,24 @@
         font-size: 12px;
     }
 
-    /* 关系绑定折叠面板：内容区及内部 Tabs/Table 组件底色均设为纯黑 */
-    .lna-expansion .mud-collapse-container,
-    .lna-expansion .mud-expand-panel-content,
-    .lna-expansion .mud-tabs,
-    .lna-expansion .mud-tabs-panels,
-    .lna-expansion .mud-table-container,
-    .lna-expansion .mud-table-root,
-    .lna-expansion .mud-table-row,
-    .lna-expansion .mud-table-cell {
+    /* 基本信息折叠面板：内容区顶部更紧凑 */
+    .lna-info .mud-collapse-container,
+    .lna-info .mud-expand-panel-content {
+        background-color: #000;
+        padding-top: 4px;
+    }
+
+    /* 关系绑定折叠面板：内容区底色设为纯黑（无 padding 覆盖） */
+    .lna-rel .mud-collapse-container,
+    .lna-rel .mud-expand-panel-content {
+        background-color: #000;
+    }
+    .lna-rel .mud-tabs,
+    .lna-rel .mud-tabs-panels,
+    .lna-rel .mud-table-container,
+    .lna-rel .mud-table-root,
+    .lna-rel .mud-table-row,
+    .lna-rel .mud-table-cell {
         background-color: #000;
     }
 </style>
@@ -48,29 +57,34 @@
     </ToolBarRightContent>
     <DialogContent>
         <MudContainer Class="pt-0 pb-4" MaxWidth="MaxWidth.Medium">
-            <MudTabs Elevation="0" Rounded="true" Class="lna-tabs">
-                <MudTabPanel Text="基本信息"
-                             Icon="@Icons.Material.Outlined.Info">
-                    <MudStack Spacing="2">
-                        <MudTextField T="string" Value="Node.Name"
-                                      Label="名称" Variant="Variant.Outlined" ReadOnly="true" />
-                        <MudTextField T="string" Value="Node.Description"
-                                      Label="描述" Variant="Variant.Outlined" ReadOnly="true" Lines="3" />
-                        <MudTextField T="string"
-                                      Value="@(string.IsNullOrEmpty(Node.PredecessorName) ? "无（首节点）" : Node.PredecessorName)"
-                                      Label="前驱节点" Variant="Variant.Outlined" ReadOnly="true" />
+        <MudExpansionPanel Class="lna-info mb-2" Expanded="true">
+            <TitleContent>
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" Color="Color.Warning" />
+                    <MudText Typo="Typo.subtitle2">基本信息</MudText>
+                </MudStack>
+            </TitleContent>
+            <ChildContent>
+                <MudStack Spacing="2">
+                    <MudTextField T="string" Value="Node.Name"
+                                  Label="名称" Variant="Variant.Outlined" ReadOnly="true" />
+                    <MudTextField T="string" Value="Node.Description"
+                                  Label="描述" Variant="Variant.Outlined" ReadOnly="true" Lines="3" />
+                    <MudTextField T="string"
+                                  Value="@(string.IsNullOrEmpty(Node.PredecessorName) ? "无（首节点）" : Node.PredecessorName)"
+                                  Label="前驱节点" Variant="Variant.Outlined" ReadOnly="true" />
 
-                        @* 属性区：仅展示本节点已关注属性定义的属性（只读） *@
-                        <NodeAttributeItemsSky NodeId="@Node.Id" ReadOnly="true" />
-                    </MudStack>
-                </MudTabPanel>
-            </MudTabs>
+                    @* 属性区：仅展示本节点已关注属性定义的属性（只读） *@
+                    <NodeAttributeItemsSky NodeId="@Node.Id" ReadOnly="true" />
+                </MudStack>
+            </ChildContent>
+        </MudExpansionPanel>
 
             @* ===== 关系绑定（可展开，只读；始终显示，无关系时由组件内部给空态提示） ===== *@
-            <MudExpansionPanel Class="lna-expansion">
+            <MudExpansionPanel Class="lna-rel">
                 <TitleContent>
                     <MudStack Row AlignItems="AlignItems.Center">
-                        <MudIcon Icon="@Icons.Material.Outlined.Share" Size="Size.Small" />
+                        <MudIcon Icon="@Icons.Material.Outlined.Share" Size="Size.Small" Color="Color.Warning" />
                         <MudText Typo="Typo.subtitle2">关系绑定</MudText>
                     </MudStack>
                 </TitleContent>
