@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using TreeGraph.Api.Data;
 using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.EdgeSky.Services;
+using TreeGraph.Api.GraphSyncSky.SpaceNode;
 
 namespace TreeGraph.Api.GraphSyncSky;
 
@@ -170,6 +171,77 @@ public sealed class GraphSchemaInitializer : IHostedService, IDisposable
         // ★ 对齐删除：PG 已物理删除的边类型在 Nebula 侧是残留
         //   （EdgeTypeService.DeleteAsync 的 DROP EDGE 失败只记日志、不回滚 PG，此处补偿）。
         await DropStaleEdgeTypesAsync(space, edgeTypes.Select(t => t.Name), ct);
+
+        // ★ SpaceNodeSky：组合属性派生 Tag 的账本对齐（只作用受管 Tag，不碰系统/未知 Tag）
+        await AlignSpaceNodeTagProjectionsAsync(db, spaceId, ct);
+    }
+
+    /// <summary>
+    /// 派生 Tag 账本对齐（启动/重建兜底，幂等）：
+    /// 缺失 —— 账本有活动行而 Nebula 无 Tag → CREATE；列漂移 → ADD/DROP 补齐到快照；
+    /// 墓碑 —— 账本墓碑行确保图侧 DROP 后物理清行（启动时点是权威态，无需版本条件）；
+    /// 懒物化补偿 —— 其他空间已有的活动投影而本空间缺行（如运行中新建空间），
+    ///   按兄弟行复制 Tag 名/快照/版本建行后再对齐。
+    /// 未知 Tag 不处理（受管集合 = 账本 Tag 名）。
+    /// </summary>
+    private async Task AlignSpaceNodeTagProjectionsAsync(
+        TreeGraphDbContext db, string spaceId, CancellationToken ct)
+    {
+        var ownRows = await db.TagProjections
+            .Where(p => p.SpaceId == spaceId)
+            .ToListAsync(ct);
+
+        // 懒物化补偿：复制兄弟空间的活动投影（同一来源各行共享 Version/快照不变量）
+        var ownSources = ownRows.Select(r => r.SourceAttributeId).ToHashSet(StringComparer.Ordinal);
+        var siblings = await db.TagProjections.AsNoTracking()
+            .Where(p => p.SpaceId != spaceId && !p.IsDeleted)
+            .ToListAsync(ct);
+        var missing = siblings
+            .GroupBy(p => p.SourceAttributeId)
+            .Select(g => g.First())
+            .Where(p => !ownSources.Contains(p.SourceAttributeId))
+            .ToList();
+        if (missing.Count > 0)
+        {
+            var now = DateTimeOffset.UtcNow;
+            foreach (var s in missing)
+            {
+                var row = new SpaceNodeSky.Entities.TagProjection
+                {
+                    SpaceId = spaceId,
+                    TagName = s.TagName,
+                    SourceAttributeId = s.SourceAttributeId,
+                    SourceEntityType = s.SourceEntityType,
+                    SchemaSnapshot = s.SchemaSnapshot,
+                    Version = s.Version,
+                    CreatedAt = now
+                };
+                db.TagProjections.Add(row);
+                ownRows.Add(row);
+            }
+            await db.SaveChangesAsync(ct);
+            _logger.LogInformation(
+                "NebulaGraph 空间 {Space} 补建 {Count} 行派生 Tag 账本（懒物化补偿）",
+                GraphNaming.ToNebulaSpace(spaceId), missing.Count);
+        }
+
+        var space = GraphNaming.ToNebulaSpace(spaceId);
+        foreach (var row in ownRows)
+        {
+            if (row.IsDeleted)
+            {
+                // 墓碑补偿：消费者 DROP 失败/事件丢失时兜底；成功后无条件清行（启动即权威态）
+                await _client.QueryAsync(space, SpaceNodeTagProjector.BuildDropTagNgql(row.TagName), ct);
+                db.TagProjections.Remove(row);
+                _logger.LogInformation("派生 Tag 墓碑已对齐清理：{Space}.{Tag}", space, row.TagName);
+                continue;
+            }
+
+            await SpaceNodeTagSchemaAligner.EnsureTagAsync(
+                _client, space, row.TagName,
+                TagProjectionSchema.FromJson(row.SchemaSnapshot), _logger, ct);
+        }
+        await db.SaveChangesAsync(ct);
     }
 
     /// <summary>

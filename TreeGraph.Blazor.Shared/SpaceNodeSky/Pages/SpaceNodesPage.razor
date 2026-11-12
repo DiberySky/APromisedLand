@@ -1,0 +1,233 @@
+@* SpaceNodesPage.razor — 空间节点管理页：空间选择器 + 节点列表（以 PG 为准），
+   创建/重命名/删除走对话框；行内「详情」打开属性绑定与派生 Tag 只读区。 *@
+@page "/space-nodes"
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Dialogs
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Services
+@using TreeGraph.Blazor.Shared.SpaceSky
+@using TreeGraph.Blazor.Shared.SpaceSky.Services
+@using TreeGraph.Shared.SpaceNodeSky.Dtos
+@inject SpaceNodeApiClient Api
+@inject SpaceApiClient SpaceApi
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>空间节点</PageTitle>
+
+<PageSky Title="空间节点" ArrowBackVisible="false">
+    <PageContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+            <MudSelect T="string"
+                       Value="_selectedSpaceId"
+                       ValueChanged="OnSpaceChangedAsync"
+                       Label="选择空间"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Style="max-width: 320px;">
+                @foreach (var space in _spaces)
+                {
+                    <MudSelectItem T="string" Value="@space.Id">@space.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Success"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Outlined.Add"
+                       Disabled="@(_selectedSpaceId is null)"
+                       OnClick="OpenCreateAsync">
+                新建节点
+            </MudButton>
+        </MudStack>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_selectedSpaceId is null)
+        {
+            <EmptyStateSky Icon="@Icons.Material.Outlined.Workspaces"
+                           Title="请先选择空间" />
+        }
+        else if (_nodes is null || _nodes.Count == 0)
+        {
+            <EmptyStateSky Icon="@Icons.Material.Outlined.Hub"
+                           Title="该空间暂无节点">
+                <Description>
+                    <text>点击右上角「新建节点」创建第一个空间节点</text>
+                </Description>
+            </EmptyStateSky>
+        }
+        else
+        {
+            <MudTable Items="_nodes" Hover="true">
+                <HeaderContent>
+                    <MudTh>名称</MudTh>
+                    <MudTh>描述</MudTh>
+                    <MudTh>创建时间</MudTh>
+                    <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">操作</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@context.Description</MudTd>
+                    <MudTd>@context.CreatedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                    <MudTd Style="white-space: nowrap; text-align: right;">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Info"
+                                       Color="Color.Info"
+                                       Size="Size.Small"
+                                       OnClick="@(async () => await OpenDetailAsync(context))"
+                                       title="详情（属性绑定 / 派生 Tag）" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       OnClick="@(async () => await OpenRenameAsync(context))"
+                                       title="重命名" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                       Color="Color.Error"
+                                       Size="Size.Small"
+                                       OnClick="@(async () => await OpenDeleteAsync(context))"
+                                       title="删除" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </PageContent>
+</PageSky>
+
+@code {
+    private IReadOnlyList<SpaceDto> _spaces = [];
+    private IReadOnlyList<SpaceNodeDto>? _nodes;
+    private string? _selectedSpaceId;
+    private bool _loading;
+    private bool _initialized;
+
+    /// <summary>管理对话框通用打开参数：顶部居中、小尺寸、可最大化。</summary>
+    private static readonly DialogOptionsEx ManageOptions = new()
+    {
+        Position = DialogPosition.TopCenter,
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        MaximizeButton = true,
+        BackdropClick = false
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        try
+        {
+            _spaces = await SpaceApi.GetAllAsync();
+            _selectedSpaceId = _spaces.Count > 0 ? _spaces[0].Id : null;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"空间加载失败：{ex.Message}", Severity.Error);
+        }
+
+        if (_selectedSpaceId is not null)
+            await LoadNodesAsync();
+
+        StateHasChanged();
+    }
+
+    private async Task OnSpaceChangedAsync(string spaceId)
+    {
+        _selectedSpaceId = spaceId;
+        await LoadNodesAsync();
+    }
+
+    private async Task LoadNodesAsync()
+    {
+        if (_selectedSpaceId is null) return;
+
+        _loading = true;
+        try
+        {
+            _nodes = await Api.GetNodesAsync(_selectedSpaceId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"节点加载失败：{ex.Message}", Severity.Error);
+            _nodes = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>新建节点（对话框，成功后刷新列表）。</summary>
+    private async Task OpenCreateAsync()
+    {
+        if (_selectedSpaceId is null) return;
+
+        var parameters = new DialogParameters<SpaceNodeEditDialog>
+        {
+            { x => x.SpaceId, _selectedSpaceId }
+        };
+        var dialog = await DialogService.ShowExAsync<SpaceNodeEditDialog>(
+            string.Empty, parameters, ManageOptions);
+        var result = await dialog.Result;
+
+        if (result?.Canceled == false)
+            await LoadNodesAsync();
+    }
+
+    /// <summary>重命名节点（复用编辑对话框，传入既有节点）。</summary>
+    private async Task OpenRenameAsync(SpaceNodeDto node)
+    {
+        if (_selectedSpaceId is null) return;
+
+        var parameters = new DialogParameters<SpaceNodeEditDialog>
+        {
+            { x => x.SpaceId, _selectedSpaceId },
+            { x => x.Node, node }
+        };
+        var dialog = await DialogService.ShowExAsync<SpaceNodeEditDialog>(
+            string.Empty, parameters, ManageOptions);
+        var result = await dialog.Result;
+
+        if (result?.Canceled == false)
+            await LoadNodesAsync();
+    }
+
+    /// <summary>删除节点（确认对话框；409 删除守卫原因在对话框内展示）。</summary>
+    private async Task OpenDeleteAsync(SpaceNodeDto node)
+    {
+        if (_selectedSpaceId is null) return;
+
+        var parameters = new DialogParameters<SpaceNodeDeleteDialog>
+        {
+            { x => x.SpaceId, _selectedSpaceId },
+            { x => x.Node, node }
+        };
+        var dialog = await DialogService.ShowExAsync<SpaceNodeDeleteDialog>(
+            string.Empty, parameters, ManageOptions);
+        var result = await dialog.Result;
+
+        if (result?.Canceled == false)
+            await LoadNodesAsync();
+    }
+
+    /// <summary>节点详情（EAV 属性绑定区 + 派生 Tag 只读区），大尺寸对话框。</summary>
+    private async Task OpenDetailAsync(SpaceNodeDto node)
+    {
+        var parameters = new DialogParameters<SpaceNodeDetailDialog>
+        {
+            { x => x.Node, node }
+        };
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+        var dialog = await DialogService.ShowExAsync<SpaceNodeDetailDialog>(
+            string.Empty, parameters, options);
+        await dialog.Result;
+    }
+}

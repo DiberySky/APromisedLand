@@ -1,0 +1,107 @@
+@* SpaceNodeEditDialog.razor — 空间节点创建/重命名对话框（Node 为空=创建，非空=重命名）。
+   SpaceId 创建后不可改；跨空间移动 = 删除后重建。 *@
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Services
+@using TreeGraph.Shared.SpaceNodeSky.Dtos
+@inject SpaceNodeApiClient Api
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@(IsCreate ? "新建空间节点" : "重命名空间节点")"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+           SubmitButtonDisabled="@_submitting"
+           OnSubmitClick="SaveAsync"
+           OnCanceledClick="@Close">
+    <DialogContent>
+        <MudStack Spacing="3" Class="pa-2">
+            <MudTextField T="string"
+                          @bind-Value="_name"
+                          Label="名称"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          RequiredError="名称不能为空"
+                          MaxLength="100"
+                          Counter="100"
+                          Immediate="true" />
+
+            <MudTextField T="string"
+                          @bind-Value="_description"
+                          Label="描述"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          MaxLength="500"
+                          Counter="500"
+                          Immediate="true" />
+        </MudStack>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>归属空间（创建后不可改）。</summary>
+    [Parameter, EditorRequired] public required string SpaceId { get; set; }
+
+    /// <summary>既有节点；为空表示创建。</summary>
+    [Parameter] public SpaceNodeDto? Node { get; set; }
+
+    private bool IsCreate => Node is null;
+
+    private string _name = "";
+    private string? _description;
+    private bool _submitting;
+
+    protected override void OnInitialized()
+    {
+        _name = Node?.Name ?? "";
+        _description = Node?.Description;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            Snackbar.Add("名称不能为空", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            if (IsCreate)
+            {
+                await Api.CreateAsync(SpaceId, new CreateSpaceNodeRequest
+                {
+                    Name = _name.Trim(),
+                    Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim()
+                });
+                Snackbar.Add("创建成功", Severity.Success);
+            }
+            else
+            {
+                var updated = await Api.UpdateAsync(SpaceId, Node!.Id, new UpdateSpaceNodeRequest
+                {
+                    Name = _name.Trim(),
+                    Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim()
+                });
+                if (updated is null)
+                {
+                    Snackbar.Add("保存失败：节点不存在或已被删除", Severity.Error);
+                    return;
+                }
+                Snackbar.Add("保存成功", Severity.Success);
+            }
+
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"保存失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private void Close() => MudDialog?.Close(DialogResult.Cancel());
+}

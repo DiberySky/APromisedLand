@@ -34,19 +34,22 @@ public sealed class GraphSynchronizer
     private readonly GraphSchemaInitializer _schemaInitializer;
     private readonly GraphSyncOptions _options;
     private readonly ILogger<GraphSynchronizer> _logger;
+    private readonly SpaceNode.SpaceNodeVertexTagSyncer _spaceNodeTagSyncer;
 
     public GraphSynchronizer(
         TreeGraphDbContext db,
         NebulaGraphClient client,
         GraphSchemaInitializer schemaInitializer,
         IOptions<GraphSyncOptions> options,
-        ILogger<GraphSynchronizer> logger)
+        ILogger<GraphSynchronizer> logger,
+        SpaceNode.SpaceNodeVertexTagSyncer spaceNodeTagSyncer)
     {
         _db = db;
         _client = client;
         _schemaInitializer = schemaInitializer;
         _options = options.Value;
         _logger = logger;
+        _spaceNodeTagSyncer = spaceNodeTagSyncer;
     }
 
     // ============================================================
@@ -77,6 +80,10 @@ public sealed class GraphSynchronizer
             //     line_segment 段边为 edges 表内置边类型，走 EdgeGraphSyncConsumer 管道。
             if (node.Tag == GraphNaming.LineNodeTag)
                 await SyncLineNodeLinksAsync(space, node, ct);
+
+            // SpaceNode 派生 Tag 值同步（S4）：组合属性 → 受管 Tag 写值 + 条件收敛（PG 唯一事实源）
+            if (node.Tag == GraphNaming.SpaceNodeTag && node.SpaceId is not null)
+                await _spaceNodeTagSyncer.SyncAsync(space, node.SpaceId, node.Id, ct);
         }
 
         _logger.LogDebug("图顶点已同步：{InodeId} tag={Tag}", node.Id, node.Tag);
@@ -229,6 +236,17 @@ public sealed class GraphSynchronizer
                     .FirstOrDefaultAsync(ct);
                 return new GraphNodeInfo(inodeId, row.Name, GraphNaming.EavTreeTag,
                     "EavTree", false, parentId, null, null);
+            }
+            case "SpaceNode":
+            {
+                // 空间节点：归属空间在 space_nodes.space_id，只同步进该空间
+                var spaceId = await _db.SpaceNodes.AsNoTracking()
+                    .Where(n => n.Id == inodeId)
+                    .Select(n => n.SpaceId)
+                    .FirstOrDefaultAsync(ct);
+                if (spaceId is null) return null; // 宿主行缺失 = 数据异常，不同步
+                return new GraphNodeInfo(inodeId, row.Name, GraphNaming.SpaceNodeTag,
+                    "SpaceNode", false, null, null, spaceId);
             }
             case "LineNode":
             {
@@ -386,8 +404,8 @@ public sealed class GraphSynchronizer
         var ctx = await LoadGraphContextAsync(ct);
 
         return await SyncSpacesAsync(spaceIds, sid => BuildSpaceBatch(ctx, sid,
-            includeSpaceTree: true, includeTrees: true, includeFreeNodes: true,
-            includeLines: true, includeSemantic: true), "全量重建", ct);
+            includeSpaceTree: true, includeTrees: true, includeSpaceNodes: true,
+            includeFreeNodes: true, includeLines: true, includeSemantic: true), "全量重建", ct);
     }
 
     /// <summary>
@@ -401,7 +419,8 @@ public sealed class GraphSynchronizer
 
         return await SyncSpacesAsync(spaceIds, category switch
         {
-            SyncCategory.Space => sid => BuildSpaceBatch(ctx, sid, includeSpaceTree: true),
+            SyncCategory.Space => sid => BuildSpaceBatch(ctx, sid,
+                includeSpaceTree: true, includeSpaceNodes: true),
             SyncCategory.Tree => sid => BuildSpaceBatch(ctx, sid, includeTrees: true),
             SyncCategory.Line => sid => BuildSpaceBatch(ctx, sid, includeLines: true),
             SyncCategory.Edge => sid => BuildSpaceBatch(ctx, sid, includeSemantic: true),
@@ -422,8 +441,8 @@ public sealed class GraphSynchronizer
 
         var ctx = await LoadGraphContextAsync(ct);
         var batch = BuildSpaceBatch(ctx, spaceId,
-            includeSpaceTree: true, includeTrees: true, includeFreeNodes: true,
-            includeLines: true, includeSemantic: true);
+            includeSpaceTree: true, includeTrees: true, includeSpaceNodes: true,
+            includeFreeNodes: true, includeLines: true, includeSemantic: true);
 
         var errors = new List<string>();
         if (batch.Vertices.Count == 0 && batch.Edges.Count == 0)
@@ -539,6 +558,7 @@ public sealed class GraphSynchronizer
 
     private sealed record SpaceTreeRow(string Id, string? ParentId, string RootSpaceId);
     private sealed record TreeRow(string Id, string? ParentId, bool IsArchived);
+    private sealed record SpaceNodeRow(string Id, string Name, string SpaceId);
     private sealed record LineRow(string Id, string Name, string SpaceId);
     private sealed record LineNodeRow(
         string Id, string Name, string LineId, string LineSpaceId,
@@ -555,6 +575,7 @@ public sealed class GraphSynchronizer
         List<TreeRow> KnowledgeTrees,
         List<TreeRow> EavTrees,
         List<(string Id, string? Name)> FreeNodes,
+        List<SpaceNodeRow> SpaceNodes,
         List<LineRow> Lines,
         List<LineNodeRow> LineNodes,
         List<(string NodeId, string ExternalNodeId, string Role, string OperatingState)> ConnectsTo,
@@ -600,6 +621,13 @@ public sealed class GraphSynchronizer
             .Select(x => new ValueTuple<string, string?>(x.Id, x.Name))
             .ToListAsync(ct);
 
+        // 空间节点：名称在 nodes，归属空间在 space_nodes
+        var spaceNodes = await (
+            from n in _db.Nodes.AsNoTracking()
+            where n.HostType == TreeGraph.Api.SpaceNodeSky.Entities.SpaceNode.HostTypeName
+            join s in _db.SpaceNodes.AsNoTracking() on n.Id equals s.Id
+            select new SpaceNodeRow(n.Id, n.Name ?? "", s.SpaceId)).ToListAsync(ct);
+
         // 线路：名称唯一真源在 nodes；空间归属在 lines 表
         var lines = await (
             from n in _db.Nodes.AsNoTracking()
@@ -638,7 +666,7 @@ public sealed class GraphSynchronizer
 
         return new GraphContext(
             nodeNames, spaceTrees, unitTrees, categoryTrees, knowledgeTrees, eavTrees,
-            freeNodes, lines, lineNodes, connectsTo, semanticEdges);
+            freeNodes, spaceNodes, lines, lineNodes, connectsTo, semanticEdges);
     }
 
     /// <summary>单空间图批次（顶点 + 边，含分类计数）。</summary>
@@ -653,8 +681,8 @@ public sealed class GraphSynchronizer
     /// </summary>
     private SpaceBatch BuildSpaceBatch(
         GraphContext ctx, string spaceId,
-        bool includeSpaceTree = false, bool includeTrees = false, bool includeFreeNodes = false,
-        bool includeLines = false, bool includeSemantic = false)
+        bool includeSpaceTree = false, bool includeTrees = false, bool includeSpaceNodes = false,
+        bool includeFreeNodes = false, bool includeLines = false, bool includeSemantic = false)
     {
         var vertices = new List<VertexItem>();
         var edges = new List<EdgeItem>();
@@ -693,6 +721,10 @@ public sealed class GraphSynchronizer
             // EAV 树不归属空间：每个空间都写入（与自由 Node 同口径）
             AddTree(ctx.EavTrees, GraphNaming.EavTreeTag, "EavTree");
         }
+
+        if (includeSpaceNodes)
+            foreach (var n in ctx.SpaceNodes.Where(s => s.SpaceId == spaceId))
+                vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.SpaceNodeTag, "SpaceNode", false));
 
         if (includeFreeNodes)
             foreach (var n in ctx.FreeNodes)

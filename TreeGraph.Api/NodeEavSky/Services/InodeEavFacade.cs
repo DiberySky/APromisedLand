@@ -68,20 +68,34 @@ public class InodeEavFacade
     // ============================================================
 
     /// <summary>新建命名绑定（含该绑定私有的实体）。</summary>
-    public Task<(string BindingId, string EntityId)> CreateBindingAsync(
+    public async Task<(string BindingId, string EntityId)> CreateBindingAsync(
         string inodeId, string entityType, string name,
         CancellationToken ct = default)
-        => _inodeEntities.CreateBindingAsync(inodeId, entityType, name, ct);
+    {
+        var result = await _inodeEntities.CreateBindingAsync(inodeId, entityType, name, ct);
+        // ★ 新绑定可能改变主绑定选取（同 EntityType 按 DisplayOrder→BindingId 取主），须触发派生重算
+        await PublishAsync(inodeId, InodeChangeKind.Saved, ct);
+        return result;
+    }
 
-    public Task<bool> RenameBindingAsync(
+    public async Task<bool> RenameBindingAsync(
         string inodeId, string bindingId, string newName,
         CancellationToken ct = default)
-        => _inodeEntities.RenameBindingAsync(inodeId, bindingId, newName, ct);
+    {
+        var ok = await _inodeEntities.RenameBindingAsync(inodeId, bindingId, newName, ct);
+        if (ok) await PublishAsync(inodeId, InodeChangeKind.Saved, ct);
+        return ok;
+    }
 
-    public Task<bool> ReorderBindingAsync(
+    public async Task<bool> ReorderBindingAsync(
         string inodeId, string bindingId, int displayOrder,
         CancellationToken ct = default)
-        => _inodeEntities.UpdateBindingOrderAsync(inodeId, bindingId, displayOrder, ct);
+    {
+        var ok = await _inodeEntities.UpdateBindingOrderAsync(inodeId, bindingId, displayOrder, ct);
+        // ★ DisplayOrder 是主绑定第一排序键，变更可能换主绑定，须触发派生重算
+        if (ok) await PublishAsync(inodeId, InodeChangeKind.Saved, ct);
+        return ok;
+    }
 
     public async Task SaveAsync(
         string inodeId, string bindingId,

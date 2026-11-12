@@ -1,0 +1,181 @@
+@* SpaceNodeDetailDialog.razor — 空间节点详情对话框：
+   1. 基本信息（ID/名称/描述/创建时间，只读）；
+   2. EAV 属性绑定区：复用 NodeAttributeItemsSky（NodeId = iNode = SpaceNode.Id），
+      绑定维护与属性编辑与树节点同一套交互；
+   3. 派生 Tag 只读区：来自 PG 投影账本（tag-projection-plan），
+      标注「图侧异步生效」最终一致提示；未投影条目给出原因标记。 *@
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Services
+@using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@using TreeGraph.Shared.SpaceNodeSky.Dtos
+@inject SpaceNodeApiClient Api
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@($"节点详情 - {Node?.Name}")"
+           SubmitButtonVisible="false"
+           CancelButtonText="关闭"
+           OnCanceledClick="@Close">
+    <DialogContent>
+        <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
+
+            @* ======== 基本信息（只读） ======== *@
+            <MudPaper Class="pa-3 mb-4" Outlined="true">
+                <MudStack Spacing="1">
+                    <div class="d-flex align-center" style="gap: 8px;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">节点 ID</MudText>
+                        <code>@Node?.Id</code>
+                    </div>
+                    <MudText Typo="Typo.body2">@Node?.Description</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        创建时间：@Node?.CreatedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+
+            @* ======== EAV 属性绑定区（复用 NodeEavSky 既有模式） ======== *@
+            <MudText Typo="Typo.subtitle2" Class="mb-2">EAV 属性绑定</MudText>
+            @if (Node is not null)
+            {
+                <NodeAttributeItemsSky NodeId="@Node.Id"
+                                       ReadOnly="false"
+                                       AllowManage="true" />
+            }
+
+            <MudDivider Class="my-4" />
+
+            @* ======== 派生 Tag 只读区（来自 PG 投影账本，图侧异步生效） ======== *@
+            <MudText Typo="Typo.subtitle2" Class="mb-2">派生 Tag（只读）</MudText>
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                派生 Tag 由组合属性自动投影，图侧异步生效（最终一致），不可手工挂卸。
+            </MudAlert>
+
+            @if (_planLoading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Info" />
+            }
+            else
+            {
+                @if (_projected.Count > 0)
+                {
+                    <MudSimpleTable Dense="true" Bordered="true" Hover="true"
+                                    Style="overflow-x: auto; background-color: #000;">
+                        <thead>
+                            <tr>
+                                <th>Tag 名</th>
+                                <th>来源属性</th>
+                                <th>状态</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in _projected)
+                            {
+                                <tr>
+                                    <td><code>@item.TagName</code></td>
+                                    <td>@item.EntityType.@item.AttributeName</td>
+                                    <td>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success">
+                                            已投影
+                                        </MudChip>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+                else
+                {
+                    <EmptyStateSky Icon="@Icons.Material.Outlined.LabelOff"
+                                   Title="暂无已投影的派生 Tag" />
+                }
+
+                @* ======== 未投影标记（含墓碑清理中/待投影/拒绝投影及原因） ======== *@
+                @if (_unprojected.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">未投影</MudText>
+                    <MudSimpleTable Dense="true" Bordered="true" Hover="true"
+                                    Style="overflow-x: auto; background-color: #000;">
+                        <thead>
+                            <tr>
+                                <th>来源属性</th>
+                                <th>状态</th>
+                                <th>原因</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in _unprojected)
+                            {
+                                <tr>
+                                    <td>@item.EntityType.@item.AttributeName</td>
+                                    <td>
+                                        <MudChip T="string" Size="Size.Small"
+                                                 Color="@StatusColor(item.Status)">
+                                            @StatusLabel(item.Status)
+                                        </MudChip>
+                                    </td>
+                                    <td>@ReasonLabel(item)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            }
+        </MudContainer>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public SpaceNodeDto? Node { get; set; }
+
+    private IReadOnlyList<TagProjectionPlanItemDto> _projected = [];
+    private IReadOnlyList<TagProjectionPlanItemDto> _unprojected = [];
+    private bool _planLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var plan = await Api.GetTagProjectionPlanAsync();
+            _projected = plan.Where(p => p.Status == "projected").ToList();
+            _unprojected = plan.Where(p => p.Status != "projected").ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"派生 Tag 投影计划加载失败：{ex.Message}", Severity.Warning);
+        }
+        finally
+        {
+            _planLoading = false;
+        }
+    }
+
+    private void Close() => MudDialog?.Close(DialogResult.Cancel());
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "tombstoned" => "清理中",
+        "pending" => "待投影",
+        "unprojected" => "未投影",
+        _ => status
+    };
+
+    private static Color StatusColor(string status) => status switch
+    {
+        "tombstoned" => Color.Warning,
+        "pending" => Color.Info,
+        "unprojected" => Color.Error,
+        _ => Color.Default
+    };
+
+    /// <summary>未投影原因（服务端对 tombstoned 已返回中文；unprojected 的 reason 码在此映射）。</summary>
+    private static string ReasonLabel(TagProjectionPlanItemDto item) => item.Reason switch
+    {
+        "system_tag" => "命中系统 Tag",
+        "no_columns" => "无可投影列",
+        "no_composite_type" => "未引用组合类型",
+        "name_conflict" => "Tag 名冲突",
+        null => "—",
+        var reason => reason
+    };
+}

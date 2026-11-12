@@ -100,6 +100,15 @@ builder.Services
     .RemoveAllResilienceHandlers()
     .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
 
+// ★ SpaceNodeSky 空间节点客户端（api/spaces/{spaceId}/nodes + api/spaces/tag-projection-plan）：同上。
+builder.Services
+    .AddHttpClient<TreeGraph.Blazor.Shared.SpaceNodeSky.Services.SpaceNodeApiClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://treegrapheavapi");
+    })
+    .RemoveAllResilienceHandlers()
+    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
 // ★ EdgeSky 边类型客户端（/api/edge/types）：同一后端、同款弹性策略。
 builder.Services
     .AddHttpClient<TreeGraph.Blazor.Shared.EdgeSky.Services.EdgeApiClient>(client =>

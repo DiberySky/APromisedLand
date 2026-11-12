@@ -10,11 +10,11 @@ using TreeGraph.Api.Data;
 
 #nullable disable
 
-namespace TreeGraph.Api.Data.Migrations
+namespace TreeGraph.Api.Migrations
 {
     [DbContext(typeof(TreeGraphDbContext))]
-    [Migration("20261029082531_InodeEntityDisplayOrder")]
-    partial class InodeEntityDisplayOrder
+    [Migration("20261104213736_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -106,6 +106,10 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
 
                     b.Property<string>("TtlCol")
                         .HasMaxLength(200)
@@ -373,11 +377,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("ref_table_definition_id");
 
-                    b.Property<string>("UnitId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("unit_id");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -400,8 +399,6 @@ namespace TreeGraph.Api.Data.Migrations
                     b.HasIndex("RefOptionSetId");
 
                     b.HasIndex("RefTableDefinitionId");
-
-                    b.HasIndex("UnitId");
 
                     b.HasIndex("EntityType", "AttributeName")
                         .IsUnique()
@@ -434,11 +431,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)")
                         .HasColumnName("entity_id");
-
-                    b.Property<string>("UnitId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("unit_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -486,8 +478,6 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasIndex("EntityId")
                         .HasDatabaseName("ix_av_entity");
-
-                    b.HasIndex("UnitId");
 
                     b.HasIndex("ValueFileMeta")
                         .HasDatabaseName("ix_av_file_meta")
@@ -616,11 +606,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("ref_option_set_id");
 
-                    b.Property<string>("UnitId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("unit_id");
-
                     b.Property<JsonDocument>("ValidationRule")
                         .HasColumnType("jsonb")
                         .HasColumnName("validation_rule");
@@ -631,16 +616,12 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasIndex("RefOptionSetId");
 
-                    b.HasIndex("UnitId");
-
                     b.HasIndex("CompositeTypeId", "FieldName")
                         .IsUnique()
                         .HasDatabaseName("uq_composite_field");
 
                     b.ToTable("composite_field_definitions", null, t =>
                         {
-                            t.HasCheckConstraint("ck_composite_field_decimal_unit", "data_type IN ('int', 'decimal') OR unit_id IS NULL");
-
                             t.HasCheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
                         });
                 });
@@ -766,11 +747,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("table_definition_id");
 
-                    b.Property<string>("UnitId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("unit_id");
-
                     b.Property<JsonDocument>("ValidationRule")
                         .HasColumnType("jsonb")
                         .HasColumnName("validation_rule");
@@ -779,16 +755,11 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasIndex("RefCompositeTypeId");
 
-                    b.HasIndex("UnitId");
-
                     b.HasIndex("TableDefinitionId", "ColumnName")
                         .IsUnique()
                         .HasDatabaseName("uq_custom_table_column");
 
-                    b.ToTable("custom_table_columns", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_custom_table_column_numeric_unit", "data_type IN ('int', 'decimal') OR unit_id IS NULL");
-                        });
+                    b.ToTable("custom_table_columns", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", b =>
@@ -918,6 +889,46 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasDatabaseName("ix_ctr_parent");
 
                     b.ToTable("custom_table_rows", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EavTreeRoot", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id");
+
+                    b.Property<string>("BindingId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("binding_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BindingId")
+                        .HasDatabaseName("ix_etr_binding");
+
+                    b.HasIndex("EntityId", "AttributeId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_etr_entity_attr");
+
+                    b.ToTable("eav_tree_roots", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EntityTypeDefinition", b =>
@@ -1229,6 +1240,92 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("option_sets", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.SpaceNodeSky.Entities.SpaceNode", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("SpaceId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("space_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SpaceId")
+                        .HasDatabaseName("ix_space_nodes_space");
+
+                    b.ToTable("space_nodes", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.SpaceNodeSky.Entities.TagProjection", b =>
+                {
+                    b.Property<string>("SpaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("space_id");
+
+                    b.Property<string>("TagName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("tag_name");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("SchemaSnapshot")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("schema_snapshot");
+
+                    b.Property<string>("SourceAttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("source_attribute_id");
+
+                    b.Property<string>("SourceEntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("source_entity_type");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("SpaceId", "TagName");
+
+                    b.HasIndex("SourceAttributeId")
+                        .HasDatabaseName("ix_tag_projections_source_attribute");
+
+                    b.ToTable("tag_projections", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Api.SpaceSky.Entities.Space", b =>
@@ -1973,6 +2070,43 @@ namespace TreeGraph.Api.Data.Migrations
                             IsArchived = false,
                             SortOrder = 0
                         });
+                });
+
+            modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.EavTree", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("CanHaveChildren")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_have_children");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("HasChildren")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_children");
+
+                    b.Property<string>("ParentId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("parent_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId")
+                        .HasDatabaseName("ix_eav_trees_parent");
+
+                    b.ToTable("eav_trees", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.KnowledgeTree", b =>
@@ -2868,14 +3002,14 @@ namespace TreeGraph.Api.Data.Migrations
                     b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
                         .WithMany()
                         .HasForeignKey("DstVid")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_edges_dst_node");
 
                     b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
                         .WithMany()
                         .HasForeignKey("SrcVid")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_edges_src_node");
 
@@ -2941,18 +3075,11 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasForeignKey("RefTableDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("RefCompositeType");
 
                     b.Navigation("RefOptionSet");
 
                     b.Navigation("RefTableDefinition");
-
-                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeValue", b =>
@@ -2963,14 +3090,7 @@ namespace TreeGraph.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Attribute");
-
-                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeFieldDefinition", b =>
@@ -2991,18 +3111,11 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasForeignKey("RefOptionSetId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("CompositeType");
 
                     b.Navigation("RefCompositeType");
 
                     b.Navigation("RefOptionSet");
-
-                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableColumn", b =>
@@ -3018,16 +3131,9 @@ namespace TreeGraph.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("RefCompositeType");
 
                     b.Navigation("Table");
-
-                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableRow", b =>
@@ -3047,6 +3153,16 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Navigation("Attribute");
 
                     b.Navigation("Table");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EavTreeRoot", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.InodeEntity", "Binding")
+                        .WithMany()
+                        .HasForeignKey("BindingId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Binding");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.LocationAttributeValue", b =>
@@ -3069,6 +3185,35 @@ namespace TreeGraph.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("OptionSet");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.SpaceNodeSky.Entities.SpaceNode", b =>
+                {
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", "Node")
+                        .WithOne()
+                        .HasForeignKey("TreeGraph.Api.SpaceNodeSky.Entities.SpaceNode", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_space_nodes_node");
+
+                    b.HasOne("TreeGraph.Api.SpaceSky.Entities.Space", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_space_nodes_space");
+
+                    b.Navigation("Node");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.SpaceNodeSky.Entities.TagProjection", b =>
+                {
+                    b.HasOne("TreeGraph.Api.SpaceSky.Entities.Space", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tag_projections_space");
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.LineSky.Entities.Line", b =>
@@ -3099,6 +3244,24 @@ namespace TreeGraph.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Node");
+                });
+
+            modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.EavTree", b =>
+                {
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", "Node")
+                        .WithOne()
+                        .HasForeignKey("TreeGraph.Shared.TreeEavSky.Entities.EavTree", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.EavTree", "Parent")
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Node");
+
+                    b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.KnowledgeTree", b =>

@@ -108,6 +108,11 @@ builder.Services.AddScoped<TreeGraph.Api.LineSky.Services.LineStructureService>(
 // EdgeSky 服务（NebulaGraph 对齐的顶级边模块）
 builder.Services.AddScoped<TreeGraph.Api.EdgeSky.Services.EdgeTypeService>();
 builder.Services.AddScoped<TreeGraph.Api.EdgeSky.Services.EdgeService>();
+
+// SpaceNodeSky 服务（空间节点：归属空间的通用节点，PG-only，图侧经总线收敛）
+builder.Services.AddScoped<TreeGraph.Api.SpaceNodeSky.Services.SpaceNodeService>();
+// 组合属性 → 图 Tag 投影账本（PG-only；Version++/墓碑 + 事件发布，图侧消费者异步收敛）
+builder.Services.AddScoped<TreeGraph.Api.SpaceNodeSky.Services.TagProjectionService>();
 // Nebula DDL 同步网关：Testing 环境（EavApiFactory 集成测试）无 NebulaGraph，注 Noop 空桩
 if (isTesting)
     builder.Services.AddScoped<TreeGraph.Api.EdgeSky.Services.IEdgeSchemaGateway,

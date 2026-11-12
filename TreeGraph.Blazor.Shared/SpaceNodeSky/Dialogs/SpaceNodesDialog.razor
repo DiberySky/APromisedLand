@@ -1,0 +1,203 @@
+@* SpaceNodesDialog.razor — 空间节点管理对话框（图空间级资源）。
+   打开参数 SpaceId/SpaceName：整个维护作用于该空间，不再有空间列。
+   列表 + 新建/重命名/删除 + 详情（EAV 绑定 / 派生 Tag 只读区）。
+   对齐 LinesDialog.razor 风格。 *@
+@namespace TreeGraph.Blazor.Shared.SpaceNodeSky.Dialogs
+@using TreeGraph.Blazor.Shared.SpaceNodeSky
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Services
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
+@using TreeGraph.Shared.SpaceNodeSky.Dtos
+@inject SpaceNodeApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<DialogSky Title="空间节点"
+           SubmitButtonVisible="false">
+    <ToolBarContent>
+        <MudText Typo="Typo.subtitle1" Color="Color.Info">@(SpaceName ?? SpaceId)</MudText>
+    </ToolBarContent>
+    <ToolBarRightContent>
+        @* 名称模糊搜索（客户端过滤） *@
+        <MudTextField T="string"
+                      @bind-Value="_query"
+                      Placeholder="搜索节点名称"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Outlined.Search"
+                      Style="width: 230px;"
+                      Immediate="true" />
+    </ToolBarRightContent>
+    <DialogContent>
+        @* 表格始终渲染：空态走 NoRecordsContent（EmptyStateSky），
+           表头操作列的新建 + 按钮在空态时同样可用 *@
+        <MudTable Items="FilteredNodes" Hover="true" Bordered="true" Dense="true"
+                  Loading="@_loading" LoadingProgressColor="Color.Primary">
+            <HeaderContent>
+                <MudTh>名称</MudTh>
+                <MudTh>描述</MudTh>
+                <MudTh Style="width: 1%; white-space: nowrap;">创建时间</MudTh>
+                <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
+                    <MudIconButton Icon="@Icons.Material.Outlined.Add"
+                                   Color="Color.Success"
+                                   Size="Size.Small"
+                                   OnClick="OpenCreateAsync"
+                                   title="新建节点" />
+                </MudTh>
+                <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">详情</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.Description</MudTd>
+                <MudTd Style="white-space: nowrap;">@context.CreatedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                <MudTd Style="white-space: nowrap; text-align: right;">
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                   Color="Color.Error"
+                                   Size="Size.Small"
+                                   OnClick="@(async () => await OpenDeleteAsync(context))"
+                                   title="删除节点" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="@(async () => await OpenRenameAsync(context))"
+                                   title="重命名" />
+                </MudTd>
+                <MudTd Style="white-space: nowrap; text-align: center;">
+                    @* 详情：打开该节点的 EAV 属性绑定 + 派生 Tag 只读区 *@
+                    <MudIconButton Icon="@Icons.Material.Outlined.Info"
+                                   Color="Color.Info"
+                                   Size="Size.Small"
+                                   OnClick="@(async () => await OpenDetailAsync(context))"
+                                   title="详情（属性绑定 / 派生 Tag）" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <EmptyStateSky Icon="@Icons.Material.Outlined.Hub"
+                               Title="暂无空间节点">
+                    <Description>
+                        <text>点击右上角 + 创建第一个</text>
+                    </Description>
+                </EmptyStateSky>
+            </NoRecordsContent>
+        </MudTable>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>打开参数：目标图空间 Id（整个维护作用于该空间）。</summary>
+    [Parameter] public string SpaceId { get; set; } = string.Empty;
+
+    /// <summary>打开参数：目标图空间显示名（仅标题展示用；缺省回退显示 Id）。</summary>
+    [Parameter] public string? SpaceName { get; set; }
+
+    private IReadOnlyList<SpaceNodeDto>? _nodes;
+    private bool _loading;
+
+    /// <summary>搜索关键字（按节点名称模糊匹配，客户端过滤）。</summary>
+    private string? _query;
+
+    /// <summary>按名称模糊过滤后的节点列表。</summary>
+    private IReadOnlyList<SpaceNodeDto> FilteredNodes =>
+        _nodes is null ? [] :
+        string.IsNullOrWhiteSpace(_query) ? _nodes :
+        _nodes.Where(n => !string.IsNullOrEmpty(n.Name)
+                          && n.Name.Contains(_query, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    /// <summary>CRUD 子对话框选项（与 SpaceManagePanel / LinesDialog 一致：小宽度全宽）。</summary>
+    private static readonly DialogOptions DialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true
+    };
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _nodes = await Api.GetNodesAsync(SpaceId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
+            _nodes = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCreateAsync()
+    {
+        var parameters = new DialogParameters<SpaceNodeEditDialog>
+        {
+            { x => x.SpaceId, SpaceId }
+        };
+        var dialog = await DialogService.ShowAsync<SpaceNodeEditDialog>(
+            string.Empty, parameters, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            await LoadAsync();
+    }
+
+    private async Task OpenRenameAsync(SpaceNodeDto node)
+    {
+        var parameters = new DialogParameters<SpaceNodeEditDialog>
+        {
+            { x => x.SpaceId, SpaceId },
+            { x => x.Node, node }
+        };
+
+        var dialog = await DialogService.ShowAsync<SpaceNodeEditDialog>(
+            null, parameters, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            await LoadAsync();
+    }
+
+    private async Task OpenDeleteAsync(SpaceNodeDto node)
+    {
+        var parameters = new DialogParameters<SpaceNodeDeleteDialog>
+        {
+            { x => x.SpaceId, SpaceId },
+            { x => x.Node, node }
+        };
+
+        var dialog = await DialogService.ShowAsync<SpaceNodeDeleteDialog>(
+            null, parameters, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            await LoadAsync();
+    }
+
+    /// <summary>
+    /// 打开该节点的详情对话框（EAV 属性绑定区 + 派生 Tag 只读区），大尺寸对话框。
+    /// 详情对话框关闭后不回刷列表（节点实体本身未变更）。
+    /// </summary>
+    private async Task OpenDetailAsync(SpaceNodeDto node)
+    {
+        var parameters = new DialogParameters<SpaceNodeDetailDialog>
+        {
+            { x => x.Node, node }
+        };
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+        var dialog = await DialogService.ShowExAsync<SpaceNodeDetailDialog>(
+            string.Empty, parameters, options);
+        await dialog.Result;
+    }
+}

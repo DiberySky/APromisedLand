@@ -94,4 +94,26 @@ public sealed class GraphSyncController : ControllerBase
             result.Vertices, result.ParentEdges + result.LineEdges + result.SemanticEdges,
             result.VerticesWritten, result.EdgesWritten, result.Errors));
     }
+
+    /// <summary>
+    /// SpaceNode 派生 Tag 手动对账（S4.5）：全空间活动账本 schema 对齐 +
+    /// 墓碑行补偿 DROP 清行 + 全部 SpaceNode 顶点的派生 Tag 值对齐（含受管多余 Tag 收敛）。
+    /// 幂等，可任意重放。
+    /// </summary>
+    [HttpPost("space-node-tags")]
+    public async Task<IActionResult> ReconcileSpaceNodeTags(CancellationToken ct)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var service = scope.ServiceProvider
+            .GetRequiredService<SpaceNode.SpaceNodeTagReconcileService>();
+
+        var result = await service.ReconcileAsync(ct);
+
+        _logger.LogInformation(
+            "手动 SpaceNode Tag 对账：节点 {Nodes} schema {Tags} 墓碑 {Tombstones} 错误 {Errors}",
+            result.NodesChecked, result.TagsAligned, result.TombstonesCleared,
+            result.Errors.Count);
+
+        return Ok(result);
+    }
 }

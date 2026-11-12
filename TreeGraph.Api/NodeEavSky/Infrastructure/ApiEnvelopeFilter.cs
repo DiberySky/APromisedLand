@@ -38,7 +38,9 @@ public sealed class ApiEnvelopeFilter : IResultFilter, IExceptionFilter, IOrdere
                || cad.ControllerTypeInfo.Namespace?.Contains(
                    "LineSky.Controllers", StringComparison.Ordinal) == true
                || cad.ControllerTypeInfo.Namespace?.Contains(
-                   "EdgeSky.Controllers", StringComparison.Ordinal) == true);
+                   "EdgeSky.Controllers", StringComparison.Ordinal) == true
+               || cad.ControllerTypeInfo.Namespace?.Contains(
+                   "SpaceNodeSky.Controllers", StringComparison.Ordinal) == true);
 
     // ------------------------------------------------------------
     // 结果包装

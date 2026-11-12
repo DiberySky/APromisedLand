@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
 
-namespace TreeGraph.Api.Data.Migrations
+namespace TreeGraph.Api.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -95,14 +95,17 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "inode_entity",
                 columns: table => new
                 {
+                    binding_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     inode_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
                     attached_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_inode_entity", x => new { x.inode_id, x.entity_type });
+                    table.PrimaryKey("PK_inode_entity", x => x.binding_id);
                 });
 
             migrationBuilder.CreateTable(
@@ -173,6 +176,64 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "custom_table_columns",
+                columns: table => new
+                {
+                    column_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    column_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    is_required = table.Column<bool>(type: "boolean", nullable: false),
+                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_unique = table.Column<bool>(type: "boolean", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
+                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_custom_table_columns", x => x.column_id);
+                    table.ForeignKey(
+                        name: "FK_custom_table_columns_composite_type_definitions_ref_composi~",
+                        column: x => x.ref_composite_type_id,
+                        principalTable: "composite_type_definitions",
+                        principalColumn: "composite_type_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_custom_table_columns_custom_table_definitions_table_definit~",
+                        column: x => x.table_definition_id,
+                        principalTable: "custom_table_definitions",
+                        principalColumn: "table_definition_id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "eav_tree_roots",
+                columns: table => new
+                {
+                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    binding_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_eav_tree_roots", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_eav_tree_roots_inode_entity_binding_id",
+                        column: x => x.binding_id,
+                        principalTable: "inode_entity",
+                        principalColumn: "binding_id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "category_trees",
                 columns: table => new
                 {
@@ -188,6 +249,34 @@ namespace TreeGraph.Api.Data.Migrations
                     table.PrimaryKey("PK_category_trees", x => x.id);
                     table.ForeignKey(
                         name: "FK_category_trees_nodes_id",
+                        column: x => x.id,
+                        principalTable: "nodes",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "eav_trees",
+                columns: table => new
+                {
+                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    parent_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    can_have_children = table.Column<bool>(type: "boolean", nullable: false),
+                    sort_order = table.Column<int>(type: "integer", nullable: false),
+                    has_children = table.Column<bool>(type: "boolean", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_eav_trees", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_eav_trees_eav_trees_parent_id",
+                        column: x => x.parent_id,
+                        principalTable: "eav_trees",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_eav_trees_nodes_id",
                         column: x => x.id,
                         principalTable: "nodes",
                         principalColumn: "id",
@@ -274,6 +363,98 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "attribute_catalog",
+                columns: table => new
+                {
+                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    attribute_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    is_required = table.Column<bool>(type: "boolean", nullable: false),
+                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
+                    version = table.Column<int>(type: "integer", nullable: false),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
+                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    ref_table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    IsRecordMode = table.Column<bool>(type: "boolean", nullable: false),
+                    ref_option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_attribute_catalog", x => x.attribute_id);
+                    table.ForeignKey(
+                        name: "FK_attribute_catalog_composite_type_definitions_ref_composite_~",
+                        column: x => x.ref_composite_type_id,
+                        principalTable: "composite_type_definitions",
+                        principalColumn: "composite_type_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_attribute_catalog_custom_table_definitions_ref_table_defini~",
+                        column: x => x.ref_table_definition_id,
+                        principalTable: "custom_table_definitions",
+                        principalColumn: "table_definition_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_attribute_catalog_option_sets_ref_option_set_id",
+                        column: x => x.ref_option_set_id,
+                        principalTable: "option_sets",
+                        principalColumn: "option_set_id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "composite_field_definitions",
+                columns: table => new
+                {
+                    field_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    field_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    ref_option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    is_array = table.Column<bool>(type: "boolean", nullable: false),
+                    is_required = table.Column<bool>(type: "boolean", nullable: false),
+                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
+                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_composite_field_definitions", x => x.field_id);
+                    table.CheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
+                    table.ForeignKey(
+                        name: "FK_composite_field_definitions_composite_type_definitions_comp~",
+                        column: x => x.composite_type_id,
+                        principalTable: "composite_type_definitions",
+                        principalColumn: "composite_type_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_composite_field_definitions_composite_type_definitions_ref_~",
+                        column: x => x.ref_composite_type_id,
+                        principalTable: "composite_type_definitions",
+                        principalColumn: "composite_type_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_composite_field_definitions_option_sets_ref_option_set_id",
+                        column: x => x.ref_option_set_id,
+                        principalTable: "option_sets",
+                        principalColumn: "option_set_id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "option_items",
                 columns: table => new
                 {
@@ -305,6 +486,7 @@ namespace TreeGraph.Api.Data.Migrations
                     name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     comment = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
                     ttl_col = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     ttl_duration_seconds = table.Column<long>(type: "bigint", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -345,242 +527,53 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "attribute_catalog",
+                name: "space_nodes",
                 columns: table => new
                 {
-                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    attribute_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    is_required = table.Column<bool>(type: "boolean", nullable: false),
-                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
+                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    space_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_space_nodes", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_space_nodes_node",
+                        column: x => x.id,
+                        principalTable: "nodes",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_space_nodes_space",
+                        column: x => x.space_id,
+                        principalTable: "spaces",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "tag_projections",
+                columns: table => new
+                {
+                    space_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    tag_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    source_attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    source_entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    schema_snapshot = table.Column<string>(type: "jsonb", nullable: false),
                     version = table.Column<int>(type: "integer", nullable: false),
-                    display_order = table.Column<int>(type: "integer", nullable: false),
-                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    ref_table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    IsRecordMode = table.Column<bool>(type: "boolean", nullable: false),
-                    ref_option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    unit_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_attribute_catalog", x => x.attribute_id);
-                    table.ForeignKey(
-                        name: "FK_attribute_catalog_composite_type_definitions_ref_composite_~",
-                        column: x => x.ref_composite_type_id,
-                        principalTable: "composite_type_definitions",
-                        principalColumn: "composite_type_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_attribute_catalog_custom_table_definitions_ref_table_defini~",
-                        column: x => x.ref_table_definition_id,
-                        principalTable: "custom_table_definitions",
-                        principalColumn: "table_definition_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_attribute_catalog_option_sets_ref_option_set_id",
-                        column: x => x.ref_option_set_id,
-                        principalTable: "option_sets",
-                        principalColumn: "option_set_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_attribute_catalog_unit_trees_unit_id",
-                        column: x => x.unit_id,
-                        principalTable: "unit_trees",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "composite_field_definitions",
-                columns: table => new
-                {
-                    field_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    field_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    unit_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    ref_option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    is_array = table.Column<bool>(type: "boolean", nullable: false),
-                    is_required = table.Column<bool>(type: "boolean", nullable: false),
-                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
                     is_deleted = table.Column<bool>(type: "boolean", nullable: false),
-                    display_order = table.Column<int>(type: "integer", nullable: false),
-                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_composite_field_definitions", x => x.field_id);
-                    table.CheckConstraint("ck_composite_field_decimal_unit", "data_type IN ('int', 'decimal') OR unit_id IS NULL");
-                    table.CheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
-                    table.ForeignKey(
-                        name: "FK_composite_field_definitions_composite_type_definitions_comp~",
-                        column: x => x.composite_type_id,
-                        principalTable: "composite_type_definitions",
-                        principalColumn: "composite_type_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_composite_field_definitions_composite_type_definitions_ref_~",
-                        column: x => x.ref_composite_type_id,
-                        principalTable: "composite_type_definitions",
-                        principalColumn: "composite_type_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_composite_field_definitions_option_sets_ref_option_set_id",
-                        column: x => x.ref_option_set_id,
-                        principalTable: "option_sets",
-                        principalColumn: "option_set_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_composite_field_definitions_unit_trees_unit_id",
-                        column: x => x.unit_id,
-                        principalTable: "unit_trees",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "custom_table_columns",
-                columns: table => new
-                {
-                    column_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    column_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    is_required = table.Column<bool>(type: "boolean", nullable: false),
-                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_unique = table.Column<bool>(type: "boolean", nullable: false),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
-                    display_order = table.Column<int>(type: "integer", nullable: false),
-                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    unit_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_custom_table_columns", x => x.column_id);
-                    table.CheckConstraint("ck_custom_table_column_numeric_unit", "data_type IN ('int', 'decimal') OR unit_id IS NULL");
-                    table.ForeignKey(
-                        name: "FK_custom_table_columns_composite_type_definitions_ref_composi~",
-                        column: x => x.ref_composite_type_id,
-                        principalTable: "composite_type_definitions",
-                        principalColumn: "composite_type_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_custom_table_columns_custom_table_definitions_table_definit~",
-                        column: x => x.table_definition_id,
-                        principalTable: "custom_table_definitions",
-                        principalColumn: "table_definition_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_custom_table_columns_unit_trees_unit_id",
-                        column: x => x.unit_id,
-                        principalTable: "unit_trees",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "edge_type_props",
-                columns: table => new
-                {
-                    space_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    edge_type_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    prop_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    nullable = table.Column<bool>(type: "boolean", nullable: false),
-                    default_value = table.Column<JsonElement>(type: "jsonb", nullable: true),
-                    comment = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
-                    display_order = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_edge_type_props", x => new { x.space_id, x.edge_type_name, x.prop_name });
-                    table.CheckConstraint("ck_edge_type_props_notnull_default", "nullable OR default_value IS NOT NULL");
-                    table.ForeignKey(
-                        name: "FK_edge_type_props_edge_types_space_id_edge_type_name",
-                        columns: x => new { x.space_id, x.edge_type_name },
-                        principalTable: "edge_types",
-                        principalColumns: new[] { "space_id", "name" },
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "edges",
-                columns: table => new
-                {
-                    space_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    edge_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    src_vid = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    dst_vid = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    rank = table.Column<long>(type: "bigint", nullable: false),
-                    props = table.Column<JsonElement>(type: "jsonb", nullable: true),
+                    deleted_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_edges", x => new { x.space_id, x.edge_type, x.src_vid, x.rank, x.dst_vid });
+                    table.PrimaryKey("PK_tag_projections", x => new { x.space_id, x.tag_name });
                     table.ForeignKey(
-                        name: "fk_edges_dst_node",
-                        column: x => x.dst_vid,
-                        principalTable: "nodes",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_edges_edge_type",
-                        columns: x => new { x.space_id, x.edge_type },
-                        principalTable: "edge_types",
-                        principalColumns: new[] { "space_id", "name" },
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_edges_src_node",
-                        column: x => x.src_vid,
-                        principalTable: "nodes",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "line_terminals",
-                columns: table => new
-                {
-                    line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    external_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    operating_state = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_line_terminals", x => new { x.line_id, x.node_id });
-                    table.ForeignKey(
-                        name: "FK_line_terminals_lines_line_id",
-                        column: x => x.line_id,
-                        principalTable: "lines",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_lt_node",
-                        column: x => x.node_id,
-                        principalTable: "nodes",
+                        name: "fk_tag_projections_space",
+                        column: x => x.space_id,
+                        principalTable: "spaces",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -602,8 +595,7 @@ namespace TreeGraph.Api.Data.Migrations
                     value_file_meta = table.Column<JsonDocument>(type: "jsonb", nullable: true),
                     value_jsonb = table.Column<JsonDocument>(type: "jsonb", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    unit_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true)
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -613,12 +605,6 @@ namespace TreeGraph.Api.Data.Migrations
                         column: x => x.attribute_id,
                         principalTable: "attribute_catalog",
                         principalColumn: "attribute_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_attribute_values_unit_trees_unit_id",
-                        column: x => x.unit_id,
-                        principalTable: "unit_trees",
-                        principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -676,6 +662,95 @@ namespace TreeGraph.Api.Data.Migrations
                         column: x => x.attribute_id,
                         principalTable: "attribute_catalog",
                         principalColumn: "attribute_id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "edge_type_props",
+                columns: table => new
+                {
+                    space_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    edge_type_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    prop_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    nullable = table.Column<bool>(type: "boolean", nullable: false),
+                    default_value = table.Column<JsonElement>(type: "jsonb", nullable: true),
+                    comment = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    display_order = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_edge_type_props", x => new { x.space_id, x.edge_type_name, x.prop_name });
+                    table.CheckConstraint("ck_edge_type_props_notnull_default", "nullable OR default_value IS NOT NULL");
+                    table.ForeignKey(
+                        name: "FK_edge_type_props_edge_types_space_id_edge_type_name",
+                        columns: x => new { x.space_id, x.edge_type_name },
+                        principalTable: "edge_types",
+                        principalColumns: new[] { "space_id", "name" },
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "edges",
+                columns: table => new
+                {
+                    space_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    edge_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    src_vid = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    dst_vid = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    rank = table.Column<long>(type: "bigint", nullable: false),
+                    props = table.Column<JsonElement>(type: "jsonb", nullable: true),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_edges", x => new { x.space_id, x.edge_type, x.src_vid, x.rank, x.dst_vid });
+                    table.ForeignKey(
+                        name: "fk_edges_dst_node",
+                        column: x => x.dst_vid,
+                        principalTable: "nodes",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "fk_edges_edge_type",
+                        columns: x => new { x.space_id, x.edge_type },
+                        principalTable: "edge_types",
+                        principalColumns: new[] { "space_id", "name" },
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_edges_src_node",
+                        column: x => x.src_vid,
+                        principalTable: "nodes",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "line_terminals",
+                columns: table => new
+                {
+                    line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    external_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    operating_state = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_line_terminals", x => new { x.line_id, x.node_id });
+                    table.ForeignKey(
+                        name: "FK_line_terminals_lines_line_id",
+                        column: x => x.line_id,
+                        principalTable: "lines",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_lt_node",
+                        column: x => x.node_id,
+                        principalTable: "nodes",
+                        principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -900,20 +975,10 @@ namespace TreeGraph.Api.Data.Migrations
                 column: "ref_table_definition_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_attribute_catalog_unit_id",
-                table: "attribute_catalog",
-                column: "unit_id");
-
-            migrationBuilder.CreateIndex(
                 name: "uq_attr_catalog",
                 table: "attribute_catalog",
                 columns: new[] { "entity_type", "attribute_name" },
                 unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_attribute_values_unit_id",
-                table: "attribute_values",
-                column: "unit_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_av_attr_bool",
@@ -1004,11 +1069,6 @@ namespace TreeGraph.Api.Data.Migrations
                 column: "ref_option_set_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_composite_field_definitions_unit_id",
-                table: "composite_field_definitions",
-                column: "unit_id");
-
-            migrationBuilder.CreateIndex(
                 name: "uq_composite_field",
                 table: "composite_field_definitions",
                 columns: new[] { "composite_type_id", "field_name" },
@@ -1024,11 +1084,6 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "IX_custom_table_columns_ref_composite_type_id",
                 table: "custom_table_columns",
                 column: "ref_composite_type_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_custom_table_columns_unit_id",
-                table: "custom_table_columns",
-                column: "unit_id");
 
             migrationBuilder.CreateIndex(
                 name: "uq_custom_table_column",
@@ -1069,6 +1124,22 @@ namespace TreeGraph.Api.Data.Migrations
                 column: "attribute_id");
 
             migrationBuilder.CreateIndex(
+                name: "ix_etr_binding",
+                table: "eav_tree_roots",
+                column: "binding_id");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_etr_entity_attr",
+                table: "eav_tree_roots",
+                columns: new[] { "entity_id", "attribute_id" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_eav_trees_parent",
+                table: "eav_trees",
+                column: "parent_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_edges_dst",
                 table: "edges",
                 column: "dst_vid");
@@ -1093,17 +1164,18 @@ namespace TreeGraph.Api.Data.Migrations
                 filter: "is_deleted = false");
 
             migrationBuilder.CreateIndex(
-                name: "ix_inode_entity_entity",
-                table: "inode_entity",
-                column: "entity_id");
-
-            migrationBuilder.CreateIndex(
                 name: "ix_inode_entity_inode",
                 table: "inode_entity",
                 column: "inode_id");
 
             migrationBuilder.CreateIndex(
-                name: "uq_inode_entity_global",
+                name: "ux_inode_entity_name",
+                table: "inode_entity",
+                columns: new[] { "inode_id", "entity_type", "name" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ux_inode_entity_type_entity",
                 table: "inode_entity",
                 columns: new[] { "entity_type", "entity_id" },
                 unique: true);
@@ -1184,9 +1256,19 @@ namespace TreeGraph.Api.Data.Migrations
                 filter: "is_deleted = false");
 
             migrationBuilder.CreateIndex(
+                name: "ix_space_nodes_space",
+                table: "space_nodes",
+                column: "space_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_space_trees_parent",
                 table: "space_trees",
                 column: "parent_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_tag_projections_source_attribute",
+                table: "tag_projections",
+                column: "source_attribute_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_unit_trees_parent",
@@ -1216,6 +1298,12 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "custom_table_rows");
 
             migrationBuilder.DropTable(
+                name: "eav_tree_roots");
+
+            migrationBuilder.DropTable(
+                name: "eav_trees");
+
+            migrationBuilder.DropTable(
                 name: "edge_type_props");
 
             migrationBuilder.DropTable(
@@ -1223,9 +1311,6 @@ namespace TreeGraph.Api.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "entity_type_catalog");
-
-            migrationBuilder.DropTable(
-                name: "inode_entity");
 
             migrationBuilder.DropTable(
                 name: "inode_entitytype");
@@ -1243,7 +1328,19 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "option_items");
 
             migrationBuilder.DropTable(
+                name: "space_nodes");
+
+            migrationBuilder.DropTable(
                 name: "space_trees");
+
+            migrationBuilder.DropTable(
+                name: "tag_projections");
+
+            migrationBuilder.DropTable(
+                name: "unit_trees");
+
+            migrationBuilder.DropTable(
+                name: "inode_entity");
 
             migrationBuilder.DropTable(
                 name: "edge_types");
@@ -1253,6 +1350,9 @@ namespace TreeGraph.Api.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "attribute_catalog");
+
+            migrationBuilder.DropTable(
+                name: "nodes");
 
             migrationBuilder.DropTable(
                 name: "spaces");
@@ -1265,12 +1365,6 @@ namespace TreeGraph.Api.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "option_sets");
-
-            migrationBuilder.DropTable(
-                name: "unit_trees");
-
-            migrationBuilder.DropTable(
-                name: "nodes");
         }
     }
 }

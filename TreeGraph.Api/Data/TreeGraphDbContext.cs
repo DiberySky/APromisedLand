@@ -2,6 +2,7 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.LineSky.Entities;
 using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Api.SpaceNodeSky.Entities;
 using TreeGraph.Api.SpaceSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Entities;
 
@@ -40,6 +41,10 @@ public class TreeGraphDbContext : DbContext
     // 空间（独立简单实体）
     public DbSet<Space> Spaces => Set<Space>();
 
+    // SpaceNodeSky：空间节点（归属空间）与组合属性派生的 Tag 投影账本
+    public DbSet<SpaceNode> SpaceNodes => Set<SpaceNode>();
+    public DbSet<TagProjection> TagProjections => Set<TagProjection>();
+
     // LineSky：线路（独立一等公民，实现 Inode；R7 起补注册 nodes，host_type='Line'）
     public DbSet<TreeGraph.Shared.LineSky.Entities.Line> Lines => Set<TreeGraph.Shared.LineSky.Entities.Line>();
 
@@ -76,6 +81,8 @@ public class TreeGraphDbContext : DbContext
         ConfigureEavTrees(mb);
         ConfigureEavTreeRoots(mb);
         ConfigureSpaces(mb);
+        ConfigureSpaceNodes(mb);
+        ConfigureTagProjections(mb);
         ConfigureLines(mb);
         ConfigureLineTerminals(mb);
         ConfigureNodes(mb);
@@ -263,6 +270,72 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.Type).HasColumnName("type").HasConversion<string>().HasMaxLength(50).IsRequired();
 
             e.HasData(Space.SeedData());
+        });
+    }
+
+    // ============================================================
+    // SpaceNodeSky：空间节点（Id = nodes.id，归属空间在宿主表）
+    // ============================================================
+    private static void ConfigureSpaceNodes(ModelBuilder mb)
+    {
+        mb.Entity<SpaceNode>(e =>
+        {
+            e.ToTable("space_nodes");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.SpaceId).HasColumnName("space_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            // 共享主键：SpaceNode.Id 即 nodes.id，身份/名称唯一真源在 nodes
+            e.HasOne(x => x.Node)
+                .WithOne()
+                .HasForeignKey<SpaceNode>(x => x.Id)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_space_nodes_node");
+
+            // 归属空间；Restrict：空间内仍有节点时禁止删空间
+            e.HasOne<Space>()
+                .WithMany()
+                .HasForeignKey(x => x.SpaceId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_space_nodes_space");
+
+            e.HasIndex(x => x.SpaceId).HasDatabaseName("ix_space_nodes_space");
+        });
+    }
+
+    // ============================================================
+    // SpaceNodeSky：Tag 投影账本（组合属性 → 图 Tag 的物化记录）
+    // ============================================================
+    private static void ConfigureTagProjections(ModelBuilder mb)
+    {
+        mb.Entity<TagProjection>(e =>
+        {
+            e.ToTable("tag_projections");
+            e.HasKey(x => new { x.SpaceId, x.TagName });
+            e.Property(x => x.SpaceId).HasColumnName("space_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.TagName).HasColumnName("tag_name").HasMaxLength(100).IsRequired();
+            e.Property(x => x.SourceAttributeId)
+                .HasColumnName("source_attribute_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.SourceEntityType)
+                .HasColumnName("source_entity_type").HasMaxLength(100).IsRequired();
+            e.Property(x => x.SchemaSnapshot)
+                .HasColumnName("schema_snapshot").HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.Version).HasColumnName("version").IsRequired();
+            e.Property(x => x.IsDeleted).HasColumnName("is_deleted").IsRequired();
+            e.Property(x => x.DeletedAt).HasColumnName("deleted_at");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            e.HasOne<Space>()
+                .WithMany()
+                .HasForeignKey(x => x.SpaceId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_tag_projections_space");
+
+            e.HasIndex(x => x.SourceAttributeId)
+                .HasDatabaseName("ix_tag_projections_source_attribute");
         });
     }
 

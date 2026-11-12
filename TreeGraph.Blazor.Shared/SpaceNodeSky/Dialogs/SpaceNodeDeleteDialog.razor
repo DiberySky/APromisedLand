@@ -1,0 +1,74 @@
+@* SpaceNodeDeleteDialog.razor — 删除空间节点确认（DialogSky 外壳，危险色提交按钮）。
+   409 删除守卫（边/端子/iNode 实体仍引用）的服务端原因在对话框内友好展示，对话框保持打开。 *@
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Services
+@using TreeGraph.Shared.SpaceNodeSky.Dtos
+@inject SpaceNodeApiClient Api
+@inject ISnackbar Snackbar
+
+<DialogSky Title="删除空间节点"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@(_submitting ? "删除中..." : "确认删除")"
+           SubmitButtonColor="Color.Error"
+           SubmitButtonDisabled="@_submitting"
+           OnSubmitClick="DeleteAsync"
+           OnCanceledClick="@Close">
+    <DialogContent>
+        <MudStack Spacing="3" Class="pa-2">
+            <MudText>确定要删除空间节点 <strong>"@Node?.Name"</strong> 吗？此操作不可撤销，节点自身的 EAV 属性数据将一并清理。</MudText>
+
+            @if (_conflictError is not null)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true">
+                    @_conflictError
+                </MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter, EditorRequired] public required string SpaceId { get; set; }
+    [Parameter] public SpaceNodeDto? Node { get; set; }
+
+    private bool _submitting;
+
+    /// <summary>409 删除守卫返回的服务端原因（边/端子/iNode 实体仍引用）。</summary>
+    private string? _conflictError;
+
+    private async Task DeleteAsync()
+    {
+        if (Node is null) return;
+
+        _submitting = true;
+        _conflictError = null;
+        try
+        {
+            var ok = await Api.DeleteAsync(SpaceId, Node.Id);
+            if (!ok)
+            {
+                Snackbar.Add("删除失败：节点不存在或已被删除", Severity.Error);
+                return;
+            }
+            Snackbar.Add("删除成功", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (HttpRequestException ex) when (
+            ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            // 删除守卫：友好展示服务端返回的具体引用原因，对话框保持打开
+            _conflictError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private void Close() => MudDialog?.Close(DialogResult.Cancel());
+}

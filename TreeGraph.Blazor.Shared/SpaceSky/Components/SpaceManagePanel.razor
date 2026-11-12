@@ -8,6 +8,7 @@
 @inject IDialogService DialogService
 @using TreeGraph.Blazor.Shared.EdgeSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky.Dialogs
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Dialogs
 @using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Space
 @using TreeGraph.Blazor.Shared.TreeEavSky.Services
 @using TreeGraph.Blazor.Shared.TreeEavSky.Dialogs
@@ -88,6 +89,17 @@ else
                                                        Size="Size.Small"
                                                        OnClick="@(async () => await OpenLinesAsync(context))"
                                                        title="线路" />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>空间节点</td>
+                                    <td style="white-space: nowrap; text-align: right;">
+                                        @* 打开该空间的空间节点维护对话框（SpaceNode 为图空间级资源） *@
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Hub"
+                                                       Color="Color.Info"
+                                                       Size="Size.Small"
+                                                       OnClick="@(async () => await OpenSpaceNodesAsync(context))"
+                                                       title="空间节点" />
                                     </td>
                                 </tr>
                                 <tr>
@@ -298,6 +310,26 @@ else
             BackdropClick = false
         };
         await DialogService.ShowExAsync<LinesDialog>(
+            string.Empty, parameters, options);
+    }
+
+    /// <summary>打开该空间的空间节点维护对话框（SpaceNode 为图空间级资源）。</summary>
+    private async Task OpenSpaceNodesAsync(SpaceDto space)
+    {
+        var parameters = new DialogParameters<SpaceNodesDialog>
+        {
+            { x => x.SpaceId, space.Id },
+            { x => x.SpaceName, space.Name }
+        };
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+        await DialogService.ShowExAsync<SpaceNodesDialog>(
             string.Empty, parameters, options);
     }
 

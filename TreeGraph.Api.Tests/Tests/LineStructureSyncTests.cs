@@ -129,7 +129,10 @@ public class LineStructureSyncTests
         var options = Options.Create(new GraphSyncOptions());
         await using var db = CreateDb(dbName);
         var sync = new GraphSynchronizer(db, CreateClient(handler),
-            initializer, options, NullLogger<GraphSynchronizer>.Instance);
+            initializer, options, NullLogger<GraphSynchronizer>.Instance,
+            new TreeGraph.Api.GraphSyncSky.SpaceNode.SpaceNodeVertexTagSyncer(
+                db, CreateClient(handler),
+                NullLogger<TreeGraph.Api.GraphSyncSky.SpaceNode.SpaceNodeVertexTagSyncer>.Instance));
 
         var result = await sync.RebuildAllAsync(CancellationToken.None);
 
@@ -233,7 +236,10 @@ public class LineStructureSyncTests
     {
         var options = Options.Create(new GraphSyncOptions());
         return new GraphSynchronizer(db, CreateClient(handler),
-            null!, options, NullLogger<GraphSynchronizer>.Instance);
+            null!, options, NullLogger<GraphSynchronizer>.Instance,
+            new TreeGraph.Api.GraphSyncSky.SpaceNode.SpaceNodeVertexTagSyncer(
+                db, CreateClient(handler),
+                NullLogger<TreeGraph.Api.GraphSyncSky.SpaceNode.SpaceNodeVertexTagSyncer>.Instance));
     }
 
     private static async Task<GraphSchemaInitializer> CreateReadyInitializerAsync(

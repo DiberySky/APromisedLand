@@ -15,6 +15,9 @@ public sealed class GraphSyncOptions
 
     /// <summary>全量重建批量写入批大小（≤1000，NebulaApi 上限）。</summary>
     public int RebuildBatchSize { get; set; } = 500;
+
+    /// <summary>SpaceNode 派生 Tag 周期对账间隔（秒）。</summary>
+    public int ReconcileIntervalSeconds { get; set; } = 300;
 }
 
 /// <summary>NebulaGraph 图内命名常量。</summary>
@@ -50,10 +53,13 @@ public static class GraphNaming
     /// <summary>线路顶点（一条 Line 一个顶点；R7 起无 topology_mode，结构由边连接定义）。</summary>
     public const string LineTag = "line";
 
+    /// <summary>空间节点（nodes.host_type = "SpaceNode"，归属由 space_nodes.space_id 决定）。</summary>
+    public const string SpaceNodeTag = "space_node";
+
     public static readonly string[] AllNodeTags =
     [
         SpaceTreeTag, UnitTreeTag, CategoryTreeTag, KnowledgeTreeTag, EavTreeTag,
-        LineNodeTag, NodeTag, LineTag
+        LineNodeTag, NodeTag, LineTag, SpaceNodeTag
     ];
 
     /// <summary>按 tag 声明属性列（schema 初始化与 ALTER 补列共用）。</summary>
@@ -71,7 +77,8 @@ public static class GraphNaming
                 "line_id", "line_name", "terminal_role", "terminal_operating_state"
             ],
             [NodeTag] = ["name", "node_type", "is_archived"],
-            [LineTag] = ["name", "node_type", "is_archived"]
+            [LineTag] = ["name", "node_type", "is_archived"],
+            [SpaceNodeTag] = ["name", "node_type", "is_archived"]
         };
 }
 

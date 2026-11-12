@@ -283,12 +283,13 @@ public sealed class EdgeService
     }
 
     /// <summary>
-    /// 按名称关键字搜索节点（对端节点选择用）；可按宿主类型过滤。仅投影 Id/Name/HostType。
+    /// 按名称关键字搜索节点（对端节点选择用）；可按宿主类型过滤、按图空间过滤（spaceId，
+    /// 只返回在该空间内可见的节点，省略 = 不过滤）。仅投影 Id/Name/HostType。
     /// 分页：pageSize > 0 时返回 PagedResult{Items,Total,Page,PageSize}；
     ///       pageSize = 0（默认）时返回前 200 条 List（向后兼容既有调用方）。
     /// </summary>
     public async Task<object> SearchNodesAsync(
-        string? search, string? hostType, int page, int pageSize, CancellationToken ct)
+        string? search, string? hostType, string? spaceId, int page, int pageSize, CancellationToken ct)
     {
         var q = _db.Nodes.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(search))
@@ -298,6 +299,8 @@ public sealed class EdgeService
         }
         if (!string.IsNullOrWhiteSpace(hostType))
             q = q.Where(n => n.HostType == hostType);
+        if (!string.IsNullOrWhiteSpace(spaceId))
+            q = await FilterBySpaceAsync(q, spaceId, ct);
 
         var ordered = q.OrderBy(n => n.Name);
         var projection = ordered.Select(n => new NodeLookupDto { Id = n.Id, Name = n.Name, HostType = n.HostType });
@@ -319,6 +322,45 @@ public sealed class EdgeService
         }
 
         return await projection.Take(200).ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// 按图空间过滤候选节点（与 <see cref="ResolveNodeSpaceIdAsync"/> 同路由规则，面向集合）：
+    /// 自由 Node / EavTree 全空间可见；种子树按固定空间映射；SpaceNode 查 space_nodes、
+    /// Line/LineNode 查 lines.space_id；空间树节点经递归 CTE 取根（根 Id == spaceId）的全部后代。
+    /// </summary>
+    private async Task<IQueryable<Node>> FilterBySpaceAsync(
+        IQueryable<Node> q, string spaceId, CancellationToken ct)
+    {
+        // 该空间内全部空间树节点（根 Id == spaceId 的整棵后代，含根）
+        var treeIds = await _db.SpaceTrees
+            .FromSqlRaw(@"
+                WITH RECURSIVE tree AS (
+                    SELECT id, parent_id FROM space_trees WHERE id = {0}
+                    UNION ALL
+                    SELECT st.id, st.parent_id FROM space_trees st
+                    INNER JOIN tree t ON st.parent_id = t.id
+                )
+                SELECT id, parent_id FROM tree", spaceId)
+            .Select(st => st.Id)
+            .ToListAsync(ct);
+
+        var isUnit = spaceId == SeedSpaceIds.Unit;
+        var isType = spaceId == SeedSpaceIds.Type;
+        var isKnowledge = spaceId == SeedSpaceIds.Knowledge;
+
+        return q.Where(n =>
+            n.HostType == "Node" || n.HostType == "EavTree"
+            || (isUnit && n.HostType == "UnitTree")
+            || (isType && n.HostType == "CategoryTree")
+            || (isKnowledge && n.HostType == "KnowledgeTree")
+            || (n.HostType == "SpaceTree" && treeIds.Contains(n.Id))
+            || (n.HostType == "SpaceNode" &&
+                _db.SpaceNodes.Any(s => s.Id == n.Id && s.SpaceId == spaceId))
+            || (n.HostType == "Line" &&
+                _db.Lines.Any(l => l.Id == n.Id && l.SpaceId == spaceId))
+            || (n.HostType == "LineNode" && n.LineId != null &&
+                _db.Lines.Any(l => l.Id == n.LineId && l.SpaceId == spaceId)));
     }
 
     /// <summary>
@@ -349,6 +391,11 @@ public sealed class EdgeService
                     .Where(l => l.Id == row.LineId)
                     .Select(l => l.SpaceId)
                     .FirstOrDefaultAsync(ct),
+            // 空间节点：归属空间在 space_nodes.space_id
+            "SpaceNode" => await _db.SpaceNodes.AsNoTracking()
+                .Where(s => s.Id == nodeId)
+                .Select(s => s.SpaceId)
+                .FirstOrDefaultAsync(ct),
             _ => null
         };
     }

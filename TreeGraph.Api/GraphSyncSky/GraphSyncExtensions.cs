@@ -37,6 +37,12 @@ public static class GraphSyncExtensions
             services.AddHostedService(sp => sp.GetRequiredService<GraphSchemaInitializer>());
 
         services.AddScoped<GraphSynchronizer>();
+        // SpaceNode 派生 Tag 值同步（S4）：随 SyncInodeAsync 的 SpaceNode 分支调用
+        services.AddScoped<SpaceNode.SpaceNodeVertexTagSyncer>();
+        // SpaceNode 派生 Tag 对账（S4.5）：手动端点 + 周期后台服务
+        services.AddScoped<SpaceNode.SpaceNodeTagReconcileService>();
+        if (enableSchemaInitializer)
+            services.AddHostedService<SpaceNode.SpaceNodeTagReconciler>();
 
         return services;
     }

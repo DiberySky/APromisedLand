@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.NodeEavSky.Services;
+using TreeGraph.Api.SpaceNodeSky.Services;
 using TreeGraph.Shared.NodeEavSky;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
@@ -17,15 +18,17 @@ public class EavMetadataController : ControllerBase
     private readonly IAttributeCache _attrCache;
     private readonly ICompositeTypeCache _compositeCache;
     private readonly ICustomTableCache _customTableCache;
+    private readonly TagProjectionService _tagProjections;
 
     public EavMetadataController(
         TreeGraphDbContext db, IAttributeCache attrCache, ICompositeTypeCache compositeCache,
-        ICustomTableCache customTableCache)
+        ICustomTableCache customTableCache, TagProjectionService tagProjections)
     {
         _db = db;
         _attrCache = attrCache;
         _compositeCache = compositeCache;
         _customTableCache = customTableCache;
+        _tagProjections = tagProjections;
     }
 
     // ============================================================
@@ -137,6 +140,12 @@ public class EavMetadataController : ControllerBase
         }
 
         // ---- 创建 ----
+        // 组合属性将派生图 Tag：规范化 Tag 名命中未清墓碑 → 409（防 stale 事件误清新行）
+        if (req.DataType == EavDataTypes.Composite
+            && await _tagProjections.CheckRecreateConflictAsync(
+                req.EntityType, attributeName, ct) is { } recreateConflict)
+            return Conflict(new { error = recreateConflict });
+
         var def = new AttributeDefinition
         {
             EntityType = req.EntityType,
@@ -161,6 +170,20 @@ public class EavMetadataController : ControllerBase
         _db.AttributeCatalog.Add(def);
         await _db.SaveChangesAsync(ct);
         _attrCache.Invalidate(req.EntityType);
+
+        // 组合属性 → 建全空间 Tag 投影账本行并发事件（命中系统 Tag/零列 → 跳过投影，不报错）
+        if (def.DataType == EavDataTypes.Composite)
+        {
+            var projection = await _tagProjections.OnAttributeCreatedAsync(def, ct);
+            if (projection.Conflict is { } conflict)
+            {
+                // 后置竞态冲突（极罕见）：补偿删除属性，保持 409 语义
+                _db.AttributeCatalog.Remove(def);
+                await _db.SaveChangesAsync(ct);
+                _attrCache.Invalidate(req.EntityType);
+                return Conflict(new { error = conflict });
+            }
+        }
 
         return Ok(new { def.AttributeId, def.AttributeName });
     }
@@ -365,6 +388,8 @@ public class EavMetadataController : ControllerBase
         _db.CompositeFields.Add(field);
         await _db.SaveChangesAsync(ct);
         _compositeCache.Invalidate(id);
+        // 组合字段新增 → 重算全部引用属性的 Tag 投影快照（账本 Version++ + Altered 事件）
+        await _tagProjections.OnCompositeFieldsChangedAsync(id, ct);
         return Ok(new { field.FieldId });
     }
 
@@ -685,6 +710,8 @@ public class EavMetadataController : ControllerBase
 
         await _db.SaveChangesAsync(ct);
         _compositeCache.Invalidate(id);
+        // 组合字段更新 → 重算全部引用属性的 Tag 投影快照（快照有变化才 Version++ 发事件）
+        await _tagProjections.OnCompositeFieldsChangedAsync(id, ct);
         return NoContent();
     }
 
@@ -700,6 +727,8 @@ public class EavMetadataController : ControllerBase
         _db.CompositeFields.Remove(field);
         await _db.SaveChangesAsync(ct);
         _compositeCache.Invalidate(id);
+        // 组合字段删除 → 重算全部引用属性的 Tag 投影快照
+        await _tagProjections.OnCompositeFieldsChangedAsync(id, ct);
         return NoContent();
     }
 
@@ -821,6 +850,9 @@ public class EavMetadataController : ControllerBase
         def.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
         _attrCache.Invalidate(def.EntityType);
+        // 组合属性引用变更 → 重算 Tag 投影快照（清空引用走墓碑删除流；快照不变则空操作）
+        if (def.DataType == EavDataTypes.Composite)
+            await _tagProjections.OnAttributeUpdatedAsync(def, ct);
         return NoContent();
     }
 
@@ -840,6 +872,9 @@ public class EavMetadataController : ControllerBase
         _db.AttributeCatalog.Remove(def);
         await _db.SaveChangesAsync(ct);
         _attrCache.Invalidate(def.EntityType);
+        // 组合属性删除 → 全部账本行置墓碑（Version++）发 Deleted 事件，消费者 DROP 后条件清行
+        if (def.DataType == EavDataTypes.Composite)
+            await _tagProjections.OnAttributeDeletedAsync(def, ct);
         return NoContent();
     }
 
