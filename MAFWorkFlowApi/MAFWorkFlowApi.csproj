@@ -11,17 +11,17 @@
         <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" Version="13.6.5" />
         <PackageReference Include="CommunityToolkit.Aspire.OllamaSharp" Version="13.6.1" />
         <PackageReference Include="LiteGraph.Sdk" Version="10.2.0" />
-        <PackageReference Include="Microsoft.Agents.AI" Version="1.26.0" />
-        <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.26.0" />
-        <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.26.0-preview.261023.1" />
-        <PackageReference Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.26.0">
+        <PackageReference Include="Microsoft.Agents.AI" Version="1.28.0" />
+        <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.28.0" />
+        <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.28.0-preview.261106.1" />
+        <PackageReference Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.28.0">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0" />
         <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="11.0.0" />
-        <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />
-        <PackageReference Include="OllamaSharp" Version="5.5.0" />
+        <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.4.0" />
+        <PackageReference Include="OllamaSharp" Version="5.5.2" />
     </ItemGroup>
 
     <ItemGroup>

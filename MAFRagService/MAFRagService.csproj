@@ -9,33 +9,33 @@
     <ItemGroup>
         <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.6.5" />
         <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" Version="13.6.5" />
-        <PackageReference Include="AWSSDK.S3" Version="4.0.104.8" />
+        <PackageReference Include="AWSSDK.S3" Version="4.1.0" />
         <PackageReference Include="CommunityToolkit.Aspire.OllamaSharp" Version="13.6.1" />
         <PackageReference Include="Hangfire.AspNetCore" Version="1.8.25" />
         <PackageReference Include="Hangfire.Core" Version="1.8.25" />
         <PackageReference Include="Hangfire.PostgreSql" Version="1.21.1" />
-        <PackageReference Include="Microsoft.Agents.AI" Version="1.26.0" />
-        <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.26.0" />
-        <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.26.0-preview.261023.1" />
-        <PackageReference Include="Microsoft.Agents.AI.Hosting.OpenAI" Version="1.26.0-alpha.261023.1" />
-        <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.26.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.14" />
+        <PackageReference Include="Microsoft.Agents.AI" Version="1.28.0" />
+        <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.28.0" />
+        <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.28.0-preview.261106.1" />
+        <PackageReference Include="Microsoft.Agents.AI.Hosting.OpenAI" Version="1.28.0-alpha.261106.1" />
+        <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.28.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="11.0.0" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0" />
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.15">
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="11.0.0-rc.3.26522.148">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.11.0" />
+        <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="11.0.0" />
         <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="11.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="10.0.14" />
+        <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="11.0.0" />
         <PackageReference Include="Npgsql.OpenTelemetry" Version="10.0.3" />
-        <PackageReference Include="OpenTelemetry" Version="1.20.1" />
-        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.20.1" />
-        <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.20.1" />
-        <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.20.1" />
-        <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.20.1" />
-        <PackageReference Include="Polly" Version="8.9.0" />
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
+        <PackageReference Include="OpenTelemetry" Version="1.21.0" />
+        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.21.0" />
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.21.0" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.21.0" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.21.0" />
+        <PackageReference Include="Polly" Version="8.9.1" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="11.0.1" />
     </ItemGroup>
 
     <ItemGroup>
