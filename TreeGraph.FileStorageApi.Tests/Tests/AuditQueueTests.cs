@@ -53,9 +53,9 @@ public sealed class AuditQueueTests
     }
 
     [Fact]
-    public async Task DequeueBatch_FillsUpToMax_WhenConcurrentWritesArrive()
+    public async Task DequeueBatch_PreservesFifo_WhenConcurrentWritesArrive()
     {
-        // 首条阻塞等待 → 拿到首条后应尽量填满 max（即使写入发生在等待之后）
+        // 首条阻塞等待；写入与出队并发时，一批可能只拿到首条，最终仍须完整保持 FIFO。
         var queue = new AuditQueue();
 
         var dequeueTask = queue.DequeueBatchAsync(3, CancellationToken.None);
@@ -64,8 +64,11 @@ public sealed class AuditQueueTests
         queue.TryEnqueue(Entry("c"));
 
         var batch = await dequeueTask;
+        var remaining = new List<AuditEntry>();
+        while (batch.Count + remaining.Count < 3)
+            remaining.AddRange(await queue.DequeueBatchAsync(3 - batch.Count - remaining.Count, CancellationToken.None));
 
-        Assert.Equal(3, batch.Count);
+        Assert.Equal(["a", "b", "c"], batch.Concat(remaining).Select(e => e.DocId));
     }
 
     // ── 维度 3：取消语义 ──

@@ -239,15 +239,15 @@ public class FieldValidationRulesTests
     // ============================================================
 
     [Theory]
-    [InlineData("42", 42)]
-    [InlineData("3.14", 3.14)]
-    [InlineData("-5", -5)]
-    [InlineData("0", 0)]
-    public void TryGetDecimal_FromNumericString_Parses(string input, double expected)
+    [InlineData("42", "42")]
+    [InlineData("3.14", "3.14")]
+    [InlineData("-5", "-5")]
+    [InlineData("0", "0")]
+    public void TryGetDecimal_FromNumericString_Parses(string input, string expected)
     {
         var elem = JsonDocument.Parse($"\"{input}\"").RootElement;
         Assert.True(FieldValidationRules.TryGetDecimal(elem, out var value));
-        Assert.Equal((decimal)expected, value);
+        Assert.Equal(decimal.Parse(expected, System.Globalization.CultureInfo.InvariantCulture), value);
     }
 
     [Fact]
