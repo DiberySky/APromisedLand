@@ -22,7 +22,7 @@
         <PackageReference Include="OllamaSharp" Version="5.5.2" />
         <PackageReference Include="Typesense" Version="9.2.0" />
         <PackageReference Include="WolverineFx.RabbitMQ" Version="6.64.0" />
-        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.64.0" />
+        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.64.1" />
     </ItemGroup>
 
     <ItemGroup>
