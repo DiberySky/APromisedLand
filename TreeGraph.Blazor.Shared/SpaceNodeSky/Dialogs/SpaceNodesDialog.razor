@@ -1,7 +1,7 @@
 @* SpaceNodesDialog.razor — 空间节点管理对话框（图空间级资源）。
    打开参数 SpaceId/SpaceName：整个维护作用于该空间，不再有空间列。
-   列表 + 新建/重命名/删除 + 详情（EAV 绑定 / 派生 Tag 只读区）。
-   对齐 LinesDialog.razor 风格。 *@
+   列表 + 新建/删除 + 节点内容（只读）→ 设置修改（属性/关系绑定）。
+   对齐 LinesDialog.razor 与 LineNodeActionsDialog 风格。 *@
 @namespace TreeGraph.Blazor.Shared.SpaceNodeSky.Dialogs
 @using TreeGraph.Blazor.Shared.SpaceNodeSky
 @using TreeGraph.Blazor.Shared.SpaceNodeSky.Services
@@ -59,16 +59,16 @@
                     <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                    Color="Color.Primary"
                                    Size="Size.Small"
-                                   OnClick="@(async () => await OpenRenameAsync(context))"
-                                   title="重命名" />
+                                   OnClick="@(async () => await OpenEditAsync(context))"
+                                   title="设置修改" />
                 </MudTd>
                 <MudTd Style="white-space: nowrap; text-align: center;">
-                    @* 详情：打开该节点的 EAV 属性绑定 + 派生 Tag 只读区 *@
+                    @* 节点内容：只读基本信息、属性绑定与关系绑定 *@
                     <MudIconButton Icon="@Icons.Material.Outlined.Info"
                                    Color="Color.Info"
                                    Size="Size.Small"
                                    OnClick="@(async () => await OpenDetailAsync(context))"
-                                   title="详情（属性绑定 / 派生 Tag）" />
+                                   title="节点内容" />
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
@@ -112,6 +112,16 @@
         FullWidth = true
     };
 
+    /// <summary>节点内容/设置修改共用选项：顶部居中、可最大化。</summary>
+    private static readonly DialogOptionsEx NodeDialogOptions = new()
+    {
+        Position = DialogPosition.TopCenter,
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        MaximizeButton = true,
+        BackdropClick = false
+    };
+
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
@@ -146,20 +156,36 @@
             await LoadAsync();
     }
 
-    private async Task OpenRenameAsync(SpaceNodeDto node)
+    private async Task OpenEditAsync(SpaceNodeDto node)
+        => await ShowSettingsAsync(node);
+
+    /// <summary>打开设置修改；保存后返回最新节点快照，删除流程结束返回 null。</summary>
+    private async Task<SpaceNodeDto?> ShowSettingsAsync(SpaceNodeDto node)
     {
         var parameters = new DialogParameters<SpaceNodeEditDialog>
         {
             { x => x.SpaceId, SpaceId },
+            { x => x.SpaceName, SpaceName ?? SpaceId },
             { x => x.Node, node }
         };
-
-        var dialog = await DialogService.ShowAsync<SpaceNodeEditDialog>(
-            null, parameters, DialogOptions);
+        var dialog = await DialogService.ShowExAsync<SpaceNodeEditDialog>(
+            "设置修改", parameters, NodeDialogOptions);
         var result = await dialog.Result;
 
-        if (result is { Canceled: false })
+        if (result is { Canceled: false, Data: string action }
+            && action == SpaceNodeEditDialog.DeleteAction)
+        {
+            await OpenDeleteAsync(node);
+            return null;
+        }
+
+        if (result is { Canceled: false, Data: SpaceNodeDto updated })
+        {
             await LoadAsync();
+            return updated;
+        }
+
+        return node;
     }
 
     private async Task OpenDeleteAsync(SpaceNodeDto node)
@@ -178,26 +204,25 @@
             await LoadAsync();
     }
 
-    /// <summary>
-    /// 打开该节点的详情对话框（EAV 属性绑定区 + 派生 Tag 只读区），大尺寸对话框。
-    /// 详情对话框关闭后不回刷列表（节点实体本身未变更）。
-    /// </summary>
+    /// <summary>只读节点内容 → 设置修改；保存后重新打开节点内容，删除或关闭时退出。</summary>
     private async Task OpenDetailAsync(SpaceNodeDto node)
     {
-        var parameters = new DialogParameters<SpaceNodeDetailDialog>
+        SpaceNodeDto? current = node;
+        while (current is not null)
         {
-            { x => x.Node, node }
-        };
-        var options = new DialogOptionsEx
-        {
-            Position = DialogPosition.TopCenter,
-            MaxWidth = MaxWidth.Large,
-            FullWidth = true,
-            MaximizeButton = true,
-            BackdropClick = false
-        };
-        var dialog = await DialogService.ShowExAsync<SpaceNodeDetailDialog>(
-            string.Empty, parameters, options);
-        await dialog.Result;
+            var parameters = new DialogParameters<SpaceNodeDetailDialog>
+            {
+                { x => x.Node, current },
+                { x => x.SpaceName, SpaceName ?? SpaceId }
+            };
+            var dialog = await DialogService.ShowExAsync<SpaceNodeDetailDialog>(
+                "节点内容", parameters, NodeDialogOptions);
+            var result = await dialog.Result;
+
+            if (result is not { Canceled: false })
+                break;
+
+            current = await ShowSettingsAsync(current);
+        }
     }
 }
