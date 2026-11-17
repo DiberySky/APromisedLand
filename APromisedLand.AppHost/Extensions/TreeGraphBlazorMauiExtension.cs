@@ -57,6 +57,8 @@ public static class TreeGraphBlazorMauiExtension
             //   将宿主端口反向映射到模拟器内，因此服务发现变量在模拟器内仍然有效。
             if (ctx.TreeGraphEavApi is not null)
                 device.WithReference(ctx.TreeGraphEavApi);
+            if (ctx.TreeGraphSyncServices is not null)
+                device.WithReference(ctx.TreeGraphSyncServices);
 
             // ★ OTLP 导出
             //   默认 WithOtlpExporter() 会注入宿主的 OTLP endpoint（http://127.0.0.1:...），

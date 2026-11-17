@@ -1,4 +1,4 @@
-using TreeGraph.Api.EdgeSky.Entities;
+using TreeGraph.Persistence.EdgeSky.Entities;
 
 namespace TreeGraph.Api.EdgeSky.Services;
 

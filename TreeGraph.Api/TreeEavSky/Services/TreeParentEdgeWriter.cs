@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.EdgeSky.Entities;
-using TreeGraph.Api.GraphSyncSky;
+using TreeGraph.Persistence.Data;
+using TreeGraph.Persistence.EdgeSky.Entities;
+using TreeGraph.GraphSync;
 
 namespace TreeGraph.Api.TreeEavSky.Services;
 

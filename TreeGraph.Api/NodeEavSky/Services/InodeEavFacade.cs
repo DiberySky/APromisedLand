@@ -1,6 +1,6 @@
 using TreeGraph.Api.MessagingSky;
-using TreeGraph.Api.NodeEavSky.Entities;
-using TreeGraph.Shared.Messaging;
+using TreeGraph.Persistence.NodeEavSky.Entities;
+using TreeGraph.Contracts.Messaging;
 
 namespace TreeGraph.Api.NodeEavSky.Services;
 

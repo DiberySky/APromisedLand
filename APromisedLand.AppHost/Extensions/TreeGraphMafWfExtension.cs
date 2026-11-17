@@ -93,10 +93,8 @@ public static class TreeGraphMafWfExtension
         }
 
         // ══════════════════════════════════════════════════════════
-        // ★ TreeGraphEavApi（语义搜索）端点注入（服务发现）
-        //   GraphAgent 的 SemanticSearchNodes 工具远程调用该服务的
-        //   /api/search/semantic。Program.cs 优先级：
-        //   TreeGraphApi:BaseAddress > localhost:5773
+        // ★ 核心 API 与 SyncServices 分别注入：子树等核心查询走 5773，
+        //   SemanticSearchNodes 工具走独立搜索服务 5774。
         // ══════════════════════════════════════════════════════════
         if (context.TreeGraphEavApi is not null)
         {
@@ -108,9 +106,16 @@ public static class TreeGraphMafWfExtension
 
             Console.WriteLine($"[TreeGraphMafWfApi] TreeGraphEavApi 端点 → {eavEndpoint}");
         }
-        else
+
+        if (context.TreeGraphSyncServices is not null)
         {
-            Console.WriteLine("[TreeGraphMafWfApi] ⚠️ context.TreeGraphEavApi 为 null，语义搜索工具将连接 localhost:5773");
+            var syncEndpoint = context.TreeGraphSyncServices.GetEndpoint("http");
+
+            context.TreeGraphMafWfApi
+                .WaitFor(context.TreeGraphSyncServices)
+                .WithEnvironment("TreeGraphSyncServices__BaseAddress", syncEndpoint);
+
+            Console.WriteLine($"[TreeGraphMafWfApi] TreeGraphSyncServices 端点 → {syncEndpoint}");
         }
 
         // ─── 健康检查 ─────────────────────────────────────────────

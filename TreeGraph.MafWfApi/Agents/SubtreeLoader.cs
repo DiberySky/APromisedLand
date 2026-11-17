@@ -7,7 +7,7 @@ namespace TreeGraph.MafWfApi.Agents;
 
 /// <summary>
 /// 从 TreeGraph.Api 通过 HTTP 加载子树（走 SubtreeController）。
-/// 复用 SearchApiClient 已配置的 HttpClient（BaseAddress = TreeGraphEavApi）。
+/// 使用 TreeGraphApi:BaseAddress 配置的独立核心 API HttpClient。
 /// </summary>
 public sealed class SubtreeLoader
 {

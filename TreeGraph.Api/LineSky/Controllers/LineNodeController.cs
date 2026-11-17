@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.EdgeSky.Entities;
+using TreeGraph.Persistence.Data;
+using TreeGraph.Persistence.EdgeSky.Entities;
 using TreeGraph.Api.MessagingSky;
-using TreeGraph.Shared.Messaging;
+using TreeGraph.Contracts.Messaging;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 using TreeGraph.Shared.NodeSky.Entities;
 
@@ -159,11 +159,8 @@ public class LineNodeController : ControllerBase
         var id = string.IsNullOrEmpty(req.Id) ? Guid.NewGuid().ToString() : req.Id;
         var now = DateTimeOffset.UtcNow;
 
-        // NpgsqlRetryingExecutionStrategy 不支持裸用户事务：经 CreateExecutionStrategy 包成可重试单元
-        var strategy = _db.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
+        // nodes、段边与 Outbox 由请求级中间件纳入同一事务。
         {
-            await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
             var node = new Node
             {
@@ -187,14 +184,12 @@ public class LineNodeController : ControllerBase
                 await _db.SaveChangesAsync(ct);
             }
 
-            await tx.CommitAsync(ct);
-
             foreach (var evt in edgeEvents)
                 await _publishEndpoint.Publish(evt, ct);
             await PublishAsync(id, InodeChangeKind.Saved, pathAffected: false, ct);
 
-            return (IActionResult)CreatedAtAction(nameof(GetById), new { id }, ToDto(node, req.PredecessorId, null));
-        });
+            return CreatedAtAction(nameof(GetById), new { id }, ToDto(node, req.PredecessorId, null));
+        }
     }
 
     /// <summary>

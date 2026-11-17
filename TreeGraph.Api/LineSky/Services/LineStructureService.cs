@@ -1,13 +1,13 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.EdgeSky.Entities;
-using TreeGraph.Api.LineSky.Entities;
+using TreeGraph.Persistence.Data;
+using TreeGraph.Persistence.EdgeSky.Entities;
+using TreeGraph.Persistence.LineSky.Entities;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.LineSky.Dtos;
 using TreeGraph.Shared.LineSky.Entities;
-using TreeGraph.Shared.Messaging;
+using TreeGraph.Contracts.Messaging;
 using TreeGraph.Shared.NodeSky.Entities;
 
 namespace TreeGraph.Api.LineSky.Services;
@@ -165,7 +165,7 @@ public class LineStructureService
         return await ReplaceAsync(lineId, req, ct);
     }
 
-    /// <summary>全量替换：段边集 + 端子集（同事务；段边直写 edges 表，提交后发事件）。</summary>
+    /// <summary>全量替换：段边集 + 端子集；业务写入与事件由请求级事务统一提交。</summary>
     public async Task<LineStructureDto?> ReplaceAsync(
         string lineId, LineStructureRequest req, CancellationToken ct)
     {
@@ -176,12 +176,9 @@ public class LineStructureService
         var nodeIds = await LineNodeIdsAsync(lineId, ct);
         var desired = ValidateSegments(req.Segments, nodeIds);
 
-        // NpgsqlRetryingExecutionStrategy 不支持裸用户事务：经 CreateExecutionStrategy 包成可重试单元
-        var strategy = _db.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
+        // 段边、端子与 Outbox 由请求级中间件纳入同一事务。
         {
             var events = new List<EdgeChangedEvent>();
-            await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
             // 1. 段边全量替换（仅 line_segment；用户自定义分支边不动）
             var existing = nodeIds.Count == 0
@@ -210,14 +207,13 @@ public class LineStructureService
             await ReplaceTerminalsAsync(lineId, nodeIds, req.Terminals ?? [], ct);
 
             await _db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
 
-            // 事务提交后发布图同步事件（消费端回查 PG 读已提交状态）
+            // 事件写入同一请求事务的 Outbox，提交后由消费端回查 PG 已提交状态
             foreach (var evt in events)
                 await _publisher.Publish(evt, ct);
 
             return await GetAsync(lineId, ct);
-        });
+        }
     }
 
     // ============================================================

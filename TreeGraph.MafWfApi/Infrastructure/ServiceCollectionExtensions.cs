@@ -55,15 +55,15 @@ internal static class ServiceCollectionExtensions
         services.AddScoped<GraphTools>();
 
         // ★ 语义搜索客户端（GraphAgent 的 SemanticSearchNodes 工具依赖，
-        //   远程调用 TreeGraphEavApi 的 /api/search/semantic）
+        //   远程调用 TreeGraph.SyncServices 的 /api/search/semantic）
         services.AddHttpClient<SearchApiClient>(client =>
         {
             client.BaseAddress = new Uri(
-                config["TreeGraphApi:BaseAddress"] ?? "http://localhost:5773");
+                config["TreeGraphSyncServices:BaseAddress"] ?? "http://localhost:5774");
             client.Timeout = TimeSpan.FromSeconds(30);
         });
 
-        // ★ 子树加载客户端（复用 TreeGraphEavApi BaseAddress，走 /api/inode/.../subtree）
+        // ★ 子树加载客户端（TreeGraphApi BaseAddress，走核心 /api/inode/.../subtree）
         services.AddHttpClient<SubtreeLoader>(client =>
         {
             client.BaseAddress = new Uri(

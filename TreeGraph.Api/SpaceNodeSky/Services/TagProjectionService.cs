@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.GraphSyncSky.SpaceNode;
+using TreeGraph.Persistence.Data;
+using TreeGraph.GraphSync.SpaceNode;
 using TreeGraph.Api.MessagingSky;
-using TreeGraph.Api.NodeEavSky.Entities;
-using TreeGraph.Api.SpaceNodeSky.Entities;
-using TreeGraph.Shared.Messaging;
+using TreeGraph.Persistence.NodeEavSky.Entities;
+using TreeGraph.Persistence.SpaceNodeSky.Entities;
+using TreeGraph.Contracts.Messaging;
 using TreeGraph.Shared.NodeEavSky;
 using TreeGraph.Shared.SpaceNodeSky.Dtos;
 
@@ -270,6 +270,55 @@ public sealed class TagProjectionService
                 tagName, status, reason, 0));
         }
         return plan;
+    }
+
+    /// <summary>
+    /// 为核心拥有空间补齐活动投影账本。spaceId 为 null 时用于启动全量回填；
+    /// 新空间沿用兄弟空间的 Tag 名、快照与版本，图侧由 SyncServices 启动/事件对齐。
+    /// </summary>
+    public async Task<int> BackfillAsync(string? spaceId, CancellationToken ct = default)
+    {
+        var spaceIds = spaceId is null
+            ? await _db.Spaces.AsNoTracking().Select(s => s.Id).ToListAsync(ct)
+            : [spaceId];
+        if (spaceIds.Count == 0) return 0;
+
+        var rows = await _db.TagProjections.AsNoTracking().ToListAsync(ct);
+        var activeSources = rows.Where(r => !r.IsDeleted)
+            .GroupBy(r => r.SourceAttributeId)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        var now = DateTimeOffset.UtcNow;
+        var added = 0;
+
+        foreach (var id in spaceIds)
+        {
+            var ownSources = rows.Where(r => r.SpaceId == id)
+                .Select(r => r.SourceAttributeId)
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (var (sourceId, source) in activeSources)
+            {
+                if (ownSources.Contains(sourceId)) continue;
+                _db.TagProjections.Add(new TagProjection
+                {
+                    SpaceId = id,
+                    TagName = source.TagName,
+                    SourceAttributeId = source.SourceAttributeId,
+                    SourceEntityType = source.SourceEntityType,
+                    SchemaSnapshot = source.SchemaSnapshot,
+                    Version = source.Version,
+                    CreatedAt = now
+                });
+                added++;
+            }
+        }
+
+        if (added > 0)
+        {
+            await _db.SaveChangesAsync(ct);
+            _logger.LogInformation("Tag 投影账本回填完成：空间={SpaceId}，补建 {Count} 行",
+                spaceId ?? "全部", added);
+        }
+        return added;
     }
 
     // ============================================================

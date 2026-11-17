@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.EdgeSky.Entities;
-using TreeGraph.Api.GraphSyncSky;
+using TreeGraph.Persistence.Data;
+using TreeGraph.Persistence.EdgeSky.Entities;
+using TreeGraph.GraphSync;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Shared.EdgeSky.Dtos;
-using TreeGraph.Shared.Messaging;
+using TreeGraph.Contracts.Messaging;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 using TreeGraph.Shared.NodeSky.Entities;
 

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Persistence.Data;
+using TreeGraph.Persistence.NodeEavSky.Entities;
 
 namespace TreeGraph.Api.NodeEavSky.Services;
 

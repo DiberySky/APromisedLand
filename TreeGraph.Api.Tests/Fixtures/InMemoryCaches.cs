@@ -1,4 +1,4 @@
-using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Persistence.NodeEavSky.Entities;
 using TreeGraph.Api.NodeEavSky.Services;
 
 namespace TreeGraph.Api.Tests.Fixtures;

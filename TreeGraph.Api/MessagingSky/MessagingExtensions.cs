@@ -1,46 +1,40 @@
-using TreeGraph.Shared.Messaging;
+using TreeGraph.Contracts.Messaging;
 using Wolverine;
+using Wolverine.EntityFrameworkCore;
 using Wolverine.ErrorHandling;
+using Wolverine.Postgresql;
+using Wolverine.Persistence;
 using Wolverine.RabbitMQ;
 
 namespace TreeGraph.Api.MessagingSky;
 
 /// <summary>
-/// TreeGraph.Api 消息总线（Wolverine + RabbitMQ）拓扑与策略。
-///
-/// 拓扑：每事件类型一条 durable 队列，直发直收（无 exchange）：
-///   InodeChangedEvent → treegraph.inode-changed（向量同步 + 图同步两个 handler 级联消费）
-///   EdgeChangedEvent  → treegraph.edge-changed（图边同步；line_segment 段边同走此管道）
-///   SpaceNodeTagProjectionChangedEvent → treegraph.space-node-tag-projection-changed
-///     （空间节点派生 Tag 的 schema 收敛：CREATE/ALTER/DROP TAG + 条件清墓碑）
-///
-/// 消费语义：同一消息类型的多个 handler 由 Wolverine 合并为一个逻辑 handler 串行执行；
-/// 任一失败整条消息按 RetryWithCooldown 重放，消费端 IMemoryCache 去重窗口 + 幂等同步器兜底
-/// （与原 MassTransit 指数重试 5 次语义对齐）；用尽后进入 wolverine-dead-letter-queue。
+/// 核心只发布业务变更并接收投影侧反向清理命令。
+/// 业务数据与 PostgreSQL Outbox 共用请求事务；RabbitMQ 提供 at-least-once 投递，
+/// 持久化 Inbox 与幂等 handler 处理重复消息，不宣称端到端 exactly-once。
 /// </summary>
 public static class MessagingExtensions
 {
     public static WolverineOptions UseTreeGraphMessaging(
         this WolverineOptions opts, IConfiguration config)
     {
-        // 无持久化存储（无 EF 收件箱/发件箱），显式 Solo 避免 leader election 语义
-        opts.Durability.Mode = DurabilityMode.Solo;
+        opts.PersistMessagesWithPostgresqlUsingNamedConnection("TreeGraphDb", "wolverine");
+        opts.UseEntityFrameworkCoreTransactions(TransactionMiddlewareMode.Lightweight);
+        opts.Policies.AutoApplyTransactions();
 
-        // 连接优先级：ConnectionStrings:RabbitMQ（Aspire 注入）> 本地回退 amqp://localhost:5672
         var rabbitUri = config.GetConnectionString("RabbitMQ") ?? "amqp://localhost:5672";
         opts.UseRabbitMq(new Uri(rabbitUri)).AutoProvision();
 
-        opts.PublishMessage<InodeChangedEvent>().ToRabbitQueue("treegraph.inode-changed");
-        opts.ListenToRabbitQueue("treegraph.inode-changed");
-
-        opts.PublishMessage<EdgeChangedEvent>().ToRabbitQueue("treegraph.edge-changed");
-        opts.ListenToRabbitQueue("treegraph.edge-changed");
-
+        opts.PublishMessage<InodeChangedEvent>().ToRabbitQueue(MessagingQueueNames.InodeChanged);
+        opts.PublishMessage<EdgeChangedEvent>().ToRabbitQueue(MessagingQueueNames.EdgeChanged);
+        opts.PublishMessage<EntityChangedEvent>().ToRabbitQueue(MessagingQueueNames.EntityChanged);
         opts.PublishMessage<SpaceNodeTagProjectionChangedEvent>()
-            .ToRabbitQueue("treegraph.space-node-tag-projection-changed");
-        opts.ListenToRabbitQueue("treegraph.space-node-tag-projection-changed");
+            .ToRabbitQueue(MessagingQueueNames.TagProjectionChanged);
 
-        // 对齐原 MassTransit 指数重试 5 次（min 1s / max 1m）
+        opts.ListenToRabbitQueue(MessagingQueueNames.TagProjectionCleanup);
+
+        opts.Policies.UseDurableInboxOnAllListeners();
+        opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
         opts.Policies.OnAnyException().RetryWithCooldown(
             TimeSpan.FromSeconds(1),
             TimeSpan.FromSeconds(5),
@@ -48,7 +42,6 @@ public static class MessagingExtensions
             TimeSpan.FromSeconds(30),
             TimeSpan.FromMinutes(1));
 
-        // IMessageBus 在 Wolverine DI 中为 Scoped，IEventPublisher 必须同为 Scoped
         opts.Services.AddScoped<IEventPublisher, WolverineEventPublisher>();
 
         return opts;

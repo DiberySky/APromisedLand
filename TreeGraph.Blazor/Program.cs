@@ -71,16 +71,30 @@ builder.Services.AddResponsive();
 builder.Services.AddSingleton<IEavFieldValidator, EavFieldValidator>();
 builder.Services.AddScoped<EntityTypeDisplayService>();
 
-// ★ EavApiClient：通过 Aspire 服务发现访问 treegrapheavapi。
-//   弹性策略（禁止重试、超时、熔断器采样窗口）统一由 NonIdempotentResilience 提供，
-//   与 TreeEavSky 客户端保持一致，避免同一后端操作在不同客户端上行为不同。
+// ★ EavApiClient：业务调用走核心 treegrapheavapi；搜索、向量对账、图同步走独立 SyncServices。
+//   两个命名 HttpClient 均通过 Aspire 服务发现解析，并沿用同一套非幂等请求弹性策略。
 builder.Services
-    .AddHttpClient<EavApiClient>(client =>
+    .AddHttpClient("treegrapheavapi", client =>
     {
         client.BaseAddress = new Uri("https+http://treegrapheavapi");
     })
     .RemoveAllResilienceHandlers()
     .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+builder.Services
+    .AddHttpClient("treegraphsyncservices", client =>
+    {
+        client.BaseAddress = new Uri("https+http://treegraphsyncservices");
+    })
+    .RemoveAllResilienceHandlers()
+    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+builder.Services.AddTransient(sp =>
+{
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    return new EavApiClient(
+        factory.CreateClient("treegrapheavapi"),
+        factory.CreateClient("treegraphsyncservices"),
+        sp.GetRequiredService<ILogger<EavApiClient>>());
+});
 
 // ★ LineSky 客户端：与 EavApiClient 同一后端、同款弹性策略。
 builder.Services

@@ -4,7 +4,7 @@ using TreeGraph.Shared.NodeEavSky.Dtos;
 namespace TreeGraph.MafWfApi.Services;
 
 /// <summary>
-/// TreeGraph.Api 语义搜索客户端（/api/search/semantic）。
+/// TreeGraph.SyncServices 语义搜索客户端（/api/search/semantic）。
 /// 响应为全局信封 { success, data }，此处直接解析 data.items。
 /// </summary>
 public sealed class SearchApiClient

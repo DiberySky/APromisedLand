@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.EdgeSky.Entities;
-using TreeGraph.Api.SpaceSky.Entities;
+using TreeGraph.Persistence.Data;
+using TreeGraph.Persistence.EdgeSky.Entities;
+using TreeGraph.Persistence.SpaceSky.Entities;
 using TreeGraph.Shared.EdgeSky;
 
 namespace TreeGraph.Api.Tests.Fixtures;

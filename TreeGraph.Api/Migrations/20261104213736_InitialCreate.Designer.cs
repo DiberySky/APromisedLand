@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using TreeGraph.Api.Data;
+using TreeGraph.Persistence.Data;
 
 #nullable disable
 
@@ -26,7 +26,7 @@ namespace TreeGraph.Api.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.Edge", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.EdgeSky.Entities.Edge", b =>
                 {
                     b.Property<string>("SpaceId")
                         .HasMaxLength(36)
@@ -81,7 +81,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("edges", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeType", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.EdgeSky.Entities.EdgeType", b =>
                 {
                     b.Property<string>("SpaceId")
                         .HasMaxLength(36)
@@ -132,7 +132,7 @@ namespace TreeGraph.Api.Migrations
                         });
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeTypeProp", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.EdgeSky.Entities.EdgeTypeProp", b =>
                 {
                     b.Property<string>("SpaceId")
                         .HasMaxLength(36)
@@ -185,7 +185,7 @@ namespace TreeGraph.Api.Migrations
                         });
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineTerminal", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.LineSky.Entities.LineTerminal", b =>
                 {
                     b.Property<string>("LineId")
                         .HasMaxLength(36)
@@ -224,7 +224,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("line_terminals", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeAuditLog", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.AttributeAuditLog", b =>
                 {
                     b.Property<string>("AuditId")
                         .ValueGeneratedOnAdd()
@@ -297,7 +297,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("attribute_audit_log", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.AttributeDefinition", b =>
                 {
                     b.Property<string>("AttributeId")
                         .ValueGeneratedOnAdd()
@@ -407,7 +407,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("attribute_catalog", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeValue", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.AttributeValue", b =>
                 {
                     b.Property<string>("ValueId")
                         .ValueGeneratedOnAdd()
@@ -530,7 +530,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("attribute_values", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeFieldDefinition", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.CompositeFieldDefinition", b =>
                 {
                     b.Property<string>("FieldId")
                         .ValueGeneratedOnAdd()
@@ -626,7 +626,7 @@ namespace TreeGraph.Api.Migrations
                         });
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.CompositeTypeDefinition", b =>
                 {
                     b.Property<string>("CompositeTypeId")
                         .ValueGeneratedOnAdd()
@@ -676,7 +676,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("composite_type_definitions", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableColumn", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.CustomTableColumn", b =>
                 {
                     b.Property<string>("ColumnId")
                         .ValueGeneratedOnAdd()
@@ -762,7 +762,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("custom_table_columns", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.CustomTableDefinition", b =>
                 {
                     b.Property<string>("TableDefinitionId")
                         .ValueGeneratedOnAdd()
@@ -820,7 +820,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("custom_table_definitions", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableRow", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.CustomTableRow", b =>
                 {
                     b.Property<string>("RowId")
                         .ValueGeneratedOnAdd()
@@ -891,7 +891,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("custom_table_rows", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EavTreeRoot", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.EavTreeRoot", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(36)
@@ -931,7 +931,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("eav_tree_roots", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EntityTypeDefinition", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.EntityTypeDefinition", b =>
                 {
                     b.Property<string>("EntityTypeId")
                         .ValueGeneratedOnAdd()
@@ -983,7 +983,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("entity_type_catalog", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.InodeEntity", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.InodeEntity", b =>
                 {
                     b.Property<string>("BindingId")
                         .HasMaxLength(36)
@@ -1038,7 +1038,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("inode_entity", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.InodeEntityType", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.InodeEntityType", b =>
                 {
                     b.Property<string>("InodeId")
                         .HasMaxLength(36)
@@ -1065,7 +1065,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("inode_entitytype", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.LocationAttributeValue", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.LocationAttributeValue", b =>
                 {
                     b.Property<string>("ValueId")
                         .ValueGeneratedOnAdd()
@@ -1138,7 +1138,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("location_attribute_values", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionItem", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.OptionItem", b =>
                 {
                     b.Property<string>("OptionItemId")
                         .ValueGeneratedOnAdd()
@@ -1193,7 +1193,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("option_items", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionSet", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.OptionSet", b =>
                 {
                     b.Property<string>("OptionSetId")
                         .ValueGeneratedOnAdd()
@@ -1242,7 +1242,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("option_sets", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.SpaceNodeSky.Entities.SpaceNode", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.SpaceNodeSky.Entities.SpaceNode", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(36)
@@ -1271,7 +1271,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("space_nodes", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.SpaceNodeSky.Entities.TagProjection", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.SpaceNodeSky.Entities.TagProjection", b =>
                 {
                     b.Property<string>("SpaceId")
                         .HasMaxLength(36)
@@ -1328,7 +1328,7 @@ namespace TreeGraph.Api.Migrations
                     b.ToTable("tag_projections", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.SpaceSky.Entities.Space", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.SpaceSky.Entities.Space", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(36)
@@ -2997,7 +2997,7 @@ namespace TreeGraph.Api.Migrations
                         });
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.Edge", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.EdgeSky.Entities.Edge", b =>
                 {
                     b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
                         .WithMany()
@@ -3013,7 +3013,7 @@ namespace TreeGraph.Api.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_edges_src_node");
 
-                    b.HasOne("TreeGraph.Api.EdgeSky.Entities.EdgeType", null)
+                    b.HasOne("TreeGraph.Persistence.EdgeSky.Entities.EdgeType", null)
                         .WithMany()
                         .HasForeignKey("SpaceId", "EdgeType")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -3021,9 +3021,9 @@ namespace TreeGraph.Api.Migrations
                         .HasConstraintName("fk_edges_edge_type");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeType", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.EdgeSky.Entities.EdgeType", b =>
                 {
-                    b.HasOne("TreeGraph.Api.SpaceSky.Entities.Space", null)
+                    b.HasOne("TreeGraph.Persistence.SpaceSky.Entities.Space", null)
                         .WithMany()
                         .HasForeignKey("SpaceId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -3031,9 +3031,9 @@ namespace TreeGraph.Api.Migrations
                         .HasConstraintName("fk_edge_types_space");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeTypeProp", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.EdgeSky.Entities.EdgeTypeProp", b =>
                 {
-                    b.HasOne("TreeGraph.Api.EdgeSky.Entities.EdgeType", "EdgeType")
+                    b.HasOne("TreeGraph.Persistence.EdgeSky.Entities.EdgeType", "EdgeType")
                         .WithMany("Props")
                         .HasForeignKey("SpaceId", "EdgeTypeName")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -3042,7 +3042,7 @@ namespace TreeGraph.Api.Migrations
                     b.Navigation("EdgeType");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineTerminal", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.LineSky.Entities.LineTerminal", b =>
                 {
                     b.HasOne("TreeGraph.Shared.LineSky.Entities.Line", null)
                         .WithMany()
@@ -3058,19 +3058,19 @@ namespace TreeGraph.Api.Migrations
                         .HasConstraintName("fk_lt_node");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.AttributeDefinition", b =>
                 {
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
                         .WithMany()
                         .HasForeignKey("RefCompositeTypeId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.OptionSet", "RefOptionSet")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.OptionSet", "RefOptionSet")
                         .WithMany()
                         .HasForeignKey("RefOptionSetId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "RefTableDefinition")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.CustomTableDefinition", "RefTableDefinition")
                         .WithMany()
                         .HasForeignKey("RefTableDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict);
@@ -3082,9 +3082,9 @@ namespace TreeGraph.Api.Migrations
                     b.Navigation("RefTableDefinition");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeValue", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.AttributeValue", b =>
                 {
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", "Attribute")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.AttributeDefinition", "Attribute")
                         .WithMany()
                         .HasForeignKey("AttributeId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -3093,20 +3093,20 @@ namespace TreeGraph.Api.Migrations
                     b.Navigation("Attribute");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeFieldDefinition", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.CompositeFieldDefinition", b =>
                 {
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "CompositeType")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.CompositeTypeDefinition", "CompositeType")
                         .WithMany("Fields")
                         .HasForeignKey("CompositeTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
                         .WithMany()
                         .HasForeignKey("RefCompositeTypeId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.OptionSet", "RefOptionSet")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.OptionSet", "RefOptionSet")
                         .WithMany()
                         .HasForeignKey("RefOptionSetId")
                         .OnDelete(DeleteBehavior.Restrict);
@@ -3118,14 +3118,14 @@ namespace TreeGraph.Api.Migrations
                     b.Navigation("RefOptionSet");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableColumn", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.CustomTableColumn", b =>
                 {
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
                         .WithMany()
                         .HasForeignKey("RefCompositeTypeId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "Table")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.CustomTableDefinition", "Table")
                         .WithMany("Columns")
                         .HasForeignKey("TableDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -3136,15 +3136,15 @@ namespace TreeGraph.Api.Migrations
                     b.Navigation("Table");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableRow", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.CustomTableRow", b =>
                 {
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", "Attribute")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.AttributeDefinition", "Attribute")
                         .WithMany()
                         .HasForeignKey("AttributeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "Table")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.CustomTableDefinition", "Table")
                         .WithMany()
                         .HasForeignKey("TableDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -3155,9 +3155,9 @@ namespace TreeGraph.Api.Migrations
                     b.Navigation("Table");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EavTreeRoot", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.EavTreeRoot", b =>
                 {
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.InodeEntity", "Binding")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.InodeEntity", "Binding")
                         .WithMany()
                         .HasForeignKey("BindingId")
                         .OnDelete(DeleteBehavior.Restrict);
@@ -3165,9 +3165,9 @@ namespace TreeGraph.Api.Migrations
                     b.Navigation("Binding");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.LocationAttributeValue", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.LocationAttributeValue", b =>
                 {
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", "Attribute")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.AttributeDefinition", "Attribute")
                         .WithMany()
                         .HasForeignKey("AttributeId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -3176,9 +3176,9 @@ namespace TreeGraph.Api.Migrations
                     b.Navigation("Attribute");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionItem", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.OptionItem", b =>
                 {
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.OptionSet", "OptionSet")
+                    b.HasOne("TreeGraph.Persistence.NodeEavSky.Entities.OptionSet", "OptionSet")
                         .WithMany("Items")
                         .HasForeignKey("OptionSetId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -3187,16 +3187,16 @@ namespace TreeGraph.Api.Migrations
                     b.Navigation("OptionSet");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.SpaceNodeSky.Entities.SpaceNode", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.SpaceNodeSky.Entities.SpaceNode", b =>
                 {
                     b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", "Node")
                         .WithOne()
-                        .HasForeignKey("TreeGraph.Api.SpaceNodeSky.Entities.SpaceNode", "Id")
+                        .HasForeignKey("TreeGraph.Persistence.SpaceNodeSky.Entities.SpaceNode", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_space_nodes_node");
 
-                    b.HasOne("TreeGraph.Api.SpaceSky.Entities.Space", null)
+                    b.HasOne("TreeGraph.Persistence.SpaceSky.Entities.Space", null)
                         .WithMany()
                         .HasForeignKey("SpaceId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -3206,9 +3206,9 @@ namespace TreeGraph.Api.Migrations
                     b.Navigation("Node");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.SpaceNodeSky.Entities.TagProjection", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.SpaceNodeSky.Entities.TagProjection", b =>
                 {
-                    b.HasOne("TreeGraph.Api.SpaceSky.Entities.Space", null)
+                    b.HasOne("TreeGraph.Persistence.SpaceSky.Entities.Space", null)
                         .WithMany()
                         .HasForeignKey("SpaceId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -3218,7 +3218,7 @@ namespace TreeGraph.Api.Migrations
 
             modelBuilder.Entity("TreeGraph.Shared.LineSky.Entities.Line", b =>
                 {
-                    b.HasOne("TreeGraph.Api.SpaceSky.Entities.Space", null)
+                    b.HasOne("TreeGraph.Persistence.SpaceSky.Entities.Space", null)
                         .WithMany()
                         .HasForeignKey("SpaceId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -3311,22 +3311,22 @@ namespace TreeGraph.Api.Migrations
                     b.Navigation("Parent");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeType", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.EdgeSky.Entities.EdgeType", b =>
                 {
                     b.Navigation("Props");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.CompositeTypeDefinition", b =>
                 {
                     b.Navigation("Fields");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.CustomTableDefinition", b =>
                 {
                     b.Navigation("Columns");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionSet", b =>
+            modelBuilder.Entity("TreeGraph.Persistence.NodeEavSky.Entities.OptionSet", b =>
                 {
                     b.Navigation("Items");
                 });

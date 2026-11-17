@@ -1,6 +1,10 @@
 using System.Net;
 using System.Text;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using TreeGraph.MafWfApi.Agents;
+using TreeGraph.MafWfApi.Infrastructure;
 using TreeGraph.MafWfApi.Services;
 using Xunit;
 
@@ -114,5 +118,46 @@ public class SearchApiClientTests
 
         Assert.NotNull(result);
         Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public void HttpClient地址_搜索走SyncServices_子树走核心()
+    {
+        using var provider = BuildServices(new Dictionary<string, string?>
+        {
+            ["TreeGraphApi:BaseAddress"] = "http://core.example:5773/",
+            ["TreeGraphSyncServices:BaseAddress"] = "http://sync.example:5774/"
+        });
+        var factory = provider.GetRequiredService<IHttpClientFactory>();
+
+        using var search = factory.CreateClient(nameof(SearchApiClient));
+        using var subtree = factory.CreateClient(nameof(SubtreeLoader));
+
+        Assert.Equal(new Uri("http://sync.example:5774/"), search.BaseAddress);
+        Assert.Equal(new Uri("http://core.example:5773/"), subtree.BaseAddress);
+    }
+
+    [Fact]
+    public void HttpClient地址_未配置时分别回退5774与5773()
+    {
+        using var provider = BuildServices([]);
+        var factory = provider.GetRequiredService<IHttpClientFactory>();
+
+        using var search = factory.CreateClient(nameof(SearchApiClient));
+        using var subtree = factory.CreateClient(nameof(SubtreeLoader));
+
+        Assert.Equal(new Uri("http://localhost:5774"), search.BaseAddress);
+        Assert.Equal(new Uri("http://localhost:5773"), subtree.BaseAddress);
+    }
+
+    private static ServiceProvider BuildServices(Dictionary<string, string?> values)
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(values)
+            .Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddGraphDomainServices(config);
+        return services.BuildServiceProvider();
     }
 }

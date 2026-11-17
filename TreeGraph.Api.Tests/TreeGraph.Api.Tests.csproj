@@ -22,6 +22,9 @@
 
     <ItemGroup>
         <ProjectReference Include="..\TreeGraph.Api\TreeGraph.Api.csproj" />
+        <ProjectReference Include="..\TreeGraph.Contracts\TreeGraph.Contracts.csproj" />
+        <ProjectReference Include="..\TreeGraph.GraphSync\TreeGraph.GraphSync.csproj" />
+        <ProjectReference Include="..\TreeGraph.Persistence\TreeGraph.Persistence.csproj" />
         <ProjectReference Include="..\TreeGraph.Shared\TreeGraph.Shared.csproj" />
     </ItemGroup>
 

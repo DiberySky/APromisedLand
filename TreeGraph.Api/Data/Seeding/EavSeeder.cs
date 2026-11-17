@@ -1,4 +1,4 @@
-using TreeGraph.Api.Data;
+using TreeGraph.Persistence.Data;
 
 namespace TreeGraph.Api.Data.Seeding;
 

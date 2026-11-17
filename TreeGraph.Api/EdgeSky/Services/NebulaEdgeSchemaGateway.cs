@@ -1,7 +1,8 @@
 using System.IO;
 using System.Net.Http;
-using TreeGraph.Api.EdgeSky.Entities;
-using TreeGraph.Api.GraphSyncSky;
+using TreeGraph.Persistence.EdgeSky.Entities;
+using TreeGraph.GraphSync;
+using TreeGraph.GraphSync.Edge;
 
 namespace TreeGraph.Api.EdgeSky.Services;
 

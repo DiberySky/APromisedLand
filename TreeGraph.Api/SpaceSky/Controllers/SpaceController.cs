@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.GraphSyncSky;
+using TreeGraph.Persistence.Data;
 using TreeGraph.Api.MessagingSky;
-using TreeGraph.Api.SpaceSky.Entities;
-using TreeGraph.Shared.Messaging;
+using TreeGraph.Api.SpaceNodeSky.Services;
+using TreeGraph.Persistence.SpaceSky.Entities;
+using TreeGraph.Contracts.Messaging;
 using TreeGraph.Shared.TreeEavSky.Entities;
 
 namespace TreeGraph.Api.SpaceSky.Controllers;
@@ -16,7 +16,7 @@ namespace TreeGraph.Api.SpaceSky.Controllers;
 [Route("[controller]")]
 public class SpaceController(
     TreeGraphDbContext db, IEventPublisher publisher,
-    GraphSchemaInitializer graphSchema) : ControllerBase
+    TagProjectionService tagProjections) : ControllerBase
 {
     // GET /Space
     [HttpGet]
@@ -68,8 +68,8 @@ public class SpaceController(
 
         // 内置边类型不再随空间创建自动补种：由「关系设置 → 创建默认边（预置关系）」按需创建
 
-        // 新空间即时补图 schema（CREATE SPACE + tag + 边类型；best-effort，失败由启动对齐兜底）
-        await graphSchema.EnsureSpaceSchemaAsync(space.Id, cancellationToken);
+        // 核心补齐新空间的投影账本；图 schema 由 SyncServices 消费下方事件后幂等对齐。
+        await tagProjections.BackfillAsync(space.Id, cancellationToken);
 
         // ★ 语义搜索：空间根节点新增 → 即时同步向量（消费端幂等；根节点 isSpaceNode 无节点向量，仅占位）
         await publisher.Publish(new InodeChangedEvent
@@ -185,11 +185,12 @@ public class SpaceController(
             if (rootNode != null) db.Nodes.Remove(rootNode);
         }
 
+        var projections = await db.TagProjections
+            .Where(p => p.SpaceId == id)
+            .ToListAsync(cancellationToken);
+        db.TagProjections.RemoveRange(projections);
         db.Spaces.Remove(space);
         await db.SaveChangesAsync(cancellationToken);
-
-        // 图空间同步删除（DROP SPACE；best-effort，失败仅记日志）
-        await graphSchema.DropSpaceSchemaAsync(id, cancellationToken);
 
         // ★ 语义搜索：空间根节点已删除 → 消费端据 InodeId 清除残留向量
         await publisher.Publish(new InodeChangedEvent

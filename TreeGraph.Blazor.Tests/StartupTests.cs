@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
+using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using Xunit;
 
 namespace TreeGraph.Blazor.Tests;
@@ -50,6 +51,21 @@ public class StartupTests : IClassFixture<BlazorAppFactory>
         // MapDefaultEndpoints 在 Development 环境注册 /alive；
         // 若注册未生效（环境判断出错），会 404，我们把它视为异常。
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+    }
+
+    [Fact]
+    public void EavApiClient_核心与SyncServices使用不同服务发现地址()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var factory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
+
+        var eav = scope.ServiceProvider.GetRequiredService<EavApiClient>();
+        using var core = factory.CreateClient("treegrapheavapi");
+        using var sync = factory.CreateClient("treegraphsyncservices");
+
+        Assert.NotNull(eav);
+        Assert.Equal(new Uri("https+http://treegrapheavapi"), core.BaseAddress);
+        Assert.Equal(new Uri("https+http://treegraphsyncservices"), sync.BaseAddress);
     }
 
 #if DEBUG

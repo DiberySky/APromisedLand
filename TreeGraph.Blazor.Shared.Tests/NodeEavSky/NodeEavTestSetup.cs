@@ -28,7 +28,7 @@ internal static class NodeEavTestSetup
             BaseAddress = new Uri("https://test/")
         };
         services.AddSingleton(new EavApiClient(
-            http, NullLogger<EavApiClient>.Instance));
+            http, http, NullLogger<EavApiClient>.Instance));
         services.AddScoped<EntityTypeDisplayService>();
         services.AddScoped<IEavFieldValidator, EavFieldValidator>();
 

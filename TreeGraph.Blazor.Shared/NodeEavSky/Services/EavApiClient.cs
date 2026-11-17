@@ -15,11 +15,16 @@ public class EavApiClient
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _http;
+    private readonly HttpClient _syncServicesHttp;
     private readonly ILogger<EavApiClient> _logger;
 
-    public EavApiClient(HttpClient http, ILogger<EavApiClient> logger)
+    public EavApiClient(
+        HttpClient http,
+        HttpClient syncServicesHttp,
+        ILogger<EavApiClient> logger)
     {
         _http = http;
+        _syncServicesHttp = syncServicesHttp;
         _logger = logger;
     }
 
@@ -517,18 +522,18 @@ public class EavApiClient
             orders, ct);
 
     // ============================================================
-    // 语义搜索（直接调用 TreeGraphEavApi）
+    // 搜索、向量对账与图同步（独立 TreeGraph.SyncServices）
     // ============================================================
 
     /// <summary>
     /// 语义搜索（向量相似度匹配）。
-    /// 直接调用 TreeGraphEavApi 的 /api/search/semantic，不经过 MafWfApi Agent。
+    /// 直接调用 TreeGraph.SyncServices 的 /api/search/semantic，不经过 MafWfApi Agent。
     /// </summary>
     public async Task<SemanticSearchResponse?> SemanticSearchAsync(
         SemanticSearchRequest request, CancellationToken ct = default)
     {
         var resp = await PostAsync<SemanticSearchResponse>(
-            "api/search/semantic", request, ct);
+            "api/search/semantic", request, ct, _syncServicesHttp);
         return resp;
     }
 
@@ -553,7 +558,7 @@ public class EavApiClient
         var url = query.Count == 0
             ? "api/search/reconcile"
             : $"api/search/reconcile?{string.Join("&", query)}";
-        return PostNoBodyAsync<VectorReconcileResultDto>(url, ct);
+        return PostNoBodyAsync<VectorReconcileResultDto>(url, ct, _syncServicesHttp);
     }
 
     /// <summary>
@@ -582,7 +587,7 @@ public class EavApiClient
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, url);
-            using var resp = await _http.SendAsync(
+            using var resp = await _syncServicesHttp.SendAsync(
                 request, HttpCompletionOption.ResponseHeadersRead, ct);
             if (!resp.IsSuccessStatusCode)
             {
@@ -637,7 +642,7 @@ public class EavApiClient
     public Task<GraphCategorySyncResultDto?> SyncGraphCategoryAsync(
         string category, CancellationToken ct = default)
         => PostNoBodyAsync<GraphCategorySyncResultDto>(
-            $"api/graph-sync/category/{Uri.EscapeDataString(category)}", ct);
+            $"api/graph-sync/category/{Uri.EscapeDataString(category)}", ct, _syncServicesHttp);
 
     /// <summary>
     /// 按空间图同步（delete + insert）：DROP SPACE → 重建 schema → 全量装载该空间顶点/边写入 NebulaGraph。
@@ -645,7 +650,7 @@ public class EavApiClient
     public Task<GraphCategorySyncResultDto?> SyncSpaceGraphAsync(
         string spaceId, CancellationToken ct = default)
         => PostNoBodyAsync<GraphCategorySyncResultDto>(
-            $"api/graph-sync/space/{Uri.EscapeDataString(spaceId)}", ct);
+            $"api/graph-sync/space/{Uri.EscapeDataString(spaceId)}", ct, _syncServicesHttp);
 
     // ============================================================
     // 通用助手
@@ -706,11 +711,12 @@ public class EavApiClient
     }
 
     private async Task<T?> PostAsync<T>(
-        string relativeUrl, object body, CancellationToken ct) where T : class
+        string relativeUrl, object body, CancellationToken ct,
+        HttpClient? http = null) where T : class
     {
         try
         {
-            var resp = await _http.PostAsJsonAsync(relativeUrl, body, JsonOptions, ct);
+            var resp = await (http ?? _http).PostAsJsonAsync(relativeUrl, body, JsonOptions, ct);
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.LogWarning("POST {Url} → {Status}", relativeUrl, resp.StatusCode);
@@ -792,11 +798,12 @@ public class EavApiClient
 
     /// <summary>带响应体的无 Body POST（解包统一信封的 data；失败返回 default）。</summary>
     private async Task<T?> PostNoBodyAsync<T>(
-        string relativeUrl, CancellationToken ct) where T : class
+        string relativeUrl, CancellationToken ct,
+        HttpClient? http = null) where T : class
     {
         try
         {
-            var resp = await _http.PostAsync(relativeUrl, content: null, ct);
+            var resp = await (http ?? _http).PostAsync(relativeUrl, content: null, ct);
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.LogWarning("POST {Url} → {Status}", relativeUrl, resp.StatusCode);

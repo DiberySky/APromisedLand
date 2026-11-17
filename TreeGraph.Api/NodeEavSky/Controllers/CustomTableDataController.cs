@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.Services;
-using TreeGraph.Shared.Messaging;
+using TreeGraph.Contracts.Messaging;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
 namespace TreeGraph.Api.NodeEavSky.Controllers;

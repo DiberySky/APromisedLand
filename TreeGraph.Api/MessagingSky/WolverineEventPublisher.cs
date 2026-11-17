@@ -1,14 +1,23 @@
-using Wolverine;
+using TreeGraph.Persistence.Data;
+using Wolverine.EntityFrameworkCore;
 
 namespace TreeGraph.Api.MessagingSky;
 
 /// <summary>
-/// IEventPublisher 的 Wolverine 实现：委托 <see cref="IMessageBus"/> 路由发布。
-/// 注意：Wolverine 6.x <c>PublishAsync</c> 无 CancellationToken 重载，
-/// 接口上的 ct 仅为调用点签名兼容，不向前透传。
+/// 将业务事件写入当前 <see cref="TreeGraphDbContext"/> 的持久化 Outbox。
+/// 请求中间件负责提交事务并 flush；此处不向 RabbitMQ 即时发送。
 /// </summary>
-public sealed class WolverineEventPublisher(IMessageBus bus) : IEventPublisher
+public sealed class WolverineEventPublisher : IEventPublisher
 {
+    private readonly IDbContextOutbox _outbox;
+
+    public WolverineEventPublisher(
+        IDbContextOutbox outbox, TreeGraphDbContext db)
+    {
+        _outbox = outbox;
+        _outbox.Enroll(db);
+    }
+
     public Task Publish<T>(T message, CancellationToken ct = default)
-        => bus.PublishAsync(message).AsTask();
+        => _outbox.PublishAsync(message).AsTask();
 }

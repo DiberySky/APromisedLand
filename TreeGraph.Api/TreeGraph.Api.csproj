@@ -8,7 +8,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.64.0" />
+        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.64.1" />
+        <PackageReference Include="WolverineFx.EntityFrameworkCore" Version="6.64.1" />
+        <PackageReference Include="WolverineFx.Postgresql" Version="6.64.1" />
         <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.64.1" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0" />
         <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.6.5" />
@@ -17,11 +19,14 @@
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Qdrant.Client" Version="1.20.0" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\APromisedLand.ServiceDefaults\APromisedLand.ServiceDefaults.csproj" />
+      <ProjectReference Include="..\TreeGraph.Contracts\TreeGraph.Contracts.csproj" />
+      <ProjectReference Include="..\TreeGraph.Persistence\TreeGraph.Persistence.csproj" />
+      <ProjectReference Include="..\TreeGraph.GraphSync\TreeGraph.GraphSync.csproj" />
+      <ProjectReference Include="..\TreeGraph.WebShared\TreeGraph.WebShared.csproj" />
       <ProjectReference Include="..\TreeGraph.Shared\TreeGraph.Shared.csproj" />
     </ItemGroup>
 

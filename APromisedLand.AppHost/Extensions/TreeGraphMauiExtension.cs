@@ -51,6 +51,8 @@ public static class TreeGraphMauiExtension
             // ★ EAV API 服务发现引用（Android 模拟器经 adb reverse 可达宿主端口）
             if (ctx.TreeGraphEavApi is not null)
                 device.WithReference(ctx.TreeGraphEavApi);
+            if (ctx.TreeGraphSyncServices is not null)
+                device.WithReference(ctx.TreeGraphSyncServices);
 
             // ★ OTLP 导出（跨设备不可达时可改用 WithOtlpDevTunnel()）
             device.WithOtlpExporter();

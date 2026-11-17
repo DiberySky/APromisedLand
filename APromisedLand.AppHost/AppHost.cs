@@ -29,12 +29,12 @@ void TreeGraph()
     //   (SeaweedMaster/Volume/Filer/S3 容器组，由 SeaweedFsExtension 声明)
     builder.AddSeaweedFs(context);
 
-    // ★ 语义搜索基础设施（TreeGraphEavApi 的依赖，需先声明）
+    // ★ 语义搜索基础设施（TreeGraph.SyncServices 的依赖，需先声明）
     builder.AddRabbitMq(context);
     builder.AddQdrant(context);
 
     // ★ vLLM Chat/Embedding 容器（MAF 依赖；语义搜索向量化依赖 vllm-embed:5719）
-    //   必须在 AddTreeGraphEavApi 之前声明，以便注入 Embedding__Endpoint 并 WaitFor。
+    //   必须在 AddTreeGraphSyncServices 之前声明，以便注入 Embedding__Endpoint 并 WaitFor。
     builder.AddVllm(context);
 
     // ★ TreeGraph 文件存储 API(独立微服务,固定端口 5326,
@@ -43,14 +43,17 @@ void TreeGraph()
     //   需要注入 FileStorageApi 端点地址。
     builder.AddTreeGraphFileStorageApi(context);
 
-    // ★ EAV 动态类型 API(复用 TreeGraphDb,固定端口 5773)
+    // ★ EAV 动态类型核心 API(复用 TreeGraphDb,固定端口 5773)
     builder.AddTreeGraphEavApi(context);
+
+    // ★ 搜索、向量同步/对账与图同步独立服务(固定端口 5774，等待核心迁移/健康完成)
+    builder.AddTreeGraphSyncServices(context);
 
     // ★ TreeGraph.MafWfApi:MAF + Workflow 服务 API(vLLM 版,固定端口 5323,
     //   替代已停用的旧 MAFWorkFlowApi)
     builder.AddTreeGraphMafWfApi(context);
 
-    // ★ TreeGraph 管理台 Blazor Server(固定端口 5783,引用 EavApi + FileStorageApi + MafWfApi)
+    // ★ TreeGraph 管理台 Blazor Server(固定端口 5783,引用 EavApi + SyncServices + FileStorageApi + MafWfApi)
     //   必须在 AddTreeGraphMafWfApi 之后调用：否则扩展内 WithReference(TreeGraphMafWfApi)
     //   因资源尚未声明被条件跳过，Blazor 服务发现无法解析 treegraphmafwfapi。
     builder.AddTreeGraphBlazor(context);

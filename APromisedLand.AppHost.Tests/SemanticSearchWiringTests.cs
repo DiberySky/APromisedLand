@@ -8,19 +8,21 @@ namespace APromisedLand.AppHost.Tests;
 
 /// <summary>
 /// 语义搜索编排接线回归测试（模型级，不启动 Docker/DCP）：
-///   - Qdrant 资源：固定端口、数据卷、/healthz 探针、Persistent
-///   - TreeGraphEavApi：RabbitMQ / Qdrant / VllmEmbed 依赖链与环境变量注入
-///   - TreeGraphMafWfApi：TreeGraphEavApi 端点注入（SemanticSearchNodes 工具）
-/// 这些接线改坏编译不报错，只有运行时才发现。
+/// 核心 API 只保留业务依赖，SyncServices 独立承载搜索/同步并等待核心健康，
+/// MafWfApi 与 Blazor 同时获得核心和 SyncServices 两个不同地址。
 /// </summary>
 public class SemanticSearchWiringTests
 {
-    private static (
+    private sealed record Wiring(
         IResource EavApi,
+        IResource SyncServices,
         IResource MafWfApi,
+        IResource Blazor,
         QdrantServerResource Qdrant,
         IResourceWithConnectionString RabbitMq,
-        ContainerResource VllmEmbed) Build()
+        ContainerResource VllmEmbed);
+
+    private static Wiring Build()
     {
         var builder = DistributedApplication.CreateBuilder();
         var context = new AppHostResourceContext();
@@ -31,29 +33,27 @@ public class SemanticSearchWiringTests
         builder.AddQdrant(context);
         builder.AddVllm(context);
         builder.AddTreeGraphEavApi(context);
+        builder.AddTreeGraphSyncServices(context);
         builder.AddTreeGraphMafWfApi(context);
+        builder.AddTreeGraphBlazor(context);
 
-        var eavApi = builder.Resources.Single(r => r.Name == "treegrapheavapi");
-        var mafWfApi = builder.Resources.Single(r => r.Name == "TreeGraphMafWfApi");
-        var qdrant = builder.Resources.OfType<QdrantServerResource>().Single(r => r.Name == "Qdrant");
-        var rabbitMq = builder.Resources.OfType<IResourceWithConnectionString>()
-            .Single(r => r.Name == "RabbitMQ");
-        var vllmEmbed = builder.Resources.OfType<ContainerResource>()
-            .Single(r => r.Name == "vllm-embed");
-
-        return (eavApi, mafWfApi, qdrant, rabbitMq, vllmEmbed);
+        return new Wiring(
+            builder.Resources.Single(r => r.Name == "treegrapheavapi"),
+            builder.Resources.Single(r => r.Name == "treegraphsyncservices"),
+            builder.Resources.Single(r => r.Name == "TreeGraphMafWfApi"),
+            builder.Resources.Single(r => r.Name == "treegraphblazor"),
+            builder.Resources.OfType<QdrantServerResource>().Single(r => r.Name == "Qdrant"),
+            builder.Resources.OfType<IResourceWithConnectionString>()
+                .Single(r => r.Name == "RabbitMQ"),
+            builder.Resources.OfType<ContainerResource>().Single(r => r.Name == "vllm-embed"));
     }
-
-    // ══════════════════════════════════════════════════════
-    // Qdrant 资源
-    // ══════════════════════════════════════════════════════
 
     [Fact]
     public void Qdrant_固定端口6333与6334()
     {
-        var (_, _, qdrant, _, _) = Build();
+        var wiring = Build();
 
-        var endpoints = qdrant.Annotations.OfType<EndpointAnnotation>().ToList();
+        var endpoints = wiring.Qdrant.Annotations.OfType<EndpointAnnotation>().ToList();
         Assert.Contains(endpoints, e => e.Name == "grpc" && e.Port == 6334);
         Assert.Contains(endpoints, e => e.Name == "rest" && e.Port == 6333);
     }
@@ -61,42 +61,59 @@ public class SemanticSearchWiringTests
     [Fact]
     public void Qdrant_REST端口挂healthz探针_Persistent生命周期()
     {
-        var (_, _, qdrant, _, _) = Build();
+        var wiring = Build();
 
-        Assert.Contains(qdrant.Annotations.OfType<HealthCheckAnnotation>(),
+        Assert.Contains(wiring.Qdrant.Annotations.OfType<HealthCheckAnnotation>(),
             h => h.Key.Contains("healthz"));
-
-        Assert.Contains(qdrant.Annotations.OfType<ContainerLifetimeAnnotation>(),
+        Assert.Contains(wiring.Qdrant.Annotations.OfType<ContainerLifetimeAnnotation>(),
             l => l.Lifetime == ContainerLifetime.Persistent);
     }
 
-    // ══════════════════════════════════════════════════════
-    // TreeGraphEavApi 依赖链
-    // ══════════════════════════════════════════════════════
-
     [Fact]
-    public void EavApi_WaitFor链_覆盖RabbitMQ_Qdrant_VllmEmbed()
+    public void EavApi_保留RabbitMQ_不再等待Qdrant与VllmEmbed或注入Embedding()
     {
-        var (eavApi, _, qdrant, rabbitMq, vllmEmbed) = Build();
-
-        var waits = eavApi.Annotations.OfType<WaitAnnotation>()
+        var wiring = Build();
+        var waits = wiring.EavApi.Annotations.OfType<WaitAnnotation>()
             .Select(w => w.Resource).ToList();
 
-        Assert.Contains(qdrant, waits);
-        Assert.Contains(vllmEmbed, waits);
-        Assert.Contains(waits, r => ReferenceEquals(r, rabbitMq));
+        Assert.Contains(waits, r => ReferenceEquals(r, wiring.RabbitMq));
+        Assert.DoesNotContain(wiring.Qdrant, waits);
+        Assert.DoesNotContain(wiring.VllmEmbed, waits);
+        Assert.DoesNotContain("Embedding__Endpoint", EnvVars(wiring.EavApi).Keys);
     }
 
     [Fact]
-    public void EavApi_注入Embedding端点_带v1后缀()
+    public void SyncServices_注册独立项目资源_固定端口5774与健康探针()
     {
-        var (eavApi, _, _, _, _) = Build();
-        var env = EnvVars(eavApi);
+        var wiring = Build();
+
+        Assert.IsType<ProjectResource>(wiring.SyncServices);
+        Assert.Contains(wiring.SyncServices.Annotations.OfType<EndpointAnnotation>(),
+            e => e.Name == "http" && e.Port == 5774);
+        Assert.Contains(wiring.SyncServices.Annotations.OfType<HealthCheckAnnotation>(),
+            h => h.Key.Contains("/health"));
+    }
+
+    [Fact]
+    public void SyncServices_等待核心健康及RabbitMQ_Qdrant_VllmEmbed()
+    {
+        var wiring = Build();
+        var waits = wiring.SyncServices.Annotations.OfType<WaitAnnotation>().ToList();
+
+        Assert.Contains(waits, w => ReferenceEquals(w.Resource, wiring.EavApi)
+            && w.WaitType == WaitType.WaitUntilHealthy);
+        Assert.Contains(waits, w => ReferenceEquals(w.Resource, wiring.RabbitMq));
+        Assert.Contains(waits, w => ReferenceEquals(w.Resource, wiring.Qdrant));
+        Assert.Contains(waits, w => ReferenceEquals(w.Resource, wiring.VllmEmbed));
+    }
+
+    [Fact]
+    public void SyncServices_注入Embedding端点_带v1后缀()
+    {
+        var wiring = Build();
+        var env = EnvVars(wiring.SyncServices);
 
         Assert.True(env.TryGetValue("Embedding__Endpoint", out var embed));
-
-        // 模型级未分配端口时值为 ReferenceExpression（Format 形如 "{0}/v1/"），
-        // 已分配时为解析后的字符串——两种形态都校验 /v1/ 后缀
         var text = embed switch
         {
             ReferenceExpression re => re.Format,
@@ -105,22 +122,33 @@ public class SemanticSearchWiringTests
         Assert.Contains("/v1/", text);
     }
 
-    // ══════════════════════════════════════════════════════
-    // MafWfApi → EavApi（语义搜索工具）
-    // ══════════════════════════════════════════════════════
-
     [Fact]
-    public void MafWfApi_WaitFor并注入TreeGraphEavApi端点()
+    public void MafWfApi_分别等待并注入核心与SyncServices地址()
     {
-        var (eavApi, mafWfApi, _, _, _) = Build();
+        var wiring = Build();
+        var waits = wiring.MafWfApi.Annotations.OfType<WaitAnnotation>()
+            .Select(w => w.Resource).ToList();
+        var env = EnvVars(wiring.MafWfApi);
 
-        Assert.Contains(mafWfApi.Annotations.OfType<WaitAnnotation>(),
-            w => ReferenceEquals(w.Resource, eavApi));
-
-        Assert.Contains("TreeGraphApi__BaseAddress", EnvVars(mafWfApi).Keys);
+        Assert.Contains(wiring.EavApi, waits);
+        Assert.Contains(wiring.SyncServices, waits);
+        Assert.True(env.TryGetValue("TreeGraphApi__BaseAddress", out var core));
+        Assert.True(env.TryGetValue("TreeGraphSyncServices__BaseAddress", out var sync));
+        Assert.NotSame(core, sync);
     }
 
-    /// <summary>执行环境变量回调，收集最终注入的键值。</summary>
+    [Fact]
+    public void Blazor_等待SyncServices并获得独立服务发现地址()
+    {
+        var wiring = Build();
+        var env = EnvVars(wiring.Blazor);
+
+        Assert.Contains(wiring.Blazor.Annotations.OfType<WaitAnnotation>(),
+            w => ReferenceEquals(w.Resource, wiring.SyncServices));
+        Assert.Contains("services__treegrapheavapi__http__0", env.Keys);
+        Assert.Contains("services__treegraphsyncservices__http__0", env.Keys);
+    }
+
     private static Dictionary<string, object> EnvVars(IResource resource)
     {
         Assert.True(resource.TryGetEnvironmentVariables(out var annotations));

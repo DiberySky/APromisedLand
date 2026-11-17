@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.EdgeSky.Entities;
-using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Persistence.Data;
+using TreeGraph.Persistence.EdgeSky.Entities;
+using TreeGraph.Persistence.NodeEavSky.Entities;
 using TreeGraph.Api.Tests.Fixtures;
 using TreeGraph.Api.TreeEavSky.Services;
 using TreeGraph.Shared.NodeSky.Entities;

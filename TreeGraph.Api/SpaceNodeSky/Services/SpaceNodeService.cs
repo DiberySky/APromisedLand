@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
+using TreeGraph.Persistence.Data;
 using TreeGraph.Api.MessagingSky;
-using TreeGraph.Api.SpaceNodeSky.Entities;
-using TreeGraph.Shared.Messaging;
+using TreeGraph.Persistence.SpaceNodeSky.Entities;
+using TreeGraph.Contracts.Messaging;
 using TreeGraph.Shared.NodeSky.Entities;
 using TreeGraph.Shared.SpaceNodeSky.Dtos;
 
@@ -152,12 +152,8 @@ public sealed class SpaceNodeService
     /// </summary>
     public async Task<SpaceNodeDeleteResult> DeleteAsync(string spaceId, string id, CancellationToken ct)
     {
-        // Npgsql 执行策略不支持用户事务，需整体包裹
-        var strategy = _db.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
+        // 检测、删除与 Outbox 由请求级中间件纳入同一事务。
         {
-            // 同一事务内先检测后删除，避免检测与删除之间插入新数据
-            await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
             var host = await _db.SpaceNodes.FirstOrDefaultAsync(s => s.Id == id && s.SpaceId == spaceId, ct);
             if (host is null) return new SpaceNodeDeleteResult(false, null);
@@ -202,13 +198,12 @@ public sealed class SpaceNodeService
             _db.SpaceNodes.Remove(host);
             _db.Nodes.Remove(node);
             await _db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
 
-            // ★ 节点已删除 → 消费端据 InodeId 清除残留向量/图顶点
+            // ★ 节点已删除 → 事件随本请求 Outbox 提交后派发
             await PublishAsync(id, InodeChangeKind.Deleted, ct);
 
             return new SpaceNodeDeleteResult(true, null);
-        });
+        }
     }
 
     /// <summary>发布 iNode 变更事件（图/向量同步；at-least-once，消费端幂等）。空间节点无后代，PathAffected 恒 false。</summary>

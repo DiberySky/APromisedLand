@@ -38,7 +38,7 @@ public static class TreeGraphEavApiExtension
                 endpointName: "http");
 
         // ══════════════════════════════════════════════════════
-        // ★ 语义搜索依赖接线
+        // ★ 核心 API 依赖接线（Qdrant / Embedding 已独立到 SyncServices）
         // ══════════════════════════════════════════════════════
 
         // RabbitMQ（宿主变更事件管道；注入 ConnectionStrings__RabbitMQ）
@@ -50,39 +50,10 @@ public static class TreeGraphEavApiExtension
         }
         else
         {
-            Console.WriteLine("[TreeGraphEavApi] ⚠️ context.RabbitMq 为 null，向量同步消费者将连接 localhost:5672");
+            Console.WriteLine("[TreeGraphEavApi] ⚠️ context.RabbitMq 为 null，变更事件发布将连接 localhost:5672");
         }
 
-        // Qdrant（注入 ConnectionStrings__Qdrant）
-        if (context.Qdrant is not null)
-        {
-            context.TreeGraphEavApi
-                .WithReference(context.Qdrant)
-                .WaitFor(context.Qdrant);
-        }
-        else
-        {
-            Console.WriteLine("[TreeGraphEavApi] ⚠️ context.Qdrant 为 null，语义搜索将连接 localhost:6334");
-        }
-
-        // vLLM Embedding（bge-m3 向量化；ContainerResource 无连接串，手动注入端点）
-        if (context.VllmEmbed is not null)
-        {
-            var embedEndpoint = context.VllmEmbed.GetEndpoint(VllmExtension.EmbeddingHttpEndpointName);
-
-            context.TreeGraphEavApi
-                .WaitFor(context.VllmEmbed)
-                .WithEnvironment("Embedding__Endpoint",
-                    ReferenceExpression.Create($"{embedEndpoint}/v1/"));
-
-            Console.WriteLine($"[TreeGraphEavApi] Embedding 端点 → {embedEndpoint}/v1/");
-        }
-        else
-        {
-            Console.WriteLine("[TreeGraphEavApi] ⚠️ context.VllmEmbed 为 null，向量化将连接 localhost:5719");
-        }
-
-        // TreeGraph.NebulaFastApi（图同步 REST 网关；注入 NebulaFastApi:Endpoint）
+        // TreeGraph.NebulaFastApi（核心图查询 REST 网关；注入 NebulaFastApi:Endpoint）
         if (context.TreeGraphNebulaFastApiEndpoint is not null)
         {
             context.TreeGraphEavApi

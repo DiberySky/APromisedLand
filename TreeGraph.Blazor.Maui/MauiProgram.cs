@@ -73,11 +73,25 @@ public static class MauiProgram
         builder.Services.AddSingleton<IEavFieldValidator, EavFieldValidator>();
         builder.Services.AddScoped<EntityTypeDisplayService>();
         builder.Services
-            .AddHttpClient<EavApiClient>(client =>
+            .AddHttpClient("treegrapheavapi", client =>
             {
                 client.BaseAddress = new Uri("https+http://treegrapheavapi");
             })
             .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+        builder.Services
+            .AddHttpClient("treegraphsyncservices", client =>
+            {
+                client.BaseAddress = new Uri("https+http://treegraphsyncservices");
+            })
+            .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+        builder.Services.AddTransient(sp =>
+        {
+            var factory = sp.GetRequiredService<IHttpClientFactory>();
+            return new EavApiClient(
+                factory.CreateClient("treegrapheavapi"),
+                factory.CreateClient("treegraphsyncservices"),
+                sp.GetRequiredService<ILogger<EavApiClient>>());
+        });
 
         // ★ LineSky 客户端：与 EavApiClient 同一后端、同款弹性策略。
         builder.Services

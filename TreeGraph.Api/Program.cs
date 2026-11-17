@@ -1,13 +1,14 @@
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
+using TreeGraph.Persistence.Data;
 using TreeGraph.Api.Data.Seeding;
 using TreeGraph.Api.LineSky.Services;
 using TreeGraph.Api.LineSky.Templates;
-using TreeGraph.Api.GraphSyncSky;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
-using TreeGraph.Api.NodeEavSky.SemanticSearch;
 using TreeGraph.Api.NodeEavSky.Services;
+using TreeGraph.GraphSync;
+using TreeGraph.WebShared.Infrastructure;
+using TreeGraph.WebShared.NodeEavSky;
 using TreeGraph.Api.TreeEavSky.Services;
 using Wolverine;
 
@@ -19,7 +20,8 @@ builder.AddServiceDefaults();
 // Add services to the container.
 builder.Services.AddControllers(options =>
     {
-        // ★ NodeEavSky 全局 ApiResponse 信封（过滤器内部按控制器命名空间自行判定生效范围）
+        // EAV 专属异常先映射，再由共享过滤器统一包装响应。
+        options.Filters.Add<EavExceptionFilter>();
         options.Filters.Add<ApiEnvelopeFilter>();
     })
     .AddJsonOptions(options =>
@@ -35,9 +37,13 @@ builder.Services.AddExceptionHandler<DbExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 // .NET Aspire 集成:自动从 ConnectionStrings:TreeGraphDb 注入连接字符串
-builder.AddNpgsqlDbContext<TreeGraphDbContext>("TreeGraphDb");
+builder.AddNpgsqlDbContext<TreeGraphDbContext>(
+    "TreeGraphDb",
+    configureDbContextOptions: options =>
+        options.UseNpgsql(npgsql => npgsql.MigrationsAssembly("TreeGraph.Api")));
 
 builder.Services.AddMemoryCache();
+builder.Services.AddScoped<TreeGraphRequestTransaction>();
 // iNode 宿主守卫聚合器：inode 写链路（关注类型/首次写实体）校验宿主节点存在
 builder.Services.AddScoped<InodeOwnerGuardRegistry>();
 builder.Services.AddScoped<EavWriteService>();
@@ -89,18 +95,13 @@ builder.Services.AddScoped<CustomTableWriteService>();
 builder.Services.AddScoped<CustomTableReadService>();
 builder.Services.AddScoped<CustomTableQueryService>();
 
-// ★ 语义搜索 + 向量同步管道（Qdrant + vLLM bge-m3 + RabbitMQ 事件驱动）
-builder.Services.AddSemanticSearch(builder.Configuration);
-
-// ★ 图同步管道（PostgreSQL → NebulaGraph，经 TreeGraph.NebulaFastApi REST 网关）
-//   Testing 环境（EavApiFactory 集成测试）无 RabbitMQ/NebulaGraph：
-//   跳过 Wolverine 总线（消费者 handler 随 UseWolverine 一并跳过，IEventPublisher
-//   由测试工厂注册 Noop 空桩）与 schema 初始化后台服务。
-//   Wolverine 按约定自动发现本程序集中的 *Consumer handler（向量同步 + 图同步）。
+// 核心只发布业务变更并接收反向清理命令；投影消费者全部位于 SyncServices。
 var isTesting = builder.Environment.IsEnvironment("Testing");
 if (!isTesting)
     builder.Host.UseWolverine(opts => opts.UseTreeGraphMessaging(builder.Configuration));
-builder.Services.AddGraphSync(builder.Configuration, enableSchemaInitializer: !isTesting);
+
+// 核心 Edge/Space 管理仍通过共享 Nebula 客户端执行 DDL，不注册投影同步器或后台任务。
+builder.Services.AddNebulaGraphClient(builder.Configuration);
 
 // LineSky 服务
 builder.Services.AddScoped<TreeGraph.Api.LineSky.Services.LineStructureService>();
@@ -164,6 +165,9 @@ if (app.Environment.IsDevelopment())
 // ★ 全局异常处理
 app.UseExceptionHandler();
 
+if (!isTesting)
+    app.UseMiddleware<TreeGraphWriteTransactionMiddleware>();
+
 app.MapControllers();
 
 // ★ Aspire 默认端点（/health、/alive），供 Dashboard 探测
@@ -176,6 +180,9 @@ if (!EF.IsDesignTime)
     var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
     await db.Database.MigrateAsync();
     await EavSeeder.SeedAsync(db);
+    var tagProjections = scope.ServiceProvider
+        .GetRequiredService<TreeGraph.Api.SpaceNodeSky.Services.TagProjectionService>();
+    await tagProjections.BackfillAsync(null);
     // 内置边类型不再自动播种：由「空间维护 → 关系设置 → 创建默认边（预置关系）」按需创建
     // 存量树节点 parent_of 派生边回填（幂等补插缺失行；仅对已存在 parent_of 边类型的空间生效）
     var backfilled = await ParentEdgeBackfill.BackfillAsync(db);

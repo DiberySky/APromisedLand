@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Persistence.Data;
+using TreeGraph.Persistence.NodeEavSky.Entities;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 

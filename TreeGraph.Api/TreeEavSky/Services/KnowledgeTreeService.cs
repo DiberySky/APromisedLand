@@ -1,7 +1,7 @@
-using TreeGraph.Api.Data;
-using TreeGraph.Api.GraphSyncSky;
+using TreeGraph.Persistence.Data;
+using TreeGraph.GraphSync;
 using TreeGraph.Api.MessagingSky;
-using TreeGraph.Shared.Messaging;
+using TreeGraph.Contracts.Messaging;
 using TreeGraph.Shared.NodeSky.Entities;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
@@ -293,7 +293,7 @@ public class KnowledgeTreeService(TreeGraphDbContext dbContext, IEventPublisher 
         // 结构派生边 parent_of 随节点级联删除，不计入引用（否则任何子节点都无法删除）
         var hasEdges = await dbContext.Edges
             .AnyAsync(e => (e.SrcVid == nodeId || e.DstVid == nodeId)
-                        && e.EdgeType != TreeGraph.Api.GraphSyncSky.GraphNaming.ParentOfEdge,
+                        && e.EdgeType != TreeGraph.GraphSync.GraphNaming.ParentOfEdge,
                 cancellationToken);
         if (hasEdges)
             throw new InvalidOperationException("该节点仍被边引用，无法删除。请先删除引用该节点的边。");

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
+using TreeGraph.Persistence.Data;
 using TreeGraph.Api.MessagingSky;
-using TreeGraph.Shared.Messaging;
+using TreeGraph.Contracts.Messaging;
 using TreeGraph.Shared.NodeSky.Entities;
 
 namespace TreeGraph.Api.NodeSky.Controllers;
@@ -99,12 +99,8 @@ public class NodeController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id, CancellationToken ct = default)
     {
-        // Npgsql 执行策略不支持用户事务，需整体包裹
-        var strategy = _db.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync<IActionResult>(async () =>
+        // 检测、删除与 Outbox 由请求级中间件纳入同一事务。
         {
-            // 同一事务内先检测后删除，避免检测与删除之间插入新数据
-            await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
             var existing = await _db.Nodes.FindAsync([id], ct);
             if (existing is null) return NotFound();
@@ -176,13 +172,12 @@ public class NodeController : ControllerBase
 
             _db.Nodes.Remove(existing);
             await _db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
 
-            // ★ 节点已删除 → 消费端据 InodeId 清除残留向量/图顶点
+            // ★ 节点已删除 → 事件随本请求 Outbox 提交后派发
             await PublishAsync(id, InodeChangeKind.Deleted, pathAffected: false, ct);
 
             return NoContent();
-        });
+        }
     }
 
     /// <summary>发布 iNode 变更事件（向量/图同步；at-least-once，消费端幂等）。

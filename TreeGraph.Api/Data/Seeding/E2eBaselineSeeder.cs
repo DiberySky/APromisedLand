@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TreeGraph.Persistence.Data;
 
 namespace TreeGraph.Api.Data.Seeding;
 

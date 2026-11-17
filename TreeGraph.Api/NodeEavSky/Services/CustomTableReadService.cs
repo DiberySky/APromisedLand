@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Persistence.Data;
+using TreeGraph.Persistence.NodeEavSky.Entities;
 using TreeGraph.Shared.NodeEavSky;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
