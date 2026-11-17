@@ -20,7 +20,7 @@ public class EavApiClientSyncServicesTests
         };
         using var syncHttp = new HttpClient(syncHandler)
         {
-            BaseAddress = new Uri("http://sync.local:5774/")
+            BaseAddress = new Uri("http://sync.local:5775/")
         };
         var client = new EavApiClient(
             coreHttp, syncHttp, NullLogger<EavApiClient>.Instance);
@@ -49,7 +49,7 @@ public class EavApiClientSyncServicesTests
         Assert.All(syncHandler.Requests, request =>
         {
             Assert.Equal("sync.local", request.Host);
-            Assert.Equal(5774, request.Port);
+            Assert.Equal(5775, request.Port);
         });
     }
 

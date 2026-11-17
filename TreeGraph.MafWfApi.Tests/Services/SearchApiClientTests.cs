@@ -126,19 +126,19 @@ public class SearchApiClientTests
         using var provider = BuildServices(new Dictionary<string, string?>
         {
             ["TreeGraphApi:BaseAddress"] = "http://core.example:5773/",
-            ["TreeGraphSyncServices:BaseAddress"] = "http://sync.example:5774/"
+            ["TreeGraphSyncServices:BaseAddress"] = "http://sync.example:5775/"
         });
         var factory = provider.GetRequiredService<IHttpClientFactory>();
 
         using var search = factory.CreateClient(nameof(SearchApiClient));
         using var subtree = factory.CreateClient(nameof(SubtreeLoader));
 
-        Assert.Equal(new Uri("http://sync.example:5774/"), search.BaseAddress);
+        Assert.Equal(new Uri("http://sync.example:5775/"), search.BaseAddress);
         Assert.Equal(new Uri("http://core.example:5773/"), subtree.BaseAddress);
     }
 
     [Fact]
-    public void HttpClient地址_未配置时分别回退5774与5773()
+    public void HttpClient地址_未配置时分别回退5775与5773()
     {
         using var provider = BuildServices([]);
         var factory = provider.GetRequiredService<IHttpClientFactory>();
@@ -146,7 +146,7 @@ public class SearchApiClientTests
         using var search = factory.CreateClient(nameof(SearchApiClient));
         using var subtree = factory.CreateClient(nameof(SubtreeLoader));
 
-        Assert.Equal(new Uri("http://localhost:5774"), search.BaseAddress);
+        Assert.Equal(new Uri("http://localhost:5775"), search.BaseAddress);
         Assert.Equal(new Uri("http://localhost:5773"), subtree.BaseAddress);
     }
 

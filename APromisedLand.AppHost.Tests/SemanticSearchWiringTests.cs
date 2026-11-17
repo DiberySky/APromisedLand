@@ -83,13 +83,13 @@ public class SemanticSearchWiringTests
     }
 
     [Fact]
-    public void SyncServices_注册独立项目资源_固定端口5774与健康探针()
+    public void SyncServices_注册独立项目资源_固定端口5775与健康探针()
     {
         var wiring = Build();
 
         Assert.IsType<ProjectResource>(wiring.SyncServices);
         Assert.Contains(wiring.SyncServices.Annotations.OfType<EndpointAnnotation>(),
-            e => e.Name == "http" && e.Port == 5774);
+            e => e.Name == "http" && e.Port == 5775);
         Assert.Contains(wiring.SyncServices.Annotations.OfType<HealthCheckAnnotation>(),
             h => h.Key.Contains("/health"));
     }

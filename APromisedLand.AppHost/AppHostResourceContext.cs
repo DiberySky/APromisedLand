@@ -57,7 +57,7 @@ public class AppHostResourceContext
     /// <summary>EAV 动态类型 API(复用 TreeGraphDb,端口 5773)。</summary>
     public IResourceBuilder<ProjectResource>? TreeGraphEavApi { get; set; }
 
-    /// <summary>TreeGraph.SyncServices（搜索、向量同步/对账、图同步，端口 5774）。</summary>
+    /// <summary>TreeGraph.SyncServices（搜索、向量同步/对账、图同步，端口 5775）。</summary>
     public IResourceBuilder<ProjectResource>? TreeGraphSyncServices { get; set; }
 
     /// <summary>Qdrant 向量数据库（语义搜索，gRPC 6334 / REST 6333）。</summary>

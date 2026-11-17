@@ -94,7 +94,7 @@ public static class TreeGraphMafWfExtension
 
         // ══════════════════════════════════════════════════════════
         // ★ 核心 API 与 SyncServices 分别注入：子树等核心查询走 5773，
-        //   SemanticSearchNodes 工具走独立搜索服务 5774。
+        //   SemanticSearchNodes 工具走独立搜索服务 5775。
         // ══════════════════════════════════════════════════════════
         if (context.TreeGraphEavApi is not null)
         {

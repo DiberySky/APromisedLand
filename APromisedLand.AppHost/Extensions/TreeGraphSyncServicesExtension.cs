@@ -4,11 +4,11 @@ namespace APromisedLand.AppHost.Extensions;
 
 /// <summary>
 /// TreeGraph.SyncServices 的 Aspire 编排扩展。
-/// 独立承载搜索、向量同步/对账与图同步，固定主机端口 5774。
+/// 独立承载搜索、向量同步/对账与图同步，固定主机端口 5775。
 /// </summary>
 public static class TreeGraphSyncServicesExtension
 {
-    private const int HttpPort = 5774;
+    private const int HttpPort = 5775;
 
     public static IDistributedApplicationBuilder AddTreeGraphSyncServices(
         this IDistributedApplicationBuilder builder,

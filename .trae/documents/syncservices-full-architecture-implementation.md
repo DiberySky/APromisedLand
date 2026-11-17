@@ -57,10 +57,10 @@
 
 ### 6. 接入 AppHost 并切换调用方
 
-- 在 [AppHostResourceContext.cs](file:///d:/APromisedLand/APromisedLand.AppHost/AppHostResourceContext.cs) 增加 SyncServices 资源，新建编排扩展并接入 [AppHost.cs](file:///d:/APromisedLand/APromisedLand.AppHost/AppHost.cs)，使用现有 `5774` 端口。
+- 在 [AppHostResourceContext.cs](file:///d:/APromisedLand/APromisedLand.AppHost/AppHostResourceContext.cs) 增加 SyncServices 资源，新建编排扩展并接入 [AppHost.cs](file:///d:/APromisedLand/APromisedLand.AppHost/AppHost.cs)，使用现有 `5775` 端口。
 - 核心保留 TreeGraphDb、RabbitMQ、NebulaFastApi、FileStorageApi；Qdrant 和 Embedding 接线移到 SyncServices。SyncServices 注入 TreeGraphDb、RabbitMQ、NebulaFastApi、Qdrant、Embedding，并等待核心迁移/健康检查完成。
 - Blazor/MAUI 增加 SyncServices 服务发现引用。将 [EavApiClient.cs](file:///d:/APromisedLand/TreeGraph.Blazor.Shared/NodeEavSky/Services/EavApiClient.cs) 中搜索、向量对账、图同步方法切到独立 SyncServices HttpClient，更新对应页面和 MAUI 注册；核心 EavApiClient 继续负责业务数据。
-- MafWfApi 的 `SearchApiClient` 改用 `TreeGraphSyncServices:BaseAddress`，`SubtreeLoader` 等核心查询仍使用 TreeGraphApi。AppHost 注入两个不同地址，本地回退分别为 `5773` 和 `5774`。
+- MafWfApi 的 `SearchApiClient` 改用 `TreeGraphSyncServices:BaseAddress`，`SubtreeLoader` 等核心查询仍使用 TreeGraphApi。AppHost 注入两个不同地址，本地回退分别为 `5773` 和 `5775`。
 
 ### 7. 迁移和补充测试
 
@@ -74,8 +74,8 @@
 1. `dotnet restore APromisedLand.sln`、`dotnet build APromisedLand.sln --no-restore`：0 error；记录既有警告。
 2. EF `has-pending-model-changes`：程序集移动不得产生隐式模型变化；只有明确设计的消息/账本变更才允许新迁移。
 3. 运行核心、SyncServices、AppHost、Blazor.Shared 等相关测试及解决方案测试；本改造相关测试必须全绿，既有 bUnit/E2E 基线问题单独列出。
-4. 启动 Aspire，确认 `5773/health`、`5774/health`、`5783` 正常；核心无旧投影 listener/搜索/图同步路由，SyncServices 仅有所需控制器。
-5. 分别触发 inode、edge、独立 entity、TagProjection 变更，验证 Nebula/Qdrant 最终一致；验证 Blazor/MAUI/MafWf 搜索、手动图同步和向量对账均访问 `5774`。
+4. 启动 Aspire，确认 `5773/health`、`5775/health`、`5783` 正常；核心无旧投影 listener/搜索/图同步路由，SyncServices 仅有所需控制器。
+5. 分别触发 inode、edge、独立 entity、TagProjection 变更，验证 Nebula/Qdrant 最终一致；验证 Blazor/MAUI/MafWf 搜索、手动图同步和向量对账均访问 `5775`。
 6. RabbitMQ 不可用时提交业务变更，确认 Outbox 已持久化；恢复后消息仍送达。验证重启、重复消息、Vector 故障不丢 Graph 投影，以及核心对墓碑清理命令的幂等处理。
 7. 最终检查无核心旧模块残留、无 `SyncServices → TreeGraph.Api`、无面向 SyncServices 的 IVT、无业务库写入或 Migrate/Seed。
 

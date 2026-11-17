@@ -46,7 +46,7 @@ void TreeGraph()
     // ★ EAV 动态类型核心 API(复用 TreeGraphDb,固定端口 5773)
     builder.AddTreeGraphEavApi(context);
 
-    // ★ 搜索、向量同步/对账与图同步独立服务(固定端口 5774，等待核心迁移/健康完成)
+    // ★ 搜索、向量同步/对账与图同步独立服务(固定端口 5775，等待核心迁移/健康完成)
     builder.AddTreeGraphSyncServices(context);
 
     // ★ TreeGraph.MafWfApi:MAF + Workflow 服务 API(vLLM 版,固定端口 5323,

@@ -59,7 +59,7 @@ internal static class ServiceCollectionExtensions
         services.AddHttpClient<SearchApiClient>(client =>
         {
             client.BaseAddress = new Uri(
-                config["TreeGraphSyncServices:BaseAddress"] ?? "http://localhost:5774");
+                config["TreeGraphSyncServices:BaseAddress"] ?? "http://localhost:5775");
             client.Timeout = TimeSpan.FromSeconds(30);
         });
 
