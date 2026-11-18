@@ -1,0 +1,102 @@
+@* SpaceNodePickerDialog.razor — 空间节点选择器（名称模糊搜索，单选）
+   打开方式：IDialogService.ShowExAsync<SpaceNodePickerDialog>；
+   单击结果行即选中并确认，返回 DialogResult.Ok(SpaceNodeDto)；取消返回 null。
+   SpaceId 决定列表范围（空间节点扁平归属单个图空间），SpaceName 仅标题展示。 *@
+@namespace TreeGraph.Blazor.Shared.SpaceNodeSky.Dialogs
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Services
+@using TreeGraph.Shared.SpaceNodeSky.Dtos
+@inject SpaceNodeApiClient Api
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@Title"
+           CancelButtonVisible="true">
+    <ToolBarContent>
+        <MudText Typo="Typo.subtitle1" Color="Color.Info">@(SpaceName ?? SpaceId)</MudText>
+    </ToolBarContent>
+    <ToolBarRightContent>
+        <MudTextField T="string"
+                      @bind-Value="_query"
+                      Placeholder="搜索节点名称"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Outlined.Search"
+                      Style="width: 230px;"
+                      Immediate="true" />
+    </ToolBarRightContent>
+    <DialogContent>
+        @* 结果表：单击行即确认选择并关闭 *@
+        <MudTable T="SpaceNodeDto"
+                  Items="FilteredNodes"
+                  OnRowClick="@(args => Confirm(args.Item))"
+                  RowStyle="cursor: pointer;"
+                  Hover="true"
+                  Bordered="true"
+                  Dense="true"
+                  Loading="@_loading"
+                  LoadingProgressColor="Color.Primary"
+                  Style="max-height: 56vh; overflow-y: auto;">
+            <HeaderContent>
+                <MudTh>名称</MudTh>
+                <MudTh>描述</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Name</MudTd>
+                <MudTd Class="mud-text-secondary">@context.Description</MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Align="Align.Center" Color="Color.Secondary" Class="my-4">
+                    未找到匹配的空间节点
+                </MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>对话框标题。</summary>
+    [Parameter] public string Title { get; set; } = "选择空间节点";
+
+    /// <summary>目标图空间 Id（列表范围）。</summary>
+    [Parameter] public string SpaceId { get; set; } = string.Empty;
+
+    /// <summary>目标图空间显示名（仅标题展示；缺省回退显示 Id）。</summary>
+    [Parameter] public string? SpaceName { get; set; }
+
+    private IReadOnlyList<SpaceNodeDto> _nodes = [];
+    private bool _loading;
+    private string? _query;
+
+    /// <summary>按名称模糊过滤后的节点列表（客户端过滤，空间节点数量有限）。</summary>
+    private IReadOnlyList<SpaceNodeDto> FilteredNodes =>
+        string.IsNullOrWhiteSpace(_query)
+            ? _nodes
+            : _nodes.Where(n => !string.IsNullOrEmpty(n.Name)
+                                && n.Name.Contains(_query, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(SpaceId)) return;
+
+        _loading = true;
+        try
+        {
+            _nodes = await Api.GetNodesAsync(SpaceId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
+            _nodes = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>点击结果行即选中并确认，直接关闭对话框返回该节点。</summary>
+    private void Confirm(SpaceNodeDto node)
+        => MudDialog?.Close(DialogResult.Ok(node));
+}

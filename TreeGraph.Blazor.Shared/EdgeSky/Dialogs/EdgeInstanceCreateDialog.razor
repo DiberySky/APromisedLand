@@ -2,7 +2,7 @@
    打开参数 SpaceId/SpaceName/SpaceType/NodeId/Types：
    方向（出边 = 本节点为起点 / 入边 = 本节点为终点）→ 选择边类型（空间内已定义）
    → 对端节点（同空间约束：候选必须与边同属一个空间；空间内可跨类型，如 Dynamic 空间
-     同时存在空间树节点与线路/线路节点，故「树搜索」「线路」两个入口按空间能力并行提供）
+     同时存在空间树节点与线路/线路节点，故「树搜索」「空间节点」「线路」三个入口按空间能力并行提供）
    → rank → 属性。
    属性区按所选边类型的 Schema 动态渲染：STRING→文本框，INT/DOUBLE→NumberInputField，
    BOOL→BoolFieldSky，DATE→日期选择，TIMESTAMP→文本框（epoch 或 ISO 8601）。
@@ -14,7 +14,9 @@
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky.Services
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Dialogs
 @using TreeGraph.Blazor.Shared.TreeEavSky.Services
+@using TreeGraph.Shared.SpaceNodeSky.Dtos
 @using TreeGraph.Shared.EdgeSky
 @using TreeGraph.Shared.EdgeSky.Dtos
 @using TreeGraph.Shared.TreeEavSky.Abstractions
@@ -49,7 +51,7 @@
                               Margin="Margin.Dense"
                               Size="Size.Small"
                               ReadOnly="true"
-                              Placeholder="点击右侧树搜索或线路按钮选择节点"
+                              Placeholder="点击右侧树搜索、空间节点或线路按钮选择节点"
                               HelperText="@(_peerHelperText ?? string.Empty)"
                               Style="flex: 1;" />
                 <MudIconButton Icon="@Icons.Material.Outlined.Delete"
@@ -64,6 +66,12 @@
                                Disabled="@(!TreePickerAvailable)"
                                title="@(TreePickerAvailable ? "树搜索" : "当前空间无可用树结构，无法从树选择")"
                                OnClick="OpenPeerTreePickerAsync" />
+                <MudIconButton Icon="@Icons.Material.Outlined.Hub"
+                               Color="Color.Info"
+                               Size="Size.Small"
+                               Disabled="@(!SpaceNodePickerAvailable)"
+                               title="@(SpaceNodePickerAvailable ? "空间节点" : "当前空间未知，无法选择空间节点")"
+                               OnClick="OpenPeerSpaceNodePickerAsync" />
                 <MudIconButton Icon="@Icons.Material.Outlined.Route"
                                Color="Color.Success"
                                Size="Size.Small"
@@ -434,6 +442,41 @@
             };
             // HelperText 显示该线路节点所属线路名（LineNodeDto 只带 LineId）
             _peerHelperText = _spaceLines.FirstOrDefault(l => l.Id == picked.LineId)?.Name;
+        }
+    }
+
+    /// <summary>当前空间是否可选空间节点（空间节点扁平归属空间，空间已知即可选，与树/线路并存）。</summary>
+    private bool SpaceNodePickerAvailable => !string.IsNullOrEmpty(SpaceId);
+
+    /// <summary>打开空间节点选择器（SpaceNodePickerDialog），确认后写入对端。</summary>
+    private async Task OpenPeerSpaceNodePickerAsync()
+    {
+        var parameters = new DialogParameters<SpaceNodePickerDialog>
+        {
+            { x => x.Title, "选择对端节点" },
+            { x => x.SpaceId, SpaceId },
+            { x => x.SpaceName, SpaceName }
+        };
+        var dialog = await DialogService.ShowExAsync<SpaceNodePickerDialog>(
+            "空间节点", parameters,
+            new DialogOptionsEx
+            {
+                MaxWidth = MaxWidth.Small,
+                FullWidth = true,
+                BackdropClick = false,
+                Position = DialogPosition.TopCenter
+            });
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: SpaceNodeDto picked })
+        {
+            _peer = new NodeLookupDto
+            {
+                Id = picked.Id,
+                Name = picked.Name,
+                HostType = "SpaceNode"
+            };
+            // HelperText 显示该空间节点所属空间（扁平结构，无祖先链）
+            _peerHelperText = SpaceName;
         }
     }
 
