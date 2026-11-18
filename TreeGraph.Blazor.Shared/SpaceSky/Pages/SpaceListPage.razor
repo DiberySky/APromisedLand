@@ -1,10 +1,11 @@
-@* SpaceListPage.razor — 空间管理页：空间只读列表（行展开二级列表：树 + 线路），空间维护/节点属性走对话框入口。 *@
+@* SpaceListPage.razor — 空间管理页：空间只读列表（行展开二级列表：树 + 空间节点入口 + 线路），空间维护/节点属性走对话框入口。 *@
 @page "/spaces"
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Blazor.Shared.SpaceSky
 @using TreeGraph.Blazor.Shared.SpaceSky.Components
 @using TreeGraph.Blazor.Shared.SpaceSky.Dialogs
 @using TreeGraph.Blazor.Shared.SpaceSky.Services
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky.Services
@@ -70,7 +71,7 @@
                                                Color="Color.Info"
                                                Size="Size.Small"
                                                OnClick="@(() => ToggleExpand(context.Id))"
-                                               title="树与线路" />
+                                               title="树、节点与线路" />
                             </MudTd>
                         </RowTemplate>
                         <ChildRowContent>
@@ -91,6 +92,17 @@
                                                                        Size="Size.Small"
                                                                        OnClick="@(async () => await OpenTreeAsync(context))"
                                                                        title="打开树" />
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>空间节点</td>
+                                                    <td style="white-space: nowrap; text-align: right;">
+                                                        @* 以对话框打开该空间节点列表 *@
+                                                        <MudIconButton Icon="@Icons.Material.Outlined.Hub"
+                                                                       Color="Color.Default"
+                                                                       Size="Size.Small"
+                                                                       OnClick="@(async () => await OpenSpaceNodesAsync(context))"
+                                                                       title="空间节点" />
                                                     </td>
                                                 </tr>
                                                 @foreach (var line in LinesOf(context.Id))
@@ -164,11 +176,30 @@
         }
     }
 
-    /// <summary>展开/收起该空间的二级列表（树 + 线路）。</summary>
+    /// <summary>展开/收起该空间的二级列表（树 + 空间节点 + 线路）。</summary>
     private void ToggleExpand(string spaceId)
     {
         if (!_expandedIds.Remove(spaceId))
             _expandedIds.Add(spaceId);
+    }
+
+    /// <summary>打开该空间的空间节点对话框（预选当前空间）。</summary>
+    private async Task OpenSpaceNodesAsync(SpaceDto space)
+    {
+        var parameters = new DialogParameters<SpaceNodesDialog>
+        {
+            { x => x.SpaceId, space.Id },
+            { x => x.SpaceName, space.Name }
+        };
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+        await DialogService.ShowExAsync<SpaceNodesDialog>("空间节点", parameters, options);
     }
 
     /// <summary>该空间下的线路（按 SpaceId 过滤；未加载到时为空）。</summary>
