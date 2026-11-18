@@ -15,6 +15,11 @@ public sealed class AgentChatRequest
     [Required(AllowEmptyStrings = false)]
     [StringLength(4000, MinimumLength = 1)]
     public string Message { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 跳过意图路由，强制走图检索（语义搜索页使用：输入即检索意图）。
+    /// </summary>
+    public bool ForceGraph { get; set; }
 }
 
 /// <summary>工具调用详情（前端展示用）。</summary>

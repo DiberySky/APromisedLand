@@ -17,13 +17,21 @@ public class MafWfSseReader(HttpClient http, MafWfSkyOptions options)
         Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
     };
 
-    /// <summary>Graph Agent 流式对话：逐块返回 StreamChunkDto。</summary>
+    /// <summary>
+    /// Graph Agent 流式对话：逐块返回 StreamChunkDto。
+    /// forceGraph=true 时跳过服务端意图路由，强制走图检索（语义搜索页使用）。
+    /// </summary>
     public async IAsyncEnumerable<StreamChunkDto> GraphAgentStreamAsync(
-        string? conversationId, string message,
+        string? conversationId, string message, bool forceGraph = false,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var url = $"{options.GraphAgentPath.TrimEnd('/')}/chat/stream";
-        var body = new AgentChatRequest { ConversationId = conversationId, Message = message };
+        var body = new AgentChatRequest
+        {
+            ConversationId = conversationId,
+            Message = message,
+            ForceGraph = forceGraph
+        };
 
         await foreach (var chunk in ReadSseAsync<StreamChunkDto>(url, body, ct))
             yield return chunk;
@@ -38,6 +46,7 @@ public class MafWfSseReader(HttpClient http, MafWfSkyOptions options)
         => GraphAgentStreamAsync(
             conversationId,
             $"__expand_node__:{inodeId}:{hostType}",
+            forceGraph: false,
             ct);
 
     /// <summary>Writer-Critic 流式：逐事件返回 WorkflowStreamEventDto，遇 event:done 结束。</summary>

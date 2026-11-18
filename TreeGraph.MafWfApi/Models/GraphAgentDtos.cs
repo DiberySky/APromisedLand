@@ -10,6 +10,12 @@ public sealed class GraphAgentRequest
     [Required(AllowEmptyStrings = false)]
     [StringLength(4000, MinimumLength = 1)]
     public string Message { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 跳过意图路由，强制走图检索（/search 语义搜索页使用：
+    /// 输入即检索意图，短名词不应被判为 assistant 的闲聊）。
+    /// </summary>
+    public bool ForceGraph { get; set; }
 }
 
 /// <summary>POST /api/graph-agent/chat 响应体。</summary>

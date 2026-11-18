@@ -54,10 +54,11 @@ public sealed class GraphAgentService
     public async Task<AgentReply> ChatAsync(
         string? conversationId,
         string userMessage,
+        bool forceGraph,
         CancellationToken ct)
     {
-        // LLM 路由：元问题交给 AssistantAgent
-        var route = await _router.RouteAsync(userMessage, ct);
+        // LLM 路由：元问题交给 AssistantAgent（forceGraph 时跳过）
+        var route = forceGraph ? "graph" : await _router.RouteAsync(userMessage, ct);
         if (route == "assistant")
         {
             _logger.LogInformation("[Router] 路由到 AssistantAgent: {Msg}", userMessage);
@@ -111,6 +112,7 @@ public sealed class GraphAgentService
     public async IAsyncEnumerable<StreamChunk> ChatStreamAsync(
         string? conversationId,
         string userMessage,
+        bool forceGraph,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         // ★ 特殊前缀拦截：展开节点（用户点击搜索结果卡片上的 ✨ 按钮触发）
@@ -134,8 +136,8 @@ public sealed class GraphAgentService
             }
         }
 
-        // LLM 路由：元问题走 AssistantAgent（非流式，包装成流式返回）
-        var route = await _router.RouteAsync(userMessage, ct);
+        // LLM 路由：元问题走 AssistantAgent（非流式，包装成流式返回；forceGraph 时跳过）
+        var route = forceGraph ? "graph" : await _router.RouteAsync(userMessage, ct);
         if (route == "assistant")
         {
             _logger.LogInformation("[Router-Stream] 路由到 AssistantAgent: {Msg}", userMessage);

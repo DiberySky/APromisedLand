@@ -223,9 +223,11 @@
 
         try
         {
+            // 语义搜索页输入即检索意图：强制走图工具，跳过 assistant 意图路由
             await foreach (var chunk in SseReader.GraphAgentStreamAsync(
                                conversationId: null,
-                               message: query))
+                               message: query,
+                               forceGraph: true))
             {
                 HandleChunk(chunk);
             }

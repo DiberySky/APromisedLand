@@ -38,7 +38,7 @@ public sealed class GraphAgentController : ControllerBase
             request.ConversationId ?? "(new)", request.Message.Length);
 
         var reply = await _agents.ChatAsync(
-            request.ConversationId, request.Message, ct);
+            request.ConversationId, request.Message, request.ForceGraph, ct);
 
         return Ok(new GraphAgentReply(
             ConversationId: reply.ConversationId,
@@ -87,7 +87,7 @@ public sealed class GraphAgentController : ControllerBase
         try
         {
             await foreach (var chunk in _agents.ChatStreamAsync(
-                               request.ConversationId, request.Message, ct))
+                               request.ConversationId, request.Message, request.ForceGraph, ct))
             {
                 var payload = JsonSerializer.Serialize(chunk, sseOpts);
                 await Response.WriteAsync($"data: {payload}\n\n", ct);
