@@ -262,6 +262,45 @@
         }
     }
 
+    /// <summary>
+    /// 对话框外观自控：固定 Small 宽度（600px）、屏幕正中。
+    /// DialogOptions 的属性是 init-only，无法原地修改，故克隆后反射改写；
+    /// 其余选项（含 DialogSky 已强制关闭的背景点击）原样保留。
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        if (MudDialog is null)
+        {
+            return;
+        }
+
+        await MudDialog.SetOptionsAsync(CloneWithSmallSizeAtCenter(MudDialog.Options));
+    }
+
+    /// <summary>克隆选项并把「最大宽度 / 全宽 / 位置」改写为 Small 600px、屏幕正中。</summary>
+    private static DialogOptions CloneWithSmallSizeAtCenter(DialogOptions source)
+    {
+        var clone = (DialogOptions)Activator.CreateInstance(source.GetType())!;
+        foreach (var prop in source.GetType().GetProperties(
+                     System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+        {
+            if (prop.CanRead && prop.CanWrite)
+            {
+                prop.SetValue(clone, prop.GetValue(source));
+            }
+        }
+
+        void Set(string name, object? value)
+            => source.GetType().GetProperty(name)!.SetValue(clone, value);
+
+        Set(nameof(DialogOptions.MaxWidth), MaxWidth.Small);
+        Set(nameof(DialogOptions.FullWidth), true);
+        Set(nameof(DialogOptions.Position), DialogPosition.Center);
+        Set(nameof(DialogOptions.BackdropClick), false);
+
+        return clone;
+    }
+
     protected override void OnParametersSet()
     {
         _optionSets = OptionSets ?? new List<OptionSetSummaryDto>();
