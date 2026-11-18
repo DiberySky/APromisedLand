@@ -2,6 +2,7 @@
 @using Microsoft.Extensions.Logging
 @using TreeGraph.Shared.NodeEavSky.Dtos
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Search
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Dialogs
 @using TreeGraph.Blazor.Shared.TreeEavSky
 @using TreeGraph.Shared.TreeEavSky.Entities
 @using TreeGraph.Shared.TreeEavSky.Abstractions
@@ -294,11 +295,36 @@
             case "KnowledgeTree":
                 await ShowTreeDialogAsync<KnowledgeTree>(item.InodeId);
                 break;
+            case "SpaceNode":
+                await ShowSpaceNodesDialogAsync(item);
+                break;
             default:
                 _error = $"未知的节点类型：{item.HostType}";
                 StateHasChanged();
                 break;
         }
+    }
+
+    /// <summary>空间节点：打开所属空间的空间节点对话框并定位该节点。</summary>
+    private async Task ShowSpaceNodesDialogAsync(SemanticSearchItemDto item)
+    {
+        var parameters = new DialogParameters<SpaceNodesDialog>
+        {
+            { x => x.SpaceId, item.RootId ?? "" },
+            { x => x.SpaceName, item.ParentName },
+            { x => x.FocusNodeId, item.InodeId },
+        };
+
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+
+        await DialogService.ShowExAsync<SpaceNodesDialog>("空间节点", parameters, options);
     }
 
     private async Task ShowTreeDialogAsync<TItem>(string rootId)

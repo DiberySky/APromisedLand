@@ -57,7 +57,7 @@
     private bool HasTreeLocate =>
         Item.MatchKind != "Entity"
         && !string.IsNullOrEmpty(Item.RootId)
-        && Item.HostType is "UnitTree" or "CategoryTree" or "KnowledgeTree" or "SpaceTree";
+        && Item.HostType is "UnitTree" or "CategoryTree" or "KnowledgeTree" or "SpaceTree" or "SpaceNode";
 
     // ═══ 维护入口：按 HostType 直开宿主操作对话框 ═══
 

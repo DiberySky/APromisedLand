@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Persistence.Data;
 using TreeGraph.Persistence.NodeEavSky.Entities;
+using TreeGraph.Persistence.SpaceNodeSky.Entities;
+using TreeGraph.Persistence.SpaceSky.Entities;
 using TreeGraph.SyncServices.SemanticSearch;
 using TreeGraph.Shared.NodeSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Entities;
@@ -143,6 +145,34 @@ public class SourceTextBuilderTests
         // 节点仍在树中（仅无实体）→ 返回节点文本，实体列表为空
         Assert.NotNull(result);
         Assert.Contains("节点：一楼配电室", result!.NodeText);
+        Assert.Empty(result.EntityTexts);
+    }
+
+    [Fact]
+    public async Task Build_空间节点_路径为所属空间加节点名_归属空间正确()
+    {
+        const string spaceId = "22222222-2222-2222-2222-222222222222";
+        const string spaceNodeId = "33333333-3333-3333-3333-333333333333";
+
+        var dbName = Guid.NewGuid().ToString();
+        await using var db = CreateDb(dbName);
+        db.Spaces.Add(new Space { Id = spaceId, Name = "武汉供电段", Type = SpaceType.Dynamic });
+        db.Nodes.Add(new Node { Id = spaceNodeId, HostType = SpaceNode.HostTypeName, Name = "武东变电所" });
+        db.SpaceNodes.Add(new SpaceNode { Id = spaceNodeId, SpaceId = spaceId });
+        await db.SaveChangesAsync();
+
+        var result = await new SourceTextBuilder(db).BuildAsync(spaceNodeId);
+
+        Assert.NotNull(result);
+        // 空间节点是独立宿主，不落入空间树/线路分支
+        Assert.Equal("space_node", result!.HostType);
+        // 扁平结构：唯一"祖先"是所属空间 → 归属空间即该空间
+        Assert.Equal(spaceId, result.SpaceId);
+        Assert.Equal("层级路径：武汉供电段\n当前节点：武东变电所", result.NodeText);
+        // payload 路径快照：所属空间 > 节点名，PathIds = [空间, 自身]
+        Assert.Equal("武汉供电段 > 武东变电所", result.Path);
+        Assert.Equal(new[] { spaceId, spaceNodeId }, result.PathIds);
+        Assert.Equal(1, result.Depth);
         Assert.Empty(result.EntityTexts);
     }
 

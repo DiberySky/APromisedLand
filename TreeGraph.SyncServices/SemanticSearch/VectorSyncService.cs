@@ -198,7 +198,7 @@ public sealed class VectorSynchronizer
 
     /// <summary>
     /// 对账：比较 PG 期望向量集合与 Qdrant 已存集合，补缺删孤。
-    /// PG 活跃集合 = InodeEntities 挂载的 inode ∪ 4 棵宿主树节点 ∪ Lines ∪ LineNodes
+    /// PG 活跃集合 = InodeEntities 挂载的 inode ∪ 4 棵宿主树节点 ∪ Lines ∪ LineNodes ∪ SpaceNodes
     /// （Id 在 spaces 空间实体列表内的 space 节点除外，不创建向量）。
     /// 比对范围四选一：category（按数据类别）> spaceId（按空间子树）> lineId（按单线路）> 全量。
     /// onProgress：逐项异步进度回调（fix=同步节点 / purge=清理孤儿），流式端点逐行 await 推送；null 时零开销。
@@ -223,7 +223,7 @@ public sealed class VectorSynchronizer
         }
 
         // PG 侧期望：节点键 + 实体键。
-        // 节点 = 4 棵宿主树（空间/单位/分类/知识）+ 线路节点；
+        // 节点 = 4 棵宿主树（空间/单位/分类/知识）+ 线路/线路节点 + 空间节点；
         // space 节点（Id 存在于 spaces 空间实体列表内）不创建向量，不计入期望集合。
         var mounts = await _db.InodeEntities
             .AsNoTracking()
@@ -251,6 +251,8 @@ public sealed class VectorSynchronizer
             .Where(n => n.HostType == "LineNode")
             .Select(n => n.Id).ToListAsync(ct));
         hostNodeIds.AddRange(await _db.Lines.AsNoTracking()
+            .Select(n => n.Id).ToListAsync(ct));
+        hostNodeIds.AddRange(await _db.SpaceNodes.AsNoTracking()
             .Select(n => n.Id).ToListAsync(ct));
 
         if (scope is not null)
@@ -620,10 +622,14 @@ public sealed class VectorSynchronizer
                 var spaceEntityIds = (await _db.Spaces.AsNoTracking()
                         .Select(s => s.Id).ToListAsync(ct))
                     .ToHashSet(StringComparer.Ordinal);
-                return (await _db.SpaceTrees.AsNoTracking()
+                var spaceScope = (await _db.SpaceTrees.AsNoTracking()
                         .Select(n => n.Id).ToListAsync(ct))
                     .Where(id => !spaceEntityIds.Contains(id))
                     .ToHashSet(StringComparer.Ordinal);
+                // 空间节点归属「空间」类别（扁平结构，非空间树节点）
+                spaceScope.UnionWith(await _db.SpaceNodes.AsNoTracking()
+                    .Select(n => n.Id).ToListAsync(ct));
+                return spaceScope;
 
             case SyncCategory.Tree:
                 var ids = await _db.UnitTrees.AsNoTracking()
@@ -667,22 +673,26 @@ public sealed class VectorSynchronizer
         if (spaceType is null)
             return new HashSet<string>(StringComparer.Ordinal);
 
+        HashSet<string> scope;
         switch (spaceType.Value)
         {
             case SpaceType.Unit:
-                return (await _db.UnitTrees.AsNoTracking()
+                scope = (await _db.UnitTrees.AsNoTracking()
                         .Select(n => n.Id).ToListAsync(ct))
                     .ToHashSet(StringComparer.Ordinal);
+                break;
 
             case SpaceType.Type:
-                return (await _db.CategoryTrees.AsNoTracking()
+                scope = (await _db.CategoryTrees.AsNoTracking()
                         .Select(n => n.Id).ToListAsync(ct))
                     .ToHashSet(StringComparer.Ordinal);
+                break;
 
             case SpaceType.Knowledge:
-                return (await _db.KnowledgeTrees.AsNoTracking()
+                scope = (await _db.KnowledgeTrees.AsNoTracking()
                         .Select(n => n.Id).ToListAsync(ct))
                     .ToHashSet(StringComparer.Ordinal);
+                break;
 
             default:
                 const string subtreeSql = """
@@ -698,8 +708,15 @@ public sealed class VectorSynchronizer
                 var ids = await _db.Database
                     .SqlQueryRaw<string>(subtreeSql, param)
                     .ToListAsync(ct);
-                return ids.ToHashSet(StringComparer.Ordinal);
+                scope = ids.ToHashSet(StringComparer.Ordinal);
+                break;
         }
+
+        // 空间节点扁平挂在空间下（space_id 直接归属），任何类型空间的范围内都包含它们
+        scope.UnionWith(await _db.SpaceNodes.AsNoTracking()
+            .Where(n => n.SpaceId == spaceId)
+            .Select(n => n.Id).ToListAsync(ct));
+        return scope;
     }
 
     /// <summary>

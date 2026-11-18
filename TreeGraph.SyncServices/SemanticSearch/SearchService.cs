@@ -77,6 +77,12 @@ public sealed class SearchService
                 absoluteFloor, topScore, relativeFloor, before, hits.Count);
         }
 
+        // 名称词法兜底：短名/名称片段查询（如「武东」）的语义分常低于绝对下限，
+        // 用 nodes.name 包含匹配补足候选（精确 1.0 / 前缀 0.95 / 含 0.9）；
+        // 仅全局检索启用（按空间过滤时空间归属无法在词法层可靠判定）。
+        if (string.IsNullOrWhiteSpace(spaceId) && hits.Count < topK)
+            hits = await AppendNameMatchesAsync(hits, query, topK, ct);
+
         // 节点优先过滤：节点已命中，则其自身及全部后代节点上的实体原始命中不再列出
         var nodeHitInodeIds = hits
             .Where(h => h.PointKind != "entity")
@@ -188,6 +194,67 @@ public sealed class SearchService
     }
 
     /// <summary>
+    /// 名称词法兜底：nodes.name 包含查询文本的节点补充进候选，补齐短名/名称片段查询的召回。
+    /// 只覆盖有前端跳转入口的宿主（树节点 / 空间节点 / 线路节点），已命中的 inode 不重复。
+    /// </summary>
+    private async Task<List<SemanticHit>> AppendNameMatchesAsync(
+        IReadOnlyList<SemanticHit> hits, string query, int topK, CancellationToken ct)
+    {
+        var text = query.Trim();
+        // 单字符匹配噪声过大，不兜底
+        if (text.Length < 2) return hits.ToList();
+
+        var pattern = "%" + EscapeLikePattern(text) + "%";
+        // 仅按节点命中去重：同一 inode 的实体命中会随后被节点优先过滤替换
+        var existing = hits
+            .Where(h => h.PointKind != "entity")
+            .Select(h => h.InodeId)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var matches = await _db.Nodes.AsNoTracking()
+            .Where(n => n.Name != null
+                        && NodeSearchHostTypes.Contains(n.HostType)
+                        && EF.Functions.ILike(n.Name, pattern))
+            .Select(n => new { n.Id, n.Name, n.HostType })
+            .Take(topK * 2)
+            .ToListAsync(ct);
+
+        var additions = matches
+            .Where(m => !existing.Contains(m.Id))
+            .Select(m => new SemanticHit(
+                PointKind: "node",
+                InodeId: m.Id,
+                EntityId: null,
+                EntityType: null,
+                Score: RankNameMatch(m.Name!, text),
+                HostType: m.HostType,
+                SpaceId: "",
+                SourceHash: "",
+                SourceText: ""))
+            .Take(topK)
+            .ToList();
+
+        return hits.Concat(additions).ToList();
+    }
+
+    /// <summary>词法兜底覆盖的宿主类型（均有前端定位入口）。</summary>
+    private static readonly string[] NodeSearchHostTypes =
+    [
+        "SpaceTree", "EavTree", "UnitTree", "CategoryTree", "KnowledgeTree",
+        "SpaceNode", "LineNode"
+    ];
+
+    /// <summary>名称匹配分：完全相等 1.0，前缀 0.95，其余包含 0.9。</summary>
+    private static float RankNameMatch(string name, string query)
+        => name.Equals(query, StringComparison.OrdinalIgnoreCase) ? 1.0f
+            : name.StartsWith(query, StringComparison.OrdinalIgnoreCase) ? 0.95f
+            : 0.9f;
+
+    /// <summary>转义 LIKE 通配符（PG 默认转义符为反斜杠）。</summary>
+    private static string EscapeLikePattern(string value)
+        => value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+
+    /// <summary>
     /// 批量反查非空间树宿主的节点名称（单位树/分类树/知识树/线路节点）。
     /// 返回 inodeId → (名称, 前端契约 HostType)。
     /// </summary>
@@ -269,6 +336,34 @@ public sealed class SearchService
             .Where(n => n.HostType == "LineNode" && inodeIds.Contains(n.Id))
             .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
             result[n.Id] = (n.Name ?? "", n.Id, null);
+
+        // 空间节点：扁平结构，路径 = 所属空间名 / 节点名，根为所属空间
+        var spaceNodeRows = await _db.SpaceNodes.AsNoTracking()
+            .Where(s => inodeIds.Contains(s.Id))
+            .Select(s => new { s.Id, s.SpaceId })
+            .ToListAsync(ct);
+        if (spaceNodeRows.Count > 0)
+        {
+            var parentSpaceIds = spaceNodeRows.Select(r => r.SpaceId).Distinct().ToList();
+            var parentSpaceNames = (await _db.Spaces.AsNoTracking()
+                    .Where(s => parentSpaceIds.Contains(s.Id))
+                    .Select(s => new { s.Id, s.Name }).ToListAsync(ct))
+                .ToDictionary(s => s.Id, s => s.Name, StringComparer.Ordinal);
+            var spaceNodeNames = (await _db.Nodes.AsNoTracking()
+                    .Where(n => inodeIds.Contains(n.Id))
+                    .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
+                .ToDictionary(n => n.Id, n => n.Name, StringComparer.Ordinal);
+
+            foreach (var row in spaceNodeRows)
+            {
+                if (result.ContainsKey(row.Id)) continue;
+
+                var spaceName = parentSpaceNames.TryGetValue(row.SpaceId, out var sn) ? sn ?? "" : "";
+                var nodeName = spaceNodeNames.TryGetValue(row.Id, out var nn) ? nn ?? "" : "";
+                var path = string.IsNullOrEmpty(spaceName) ? nodeName : $"{spaceName} / {nodeName}";
+                result[row.Id] = (path, row.SpaceId, spaceName);
+            }
+        }
 
         return result;
     }
@@ -455,14 +550,15 @@ public sealed class SearchService
         return (string.Join(" / ", line), parentName, current.Id);
     }
 
-    /// <summary>Qdrant payload 的 snake_case 宿主类型 → 前端契约 HostType。</summary>
-    private static string MapHostType(string payloadHostType) => payloadHostType switch
+    /// <summary>Qdrant payload 的 snake_case 宿主类型 → 前端契约 HostType（internal：单元测试验证映射契约）。</summary>
+    internal static string MapHostType(string payloadHostType) => payloadHostType switch
     {
         "space_tree" => "SpaceTree",
         "eav_tree" => "EavTree",
         "unit_tree" => "UnitTree",
         "category_tree" => "CategoryTree",
         "knowledge_tree" => "KnowledgeTree",
+        "space_node" => "SpaceNode",
         "line_node" => "LineNode",
         "line" => "Line",
         "tree_node" => "TreeNode",

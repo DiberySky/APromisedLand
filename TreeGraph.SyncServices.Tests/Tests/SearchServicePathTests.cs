@@ -79,6 +79,18 @@ public class SearchServicePathTests
         Assert.Equal("r", rootId);
     }
 
+    [Theory]
+    [InlineData("space_tree", "SpaceTree")]
+    [InlineData("eav_tree", "EavTree")]
+    [InlineData("unit_tree", "UnitTree")]
+    [InlineData("category_tree", "CategoryTree")]
+    [InlineData("knowledge_tree", "KnowledgeTree")]
+    [InlineData("space_node", "SpaceNode")]
+    [InlineData("line_node", "LineNode")]
+    [InlineData("line", "Line")]
+    public void MapHostType_宿主类型映射为前端契约(string payloadHostType, string expected)
+        => Assert.Equal(expected, SearchService.MapHostType(payloadHostType));
+
     private static EavTree EavNode(string id, string name, string? parentId)
         => new() { Id = id, Name = name, ParentId = parentId };
 

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Persistence.Data;
 using TreeGraph.Persistence.NodeEavSky.Entities;
 using TreeGraph.Persistence.SpaceSky.Entities;
+using TreeGraph.Persistence.SpaceNodeSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Abstractions;
 using TreeGraph.Shared.TreeEavSky.Entities;
 
@@ -29,8 +30,9 @@ public sealed class SourceTextBuilder
     /// v2：LineNode 增加「所属线路」行；Line 成为宿主。
     /// v3：实体文本前置宿主 path_view（层级路径/所属线路 + 当前节点）。
     /// v4（仅 EAV 文本）：实体/行键值行统一 name = value。节点文本未变，故版本仍为 v3；
-    ///   实体点键 entity:{id} / 行点键 row:{id} 均不含版本，格式变更需强制重建这两类点。</summary>
-    public const string TemplateVersion = "v3";
+    ///   实体点键 entity:{id} / 行点键 row:{id} 均不含版本，格式变更需强制重建这两类点。
+    /// v5：新增 SpaceNode 宿主（层级路径 = 所属空间 > 节点名），节点文本结构扩展。</summary>
+    public const string TemplateVersion = "v5";
 
     /// <summary>节点向量视图类型。</summary>
     public const string ViewType = "path_view";
@@ -88,12 +90,16 @@ public sealed class SourceTextBuilder
         var lineNode = space is null && eav is null && unit is null && category is null && knowledge is null
             ? await _db.Nodes.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId && n.HostType == "LineNode", ct)
             : null;
-        var line = space is null && eav is null && unit is null && category is null && knowledge is null && lineNode is null
+        // 空间节点（扁平结构，无父子层级；名称唯一真源在 nodes）
+        var spaceNode = space is null && eav is null && unit is null && category is null && knowledge is null && lineNode is null
+            ? await _db.SpaceNodes.AsNoTracking().Include(x => x.Node).FirstOrDefaultAsync(n => n.Id == inodeId, ct)
+            : null;
+        var line = space is null && eav is null && unit is null && category is null && knowledge is null && lineNode is null && spaceNode is null
             ? await _db.Lines.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId, ct)
             : null;
 
         if (space is null && eav is null && unit is null && category is null &&
-            knowledge is null && lineNode is null && line is null && entityMounts.Count == 0)
+            knowledge is null && lineNode is null && spaceNode is null && line is null && entityMounts.Count == 0)
             return null; // 既无实体也不在任何宿主 → 删除向量
 
         // 3. 构造节点文本（path_view 两段式：层级路径/所属线路 + 当前节点）。
@@ -104,7 +110,8 @@ public sealed class SourceTextBuilder
         // 空间节点本身不建向量；其余宿主取业务显示名
         var nodeName = isSpaceNode
             ? null
-            : space?.Name ?? eav?.Name ?? unit?.Name ?? category?.Name ?? knowledge?.Name ?? lineNode?.Name ?? line?.Name;
+            : space?.Name ?? eav?.Name ?? unit?.Name ?? category?.Name ?? knowledge?.Name
+              ?? lineNode?.Name ?? spaceNode?.Node?.Name ?? line?.Name;
 
         // 祖先链：5 棵宿主树内沿 ParentId 上溯；线路节点以所属线路为唯一"祖先"
         var ancestorNames = new List<string>();
@@ -136,6 +143,17 @@ public sealed class SourceTextBuilder
                     ancestorIds.Add(parentLine.Id);
                 }
             }
+            else if (spaceNode is not null)
+            {
+                // 空间节点扁平无父子层级，唯一"祖先"是所属空间
+                var parentSpace = await _db.Spaces.AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.Id == spaceNode.SpaceId, ct);
+                if (parentSpace is not null)
+                {
+                    ancestorNames.Add(NormalizeName(parentSpace.Name));
+                    ancestorIds.Add(parentSpace.Id);
+                }
+            }
         }
 
         var selfName = NormalizeName(nodeName);
@@ -156,9 +174,10 @@ public sealed class SourceTextBuilder
             : unit is not null ? "unit_tree"
             : category is not null ? "category_tree"
             : knowledge is not null ? "knowledge_tree"
+            : spaceNode is not null ? "space_node"
             : line is not null ? "line"
             : "line_node";
-        var spaceId = await ResolveSpaceIdAsync(space, eav, unit, category, knowledge, inodeId, ct);
+        var spaceId = await ResolveSpaceIdAsync(space, eav, unit, category, knowledge, spaceNode, inodeId, ct);
 
         // 5. 构造各实体独立文本（v3：前置宿主 path_view，实体可被路径语义命中）
         // 前缀用 EAV 等号格式（name = value），与节点向量文案分离
@@ -189,7 +208,8 @@ public sealed class SourceTextBuilder
     ///   空间树节点 → 自身或最近的空间祖先（Id ∈ spaces）；
     ///   EAV 树节点 → 无空间归属，归 "default"（仅全局检索可见）；
     ///   单位/分类/知识树节点 → 对应类型空间（当前每类型单空间假设，与对账 ResolveScope 口径一致）；
-    ///   线路节点 → 无空间归属，归 "default"（仅全局检索可见）。
+    ///   线路节点 → 无空间归属，归 "default"（仅全局检索可见）；
+    ///   空间节点 → 自身 space_id（归属空间）。
     /// 无对应空间时归 "default"。
     /// </summary>
     private async Task<string> ResolveSpaceIdAsync(
@@ -198,6 +218,7 @@ public sealed class SourceTextBuilder
         UnitTree? unit,
         CategoryTree? category,
         KnowledgeTree? knowledge,
+        SpaceNode? spaceNode,
         string inodeId,
         CancellationToken ct)
     {
@@ -224,6 +245,10 @@ public sealed class SourceTextBuilder
             }
             return "default";
         }
+
+        // 空间节点：直接归其所属空间（扁平结构，无祖先链）
+        if (spaceNode is not null)
+            return spaceIds.Contains(spaceNode.SpaceId) ? spaceNode.SpaceId : "default";
 
         SpaceType? spaceType = unit is not null ? SpaceType.Unit
             : category is not null ? SpaceType.Type

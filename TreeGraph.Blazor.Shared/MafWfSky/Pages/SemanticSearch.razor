@@ -1,6 +1,7 @@
 @page "/search"
 @namespace TreeGraph.Blazor.Shared.MafWfSky.Pages
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Search
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Dialogs
 @inject MafWfSseReader SseReader
 @inject NavigationManager Nav
 @inject IDialogService DialogService
@@ -352,11 +353,36 @@
             case "KnowledgeTree":
                 await ShowTreeDialogAsync<KnowledgeTree>(item.RootId);
                 break;
+            case "SpaceNode":
+                await ShowSpaceNodesDialogAsync(item);
+                break;
             default:
                 _lastReply = $"未知的节点类型：{item.HostType}";
                 StateHasChanged();
                 break;
         }
+    }
+
+    /// <summary>空间节点：打开所属空间的空间节点对话框并定位该节点。</summary>
+    private async Task ShowSpaceNodesDialogAsync(SemanticSearchItemDto item)
+    {
+        var parameters = new DialogParameters<SpaceNodesDialog>
+        {
+            { x => x.SpaceId, item.RootId ?? "" },
+            { x => x.SpaceName, item.ParentName },
+            { x => x.FocusNodeId, item.InodeId },
+        };
+
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+
+        await DialogService.ShowExAsync<SpaceNodesDialog>("空间节点", parameters, options);
     }
 
     private async Task ShowTreeDialogAsync<TItem>(string rootId)
