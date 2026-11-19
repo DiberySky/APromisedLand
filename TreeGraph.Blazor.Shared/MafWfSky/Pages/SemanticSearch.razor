@@ -2,6 +2,7 @@
 @namespace TreeGraph.Blazor.Shared.MafWfSky.Pages
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Search
 @using TreeGraph.Blazor.Shared.SpaceNodeSky.Dialogs
+@using TreeGraph.Blazor.Shared.LineSky.Dialogs
 @inject MafWfSseReader SseReader
 @inject NavigationManager Nav
 @inject IDialogService DialogService
@@ -358,6 +359,9 @@
             case "SpaceNode":
                 await ShowSpaceNodesDialogAsync(item);
                 break;
+            case "LineNode":
+                await ShowLineNodesDialogAsync(item);
+                break;
             default:
                 _lastReply = $"未知的节点类型：{item.HostType}";
                 StateHasChanged();
@@ -385,6 +389,28 @@
         };
 
         await DialogService.ShowExAsync<SpaceNodesDialog>("空间节点", parameters, options);
+    }
+
+    /// <summary>线路节点：打开所属线路的线路节点对话框并按节点名定位。</summary>
+    private async Task ShowLineNodesDialogAsync(SemanticSearchItemDto item)
+    {
+        var parameters = new DialogParameters<LineNodeManageDialog>
+        {
+            { x => x.LineId, item.RootId ?? "" },
+            { x => x.LineName, item.ParentName },
+            { x => x.FocusNodeName, item.NodeName },
+        };
+
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+
+        await DialogService.ShowExAsync<LineNodeManageDialog>("线路节点", parameters, options);
     }
 
     private async Task ShowTreeDialogAsync<TItem>(string rootId)

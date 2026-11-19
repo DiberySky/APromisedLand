@@ -1,0 +1,612 @@
+@* NodeSemanticSearch.razor — 节点语义搜索（直连 SyncServices，不经 Agent）
+   与 /semantic-search-direct 同链路，布局改为 PageSky 骨架：
+   搜索内容录入框固定在底部 BottomBar，正文只放设置与结果列表。 *@
+@page "/node-semantic-search"
+@using Microsoft.Extensions.Logging
+@using Microsoft.JSInterop
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Search
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Dialogs
+@using TreeGraph.Blazor.Shared.SpaceNodeSky.Services
+@using TreeGraph.Blazor.Shared.SpaceSky.Services
+@using TreeGraph.Shared.SpaceNodeSky.Dtos
+@using TreeGraph.Blazor.Shared.LineSky
+@using TreeGraph.Blazor.Shared.LineSky.Components
+@using TreeGraph.Blazor.Shared.LineSky.Dialogs
+@using TreeGraph.Blazor.Shared.LineSky.Services
+@using TreeGraph.Blazor.Shared.TreeEavSky
+@using TreeGraph.Shared.TreeEavSky.Entities
+@using TreeGraph.Shared.TreeEavSky.Abstractions
+@using MudBlazor
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Pages
+@inject EavApiClient EavApi
+@inject LineManageApiClient LineApi
+@inject LineNodeManageApiClient LineNodeApi
+@inject SpaceNodeApiClient SpaceNodeApi
+@inject SpaceApiClient SpaceApi
+@inject ILogger<NodeSemanticSearch> Logger
+@inject IDialogService DialogService
+@inject BlazorService BlazorService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageSky Title="节点语义搜索"
+         ArrowBackVisible="false"
+         MaxWidth="MaxWidth.Medium"
+         BottomBarVisible="true">
+
+    <TopBarRightContent>
+        @if (_results.Count > 0 && !_searching)
+        {
+            <MudIconButton Icon="@Icons.Material.Outlined.ClearAll"
+                           Color="Color.Inherit"
+                           Size="Size.Small"
+                           Title="清空结果"
+                           OnClick="ClearResults" />
+        }
+    </TopBarRightContent>
+
+    <PageContent>
+        @* ═══ 已选节点（语义搜索选择器返回） ═══ *@
+        @if (_picked is not null)
+        {
+            <MudPaper Elevation="0" Class="pa-3 mt-3">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Color="Color.Success" Size="Size.Small"/>
+                    <MudText Typo="Typo.body2">
+                        已选节点：<strong>@(_picked.NodeName ?? _picked.InodeId)</strong>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-2">
+                            @_picked.HostType
+                        </MudChip>
+                    </MudText>
+                    <MudSpacer/>
+                    <MudIconButton Icon="@Icons.Material.Outlined.AccountTree"
+                                   Size="Size.Small"
+                                   Title="树定位"
+                                   OnClick="@(() => OpenTreeDialogAsync(_picked))"/>
+                    <MudIconButton Icon="@Icons.Material.Outlined.OpenInNew"
+                                   Size="Size.Small"
+                                   Title="打开详情"
+                                   OnClick="@(() => Nav.NavigateTo($"/inodes/{_picked.InodeId}"))"/>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Close"
+                                   Size="Size.Small"
+                                   Title="清除"
+                                   OnClick="ClearPicked"/>
+                </MudStack>
+            </MudPaper>
+        }
+
+        @* ═══ 错误提示 ═══ *@
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="ma-3">
+                @_error
+            </MudAlert>
+        }
+
+        @* ═══ 搜索结果（分页列表，见 SearchResultList） ═══ *@
+        @if (_results.Count > 0)
+        {
+            <MudPaper Elevation="0" Class="pa-4">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">
+                    找到 <strong>@_results.Count</strong> 个结果（查询：@_lastQuery）
+                </MudText>
+
+                <SearchResultList Items="_results"
+                                  ShowPagination="false"
+                                  OnOpenTree="OpenTreeDialogAsync"
+                                  OnAiExpand="OpenExpandDialogAsync"
+                                  OnChanged="OnResultChangedAsync"
+                                  OnDeleted="OnResultDeletedAsync"/>
+            </MudPaper>
+        }
+        else if (_searched && !_searching)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="ma-3">
+                未找到匹配结果
+            </MudAlert>
+        }
+        else if (!_searched)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="2" Class="mt-10 pa-4">
+                <MudIcon Icon="@Icons.Material.Filled.ManageSearch"
+                         Size="Size.Large" Color="Color.Success"/>
+                <MudText Typo="Typo.body1" Color="Color.Default" Align="Align.Center">
+                    在下方输入框输入名称或描述，回车搜索
+                </MudText>
+            </MudStack>
+        }
+
+        @* ═══ 搜索中 ═══ *@
+        @if (_searching)
+        {
+            <MudPaper Elevation="0" Class="pa-4 d-flex justify-center">
+                <MudProgressCircular Indeterminate="true"/>
+            </MudPaper>
+        }
+    </PageContent>
+
+    <BottomBarContent>
+        @* 底部固定区：上行搜索内容录入框，下行最低相似度调节 *@
+        <MudStack Spacing="0" Class="px-2" Style="width: 100%;">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudTextField @bind-Value="_query"
+                              id="nss-query"
+                              Placeholder="输入关键词进行语义搜索（Enter 发送，Shift+Enter 换行）..."
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Lines="3"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Outlined.Search"
+                              Immediate="true"
+                              Disabled="_searching"
+                              Style="flex: 1;"/>
+                <MudIconButton Icon="@Icons.Material.Outlined.Send"
+                               Color="Color.Primary"
+                               Disabled="@(_searching || string.IsNullOrWhiteSpace(_query))"
+                               OnClick="DoSearchAsync"/>
+            </MudStack>
+
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <MudText Typo="Typo.caption" Color="Color.Info" Style="white-space: nowrap; margin-left: 4px;">
+                    匹配严格度
+                </MudText>
+                <MudSelect T="int" @bind-Value="_level"
+                           Dense="true"
+                           Margin="Margin.Dense"
+                           Variant="Variant.Outlined"
+                           Disabled="_searching"
+                           AnchorOrigin="Origin.TopCenter"
+                           TransformOrigin="Origin.BottomCenter"
+                           Style="@LevelSelectStyle">
+                    @foreach (var lv in ScoreLevels)
+                    {
+                        <MudSelectItem T="int" Value="lv.Level">@lv.Label</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudIconButton Icon="@Icons.Material.Outlined.PersonSearch"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Title="按语义选节点"
+                               OnClick="PickNodeAsync"
+                               Disabled="_searching"/>
+            </MudStack>
+        </MudStack>
+    </BottomBarContent>
+</PageSky>
+
+@code {
+    /// <summary>后端一次性捞回的候选条数：30 条全部平铺展示，不分页。</summary>
+    private const int TopK = 30;
+
+    private string _query = "";
+
+    /// <summary>Enter 提交的 JS 回调引用。</summary>
+    private DotNetObjectReference<NodeSemanticSearch>? _selfRef;
+
+    /// <summary>相似度档位（1 最宽松 … 10 最严格），对内换算成 MinScore。</summary>
+    private int _level = 5;
+
+    /// <summary>档位 → 语言描述：普通用户按“严格程度”选择，不暴露裸数字阈值。</summary>
+    private sealed record ScoreLevel(int Level, float MinScore, string Label);
+
+    private static readonly ScoreLevel[] ScoreLevels =
+    {
+        new(1, 0.1f, "极宽松"),
+        new(2, 0.2f, "很宽松"),
+        new(3, 0.3f, "宽松"),
+        new(4, 0.4f, "略宽松"),
+        new(5, 0.5f, "适中"),
+        new(6, 0.6f, "略严格"),
+        new(7, 0.7f, "偏严格"),
+        new(8, 0.8f, "严格"),
+        new(9, 0.9f, "很严格"),
+        new(10, 1.0f, "极严格"),
+    };
+
+    /// <summary>当前档位对应的服务端 MinScore 阈值。</summary>
+    private float MinScore => ScoreLevels[Math.Clamp(_level, 1, 10) - 1].MinScore;
+
+    /// <summary>当前档位文案。</summary>
+    private string CurrentLevelLabel => ScoreLevels[Math.Clamp(_level, 1, 10) - 1].Label;
+
+    /// <summary>
+    /// 下拉框宽度随所选文案自适应：中文字宽约 1em，另加内边距与下拉箭头空间。
+    /// 不占满整行，避免挤压左侧「结果条数」。
+    /// </summary>
+    private string LevelSelectStyle =>
+        $"width: calc({CurrentLevelLabel.Length}em + 56px); min-width: 110px; flex: 0 0 auto;";
+    private bool _searching;
+    private bool _searched;
+    private string? _error;
+    private string _lastQuery = "";
+    private List<SemanticSearchItemDto> _results = new();
+
+    /// <summary>经「选节点」对话框选中的节点（null 表示未选择）。</summary>
+    private SemanticSearchItemDto? _picked;
+
+    /// <summary>空间节点内容/设置对话框选项（顶部居中，可最大化）。</summary>
+    private static readonly DialogOptionsEx SpaceNodeDialogOptions = new()
+    {
+        Position = DialogPosition.TopCenter,
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        MaximizeButton = true,
+        BackdropClick = false
+    };
+
+    private void ClearResults()
+    {
+        _results.Clear();
+        _searched = false;
+        _error = null;
+        StateHasChanged();
+    }
+
+    /// <summary>打开语义搜索节点选择器，确认后在上方展示已选节点。</summary>
+    private async Task PickNodeAsync()
+    {
+        var picked = await NodePicker.PickAsync(
+            DialogService,
+            initialQuery: string.IsNullOrWhiteSpace(_query) ? null : _query.Trim(),
+            minScore: MinScore);
+
+        if (picked is null) return;
+
+        _picked = picked;
+        StateHasChanged();
+    }
+
+    private void ClearPicked()
+    {
+        _picked = null;
+        StateHasChanged();
+    }
+
+    private async Task DoSearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_query) || _searching) return;
+
+        _searching = true;
+        _error = null;
+        _results.Clear();
+        _lastQuery = _query;
+        StateHasChanged();
+
+        try
+        {
+            var request = new SemanticSearchRequest
+            {
+                Query = _query,
+                TopK = TopK,
+                MinScore = MinScore,
+            };
+            var response = await EavApi.SemanticSearchAsync(request);
+
+            if (response is null)
+            {
+                _error = "搜索服务返回空响应";
+            }
+            else
+            {
+                _results = response.Items?.ToList() ?? new List<SemanticSearchItemDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "语义搜索失败");
+            _error = $"搜索失败：{ex.Message}";
+        }
+        finally
+        {
+            _searching = false;
+            _searched = true;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>输入框 Enter 发送 / Shift+Enter 换行（由 enterSubmit.js 拦截默认换行）。</summary>
+    [JSInvokable]
+    public async Task OnEnterSubmit()
+    {
+        if (_searching || string.IsNullOrWhiteSpace(_query)) return;
+        await DoSearchAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _selfRef = DotNetObjectReference.Create(this);
+        try
+        {
+            await JS.InvokeVoidAsync("enterSubmit.register", "#nss-query", _selfRef);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "注册输入框 Enter 提交失败，仅保留发送按钮");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("enterSubmit.unregister", "#nss-query");
+        }
+        catch (Exception)
+        {
+            // 页面卸载/JS 环境已销毁时忽略
+        }
+
+        _selfRef?.Dispose();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 结果变更回调（操作菜单）
+    // ═══════════════════════════════════════════════════════
+
+    /// <summary>变更后重跑搜索（名称/结构已变，列表需刷新）。</summary>
+    private async Task OnResultChangedAsync(SemanticSearchItemDto item) => await DoSearchAsync();
+
+    private Task OnResultDeletedAsync(SemanticSearchItemDto item)
+    {
+        _results.RemoveAll(r => r.InodeId == item.InodeId);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // AI 综合：点击 ✨ 立即打开对话框，框内显示进度 → 框内呈现结果
+    // ═══════════════════════════════════════════════════════
+
+    private async Task OpenExpandDialogAsync(SemanticSearchItemDto item)
+    {
+        var parameters = new DialogParameters<NodeExpandDialog>
+        {
+            { x => x.InodeId, item.InodeId },
+            { x => x.HostType, item.HostType },
+            { x => x.NodeName, item.NodeName ?? item.InodeId },
+        };
+
+        var options = new DialogConfig
+        {
+            MaxWidth = MaxWidth.Small,
+            DragMode = MudDialogDragMode.None, // 本对话框不可移动
+        }.ToDialogOptions();
+
+        await DialogService.ShowExAsync<NodeExpandDialog>(
+            "AI 综合", parameters, options);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 树对话框
+    // ═══════════════════════════════════════════════════════
+
+    private async Task OpenTreeDialogAsync(SemanticSearchItemDto item)
+    {
+        if (string.IsNullOrEmpty(item.RootId))
+        {
+            _error = "该节点没有根节点信息，无法打开树视图";
+            StateHasChanged();
+            return;
+        }
+
+        switch (item.HostType)
+        {
+            case "SpaceTree":
+                await ShowTreeDialogAsync<SpaceTree>(item.InodeId, SpaceNameOf(item));
+                break;
+            case "UnitTree":
+                await ShowTreeDialogAsync<UnitTree>(item.InodeId, "");
+                break;
+            case "CategoryTree":
+                await ShowTreeDialogAsync<CategoryTree>(item.InodeId, "");
+                break;
+            case "KnowledgeTree":
+                await ShowTreeDialogAsync<KnowledgeTree>(item.InodeId, "");
+                break;
+            case "SpaceNode":
+                await ShowSpaceNodesDialogAsync(item);
+                break;
+            case "LineNode":
+                await ShowLineNodesDialogAsync(item);
+                break;
+            case "Line":
+                await ShowLinesDialogAsync(item);
+                break;
+            default:
+                _error = $"未知的节点类型：{item.HostType}";
+                StateHasChanged();
+                break;
+        }
+    }
+
+    /// <summary>空间节点：打开「节点内容」（只读详情 → 设置修改循环）。</summary>
+    private async Task ShowSpaceNodesDialogAsync(SemanticSearchItemDto item)
+    {
+        var spaceId = item.RootId ?? "";
+        if (string.IsNullOrEmpty(spaceId))
+        {
+            _error = "该节点缺少所属空间信息，无法打开节点内容";
+            StateHasChanged();
+            return;
+        }
+
+        SpaceNodeDto? current;
+        string spaceName;
+        try
+        {
+            current = (await SpaceNodeApi.GetNodesAsync(spaceId))
+                .FirstOrDefault(n => n.Id == item.InodeId);
+            spaceName = (await SpaceApi.GetByIdAsync(spaceId))?.Name ?? item.ParentName ?? spaceId;
+        }
+        catch (Exception ex)
+        {
+            _error = $"加载空间节点失败：{ex.Message}";
+            StateHasChanged();
+            return;
+        }
+
+        if (current is null)
+        {
+            _error = "空间节点不存在或已被删除";
+            StateHasChanged();
+            return;
+        }
+
+        var changed = false;
+        while (current is not null)
+        {
+            var parameters = new DialogParameters<SpaceNodeDetailDialog>
+            {
+                { x => x.Node, current },
+                { x => x.SpaceName, spaceName },
+            };
+            var dialog = await DialogService.ShowExAsync<SpaceNodeDetailDialog>(
+                "节点内容", parameters, SpaceNodeDialogOptions);
+            var result = await dialog.Result;
+
+            if (result is not { Canceled: false })
+                break;
+
+            // 「设置修改」返回最新快照；删除流程返回 null 退出循环
+            var updated = await ShowSpaceNodeSettingsAsync(spaceId, spaceName, current);
+            if (updated is not null)
+                changed = true;
+            current = updated;
+        }
+
+        if (current is null)
+            OnResultDeletedAsync(item);
+        else if (changed)
+            await OnResultChangedAsync(item);
+    }
+
+    /// <summary>空间节点设置修改：保存返回最新快照，删除返回 null。</summary>
+    private async Task<SpaceNodeDto?> ShowSpaceNodeSettingsAsync(
+        string spaceId, string spaceName, SpaceNodeDto node)
+    {
+        var parameters = new DialogParameters<SpaceNodeEditDialog>
+        {
+            { x => x.SpaceId, spaceId },
+            { x => x.SpaceName, spaceName },
+            { x => x.Node, node },
+        };
+        var dialog = await DialogService.ShowExAsync<SpaceNodeEditDialog>(
+            "设置修改", parameters, SpaceNodeDialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: string action }
+            && action == SpaceNodeEditDialog.DeleteAction)
+        {
+            await ShowSpaceNodeDeleteAsync(spaceId, node);
+            return null;
+        }
+
+        if (result is { Canceled: false, Data: SpaceNodeDto updated })
+            return updated;
+
+        return node;
+    }
+
+    /// <summary>空间节点删除确认（守卫失败原因由对话框透出）。</summary>
+    private async Task ShowSpaceNodeDeleteAsync(string spaceId, SpaceNodeDto node)
+    {
+        var parameters = new DialogParameters<SpaceNodeDeleteDialog>
+        {
+            { x => x.SpaceId, spaceId },
+            { x => x.Node, node },
+        };
+        var dialog = await DialogService.ShowAsync<SpaceNodeDeleteDialog>(
+            null, parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        await dialog.Result;
+    }
+
+    /// <summary>线路节点：打开「节点内容」宿主对话框（编辑/属性/删除连续操作，可跳线路维护）。</summary>
+    private async Task ShowLineNodesDialogAsync(SemanticSearchItemDto item)
+    {
+        var outcome = await LineNodeActions.OperateAsync(
+            DialogService, LineNodeApi, item.InodeId, item.ParentName,
+            showLineManage: true);
+
+        if (outcome == LineNodeHostOutcome.Deleted)
+            OnResultDeletedAsync(item);
+        else if (outcome == LineNodeHostOutcome.Changed)
+            await OnResultChangedAsync(item);
+    }
+
+    /// <summary>线路：打开所属图空间的线路对话框并定位该线路。</summary>
+    private async Task ShowLinesDialogAsync(SemanticSearchItemDto item)
+    {
+        LineDto? line;
+        try
+        {
+            line = await LineApi.GetByIdAsync(item.InodeId);
+        }
+        catch (Exception ex)
+        {
+            _error = $"加载线路失败：{ex.Message}";
+            StateHasChanged();
+            return;
+        }
+
+        if (line is null)
+        {
+            _error = "线路不存在或已被删除";
+            StateHasChanged();
+            return;
+        }
+
+        var parameters = new DialogParameters<LinesDialog>
+        {
+            { x => x.SpaceId, line.SpaceId },
+            { x => x.FocusLineId, line.Id },
+        };
+
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+
+        await DialogService.ShowExAsync<LinesDialog>("线路", parameters, options);
+    }
+
+    /// <summary>取路径首段作为空间名（Path 形如「空间 / … / 本节点」）。</summary>
+    private static string SpaceNameOf(SemanticSearchItemDto item)
+    {
+        var path = item.Path ?? "";
+        var idx = path.IndexOf(" / ", StringComparison.Ordinal);
+        return idx > 0 ? path[..idx] : path;
+    }
+
+    private async Task ShowTreeDialogAsync<TItem>(string rootId, string titleToolBar)
+        where TItem : class, ITreeNodeBase<TItem>, new()
+    {
+        var parameters = new DialogParameters<TreeDialogPageSky<TItem>>
+        {
+            { x => x.Title, "树节点" },
+            { x => x.TitleToolBar, titleToolBar },
+            { x => x.RootId, rootId },
+        };
+
+        var options = BlazorService.DialogOptions;
+
+        var dialog = await DialogService.ShowExAsync<TreeDialogPageSky<TItem>>(
+            "树节点", parameters, options);
+
+        var result = await dialog.Result;
+
+        // 用户在树对话框中选择了节点
+        if (result is { Canceled: false, Data: TItem selectedNode })
+        {
+            _error = null;
+            StateHasChanged();
+        }
+    }
+}

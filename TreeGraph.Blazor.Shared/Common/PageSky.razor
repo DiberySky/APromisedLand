@@ -34,7 +34,9 @@
     </ChildContent>
 </MudAppBar>
 
-<MudContainer MaxWidth="@MaxWidth" Class="mb-16">
+<MudContainer MaxWidth="@MaxWidth"
+              Class="@(BottomBarVisible ? null : "mb-16")"
+              Style="@(BottomBarVisible ? "padding-bottom: 180px;" : null)">
     @if (PageContent is not null)
     {
         @PageContent
@@ -43,8 +45,10 @@
 
 @if (BottomBarVisible)
 {
-    <MudAppBar Bottom Color="@BottomBarColor" Dense>
-        <ChildContent>
+    @* 底部固定栏：脱离文档流悬浮于视口底部，滚动正文时不移动。
+       与 /search 输入栏同一套定位规则（桌面端避让抽屉宽度）。 *@
+    <div class="page-sky-bottom-bar">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="px-4 py-2">
             @if (BottomBarContent is not null)
             {
                 @BottomBarContent
@@ -57,16 +61,36 @@
                                Color="Color.Error"
                                OnClick="Logout" Size="Size.Small" />
             }
-        </ChildContent>
-    </MudAppBar>
+        </MudStack>
+    </div>
 }
+
+<style>
+    .page-sky-bottom-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 200;
+        background: var(--mud-palette-surface);
+        border-top: 1px solid var(--mud-palette-lines-default);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    /* 桌面端（≥960px）抽屉展开时避让其宽度；移动端为浮层，不推挤内容 */
+    @@media (min-width: 960px) {
+        .mud-layout.mud-drawer-open-responsive-md-left .page-sky-bottom-bar {
+            left: var(--mud-drawer-width-left, 240px);
+        }
+    }
+</style>
 
 @code {
     [Parameter] public required string Title { get; set; }
     [Parameter] public bool ArrowBackVisible { get; set; } = true;
     [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.False;
     [Parameter] public bool BottomBarVisible { get; set; } = false;
-    [Parameter] public Color BottomBarColor { get; set; } = Color.Dark;
     [Parameter] public bool StartButtonVisible { get; set; } = false;
 
     /// <summary>底部栏是否显示登出按钮，由调用方按自身认证状态控制。</summary>

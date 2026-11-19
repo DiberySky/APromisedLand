@@ -1,38 +1,17 @@
 @* SearchResultActionsMenu.razor — 语义搜索结果行的节点操作入口（行内图标直开宿主操作对话框）。
-   维护图标（⋯）：按 HostType 直开对应宿主操作对话框——树宿主 → 物化节点后开 TreeNodeActionsDialog
-   + 共享编排循环（TreeNodeActionOrchestrator）；LineNode → LineNodeActionsDialog 连续操作循环；
-   裸节点/属性数据命中 → 属性对话框。
-   树定位/AI 综合为独立行内图标（页面级能力，由页面回调处理）。 *@
+   打开节点内容/树定位/AI 综合为独立行内图标（页面级能力，由页面回调处理）。 *@
 @namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Search
-@using Microsoft.Extensions.DependencyInjection
-@using TreeGraph.Blazor.Shared.LineSky
-@using TreeGraph.Blazor.Shared.LineSky.Components
-@using TreeGraph.Blazor.Shared.LineSky.Services
-@using TreeGraph.Blazor.Shared.TreeEavSky
-@using TreeGraph.Blazor.Shared.TreeEavSky.Contracts
-@using TreeGraph.Blazor.Shared.TreeEavSky.Services
-@using TreeGraph.Blazor.Shared.TreeEavSky.Trees
-@using TreeGraph.Shared.TreeEavSky.Abstractions
-@using TreeGraph.Shared.TreeEavSky.Entities
-@using TreeGraph.Shared.TreeEavSky.Models
-@inject IDialogService DialogService
-@inject ISnackbar Snackbar
-@inject IServiceProvider Services
-@inject LineNodeManageApiClient LineNodeApi
 
-@* 维护：直开对应 Node 类型的宿主操作对话框 *@
-<MudIconButton Icon="@Icons.Material.Outlined.MoreVert"
-               Size="Size.Small"
-               title="节点操作"
-               OnClick="OpenMaintenanceAsync" />
-@if (HasTreeLocate)
+@if (HasLocate)
 {
-    <MudIconButton Icon="@Icons.Material.Outlined.Forest"
+    <MudIconButton Icon="@LocateIcon"
+                   Color="Color.Info"
                    Size="Size.Small"
-                   title="树定位"
+                   title="@LocateTitle"
                    OnClick="OpenTreeAsync" />
 }
 <MudIconButton Icon="@Icons.Material.Outlined.AutoAwesome"
+               Color="Color.Primary"
                Size="Size.Small"
                title="AI 综合"
                OnClick="AiExpandAsync" />
@@ -53,102 +32,30 @@
     /// <summary>删除成功（或节点已不存在）后触发。</summary>
     [Parameter] public EventCallback<SemanticSearchItemDto> OnDeleted { get; set; }
 
-    /// <summary>树定位可用：树宿主节点命中且有根节点信息。</summary>
-    private bool HasTreeLocate =>
+    /// <summary>定位可用：节点命中且有根信息（树宿主 / 空间节点 / 线路节点 / 线路）。</summary>
+    private bool HasLocate =>
         Item.MatchKind != "Entity"
         && !string.IsNullOrEmpty(Item.RootId)
-        && Item.HostType is "UnitTree" or "CategoryTree" or "KnowledgeTree" or "SpaceTree" or "SpaceNode";
+        && Item.HostType is "UnitTree" or "CategoryTree" or "KnowledgeTree" or "SpaceTree" or "SpaceNode" or "LineNode" or "Line";
 
-    // ═══ 维护入口：按 HostType 直开宿主操作对话框 ═══
-
-    private Task OpenMaintenanceAsync()
+    /// <summary>定位/打开图标：树宿主→账户树，空间节点→枢纽，线路节点→提交点，线路→线路。</summary>
+    private string LocateIcon => Item.HostType switch
     {
-        if (Item.MatchKind != "Entity")
-        {
-            switch (Item.HostType)
-            {
-                case "UnitTree": return OpenTreeHostAsync<UnitTree>(TreeEditTemplates.UnitEdit);
-                case "CategoryTree": return OpenTreeHostAsync<CategoryTree>(TreeEditTemplates.CategoryEdit);
-                case "KnowledgeTree": return OpenTreeHostAsync<KnowledgeTree>(TreeEditTemplates.KnowledgeEdit);
-                case "SpaceTree": return OpenTreeHostAsync<SpaceTree>(TreeEditTemplates.SpaceEdit);
-                case "LineNode": return OpenLineNodeActionsAsync();
-            }
-        }
+        "SpaceNode" => Icons.Material.Outlined.Hub,
+        "LineNode" => Icons.Material.Outlined.Commit,
+        "Line" => Icons.Material.Outlined.Route,
+        _ => Icons.Material.Outlined.AccountTree
+    };
 
-        // 裸节点（TreeNode）/ 属性数据命中：属性对话框直开
-        return AttributesAsync();
-    }
+    /// <summary>定位按钮标题，按宿主区分。</summary>
+    private string LocateTitle => Item.HostType switch
+    {
+        "SpaceNode" => "打开节点内容",
+        "LineNode" => "打开节点内容",
+        "Line" => "打开线路",
+        _ => "树定位"
+    };
 
     private Task OpenTreeAsync() => OnOpenTree.InvokeAsync(Item);
     private Task AiExpandAsync() => OnAiExpand.InvokeAsync(Item);
-
-    // ═══ 通用：EAV 属性（宿主无关，NodeId = iNode） ═══
-
-    private Task AttributesAsync() => LineNodeActions.AttributesAsync(DialogService, Item.InodeId);
-
-    // ═══ 树宿主：物化节点 → TreeNodeActionsDialog + 共享编排循环 ═══
-
-    private async Task OpenTreeHostAsync<TItem>(RenderFragment<TItem> editTemplate)
-        where TItem : class, ITreeNodeBase<TItem>, new()
-    {
-        var api = Services.GetRequiredService<TreeApiClient<TItem>>();
-
-        TreeNodeDto<TItem>? dto;
-        try
-        {
-            dto = await api.GetNodeByIdAsync(Item.InodeId);
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"加载节点失败：{ex.Message}", Severity.Error);
-            return;
-        }
-
-        if (dto?.Value is null)
-        {
-            Snackbar.Add("节点不存在或已被删除", Severity.Warning);
-            await OnDeleted.InvokeAsync(Item);
-            return;
-        }
-
-        var node = dto.ToTreeNodeItem();
-        var nodeTemplate = new NodeTemplate<TItem> { Node = node };
-
-        // 树外场景：无可视树——刷新类回调为空操作；
-        // 父节点信息来自 GetNodeByIdAsync 填充的 Value.Parent（宿主工具条/移动确认用）。
-        var ui = new TreeNodeActionUi<TItem>
-        {
-            EditTemplate = editTemplate,
-            IsRoot = v => v.Id == Item.RootId || v.ParentId is null,
-            GetParentNode = _ => node.Value?.Parent,
-            FindLoadedNode = _ => null,
-            LoadChildrenAsync = async (v, ct) =>
-                (await api.GetChildrenAsync(v!.Id, ct)).Select(d => d.ToTreeNodeItem()).ToList(),
-            RefreshNodeChildrenAsync = (_, _) => Task.CompletedTask,
-            RefreshTreeAsync = _ => Task.CompletedTask,
-            ReloadAndExpandAsync = (_, _) => Task.CompletedTask,
-        };
-
-        var ops = Services.GetRequiredService<TreeNodeActionOrchestrator<TItem>>();
-        var outcome = await ops.OperateAsync(nodeTemplate, ui);
-
-        if (outcome == TreeNodeHostOutcome.Deleted)
-            await OnDeleted.InvokeAsync(Item);
-        else if (outcome == TreeNodeHostOutcome.Changed)
-            await OnChanged.InvokeAsync(Item);
-    }
-
-    // ═══ LineNode：宿主操作对话框（编辑/属性/删除/线路维护连续操作循环，无移动——换线路走编辑对话框） ═══
-
-    private async Task OpenLineNodeActionsAsync()
-    {
-        var outcome = await LineNodeActions.OperateAsync(
-            DialogService, LineNodeApi, Item.InodeId, Item.ParentName,
-            showLineManage: true, snackbar: Snackbar);
-
-        if (outcome == LineNodeHostOutcome.Deleted)
-            await OnDeleted.InvokeAsync(Item);
-        else if (outcome == LineNodeHostOutcome.Changed)
-            await OnChanged.InvokeAsync(Item);
-    }
 }

@@ -331,11 +331,39 @@ public sealed class SearchService
         await LoadTree(_db.KnowledgeTrees);
         await LoadTree(_db.EavTrees);
 
-        // 线路节点：无层级，路径即自身名称，根为自身
-        foreach (var n in await _db.Nodes.AsNoTracking()
-            .Where(n => n.HostType == "LineNode" && inodeIds.Contains(n.Id))
-            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
-            result[n.Id] = (n.Name ?? "", n.Id, null);
+        // 线路节点：扁平结构，路径 = 所属线路名 / 节点名，根为所属线路（与 payload pathIds[0]=LineId 对齐）
+        var lineNodeRows = (await _db.Nodes.AsNoTracking()
+                .Where(n => n.HostType == "LineNode" && inodeIds.Contains(n.Id))
+                .Select(n => new { n.Id, n.Name, n.LineId })
+                .ToListAsync(ct))
+            .ToDictionary(n => n.Id, n => n, StringComparer.Ordinal);
+        if (lineNodeRows.Count > 0)
+        {
+            var lineIds = lineNodeRows.Values
+                .Where(r => !string.IsNullOrEmpty(r.LineId))
+                .Select(r => r.LineId!)
+                .Distinct()
+                .ToList();
+            var lineNames = lineIds.Count > 0
+                ? (await _db.Lines.AsNoTracking()
+                        .Where(l => lineIds.Contains(l.Id))
+                        .Select(l => new { l.Id, l.Name })
+                        .ToListAsync(ct))
+                    .ToDictionary(l => l.Id, l => l.Name, StringComparer.Ordinal)
+                : new Dictionary<string, string?>(StringComparer.Ordinal);
+
+            foreach (var kv in lineNodeRows)
+            {
+                if (result.ContainsKey(kv.Key)) continue;
+                var nodeName = kv.Value.Name ?? "";
+                var lineName = !string.IsNullOrEmpty(kv.Value.LineId)
+                               && lineNames.TryGetValue(kv.Value.LineId!, out var ln)
+                               && !string.IsNullOrEmpty(ln)
+                    ? ln : null;
+                var path = string.IsNullOrEmpty(lineName) ? nodeName : $"{lineName} / {nodeName}";
+                result[kv.Key] = (path, kv.Value.LineId, lineName);
+            }
+        }
 
         // 空间节点：扁平结构，路径 = 所属空间名 / 节点名，根为所属空间
         var spaceNodeRows = await _db.SpaceNodes.AsNoTracking()
@@ -415,6 +443,7 @@ public sealed class SearchService
     {
         var map = await _db.SpaceTrees
             .AsNoTracking()
+            .Include(n => n.Node)
             .Where(n => inodeIds.Contains(n.Id))
             .ToDictionaryAsync(n => n.Id, ct);
 
@@ -428,6 +457,7 @@ public sealed class SearchService
         {
             var parents = await _db.SpaceTrees
                 .AsNoTracking()
+                .Include(n => n.Node)
                 .Where(n => frontier.Contains(n.Id))
                 .ToListAsync(ct);
 

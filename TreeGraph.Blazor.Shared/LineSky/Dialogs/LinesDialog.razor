@@ -90,8 +90,14 @@
     /// <summary>打开参数：目标图空间显示名（仅标题展示用；缺省回退显示 Id）。</summary>
     [Parameter] public string? SpaceName { get; set; }
 
+    /// <summary>定位线路 Id（语义搜索跳转）：首次加载后按该线路名称收敛列表。</summary>
+    [Parameter] public string? FocusLineId { get; set; }
+
     private IReadOnlyList<LineDto>? _lines;
     private bool _loading;
+
+    /// <summary>定位参数是否已应用（只作用于首次加载，避免刷新后反复收敛列表）。</summary>
+    private bool _focusApplied;
 
     /// <summary>搜索关键字（按线路名称模糊匹配，客户端过滤）。</summary>
     private string? _query;
@@ -124,6 +130,15 @@
         try
         {
             _lines = await Api.GetAllAsync(SpaceId);
+
+            // 首次加载时按定位线路名称收敛列表（语义搜索跳转）
+            if (!_focusApplied && !string.IsNullOrEmpty(FocusLineId))
+            {
+                _focusApplied = true;
+                var focus = _lines.FirstOrDefault(l => l.Id == FocusLineId);
+                if (focus?.Name is { Length: > 0 } name)
+                    _query = name;
+            }
         }
         catch (Exception ex)
         {

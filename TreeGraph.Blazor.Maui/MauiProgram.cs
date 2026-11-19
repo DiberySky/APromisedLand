@@ -8,6 +8,7 @@ using TreeGraph.Blazor.Maui;
 using TreeGraph.Blazor.Maui.Infrastructure;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.LineSky.Services;
+using TreeGraph.Blazor.Shared.SpaceNodeSky.Services;
 using TreeGraph.Blazor.Shared.SpaceSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.TreeEavSky.Extensions;
@@ -101,9 +102,33 @@ public static class MauiProgram
             })
             .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
 
+        // ★ LineSky 线路实体 CRUD 客户端（/api/Lines）：语义搜索 → 打开线路。
+        builder.Services
+            .AddHttpClient<LineManageApiClient>(client =>
+            {
+                client.BaseAddress = new Uri("https+http://treegrapheavapi");
+            })
+            .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+        // ★ LineSky 线路节点 CRUD 客户端（/api/LineNode）：语义搜索 → 打开节点内容。
+        builder.Services
+            .AddHttpClient<LineNodeManageApiClient>(client =>
+            {
+                client.BaseAddress = new Uri("https+http://treegrapheavapi");
+            })
+            .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
         // ★ SpaceSky 空间 CRUD 客户端（/Space）：与 EavApiClient 同款服务发现与弹性策略。
         builder.Services
             .AddHttpClient<SpaceApiClient>(client =>
+            {
+                client.BaseAddress = new Uri("https+http://treegrapheavapi");
+            })
+            .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+        // ★ SpaceNodeSky 空间节点 CRUD 客户端（api/spaces/{id}/nodes）：语义搜索 → 打开节点内容。
+        builder.Services
+            .AddHttpClient<SpaceNodeApiClient>(client =>
             {
                 client.BaseAddress = new Uri("https+http://treegrapheavapi");
             })

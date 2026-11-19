@@ -77,10 +77,20 @@
     /// <summary>所属线路名称（仅用于标题展示）。</summary>
     [Parameter] public string LineName { get; set; } = string.Empty;
 
+    /// <summary>定位节点名称（非空时作为初始搜索词，对齐 SpaceNodesDialog 的定位体验）。</summary>
+    [Parameter] public string? FocusNodeName { get; set; }
+
     private MudTable<LineNodeDto>? _table;
 
     /// <summary>搜索关键字（仅按当前线路的节点名称模糊匹配）。</summary>
     private string? _query;
+
+    protected override void OnInitialized()
+    {
+        // 定位：首次加载即按目标节点名收敛列表（搜索框同步显示该名称）
+        if (!string.IsNullOrWhiteSpace(FocusNodeName))
+            _query = FocusNodeName;
+    }
 
     /// <summary>二级弹窗选项（与 TableRowManageDialog 一致）。</summary>
     private static readonly DialogOptionsEx NestedOptions = new()
