@@ -173,6 +173,8 @@ public class LineStructureService
         var spaceId = await LineSpaceIdAsync(lineId, ct)
             ?? throw new InvalidOperationException($"线路 {lineId} 缺少所属空间（lines 行缺失）");
 
+        await EnsureEdgeTypeExistsAsync(spaceId, SegmentEdgeType, ct);
+
         var nodeIds = await LineNodeIdsAsync(lineId, ct);
         var desired = ValidateSegments(req.Segments, nodeIds);
 
@@ -228,6 +230,8 @@ public class LineStructureService
             throw new KeyNotFoundException($"线路不存在: {lineId}");
         var spaceId = await LineSpaceIdAsync(lineId, ct)
             ?? throw new InvalidOperationException($"线路 {lineId} 缺少所属空间（lines 行缺失）");
+
+        await EnsureEdgeTypeExistsAsync(spaceId, SegmentEdgeType, ct);
 
         var nodeIds = await LineNodeIdsAsync(lineId, ct);
         ValidateSegmentEndpoints(req.FromNodeId, req.ToNodeId, nodeIds);
@@ -375,6 +379,45 @@ public class LineStructureService
     // ------------------------------------------------------------
     // 段边读写（edges 表，直写；事件收集后由调用方在提交后发布）
     // ------------------------------------------------------------
+
+    /// <summary>
+    /// 确保指定空间内存在指定名称的 EdgeType（幂等：存在跳过，不存在自动创建）。
+    /// 内置边类型 line_segment 含 name STRING NULL 属性 Schema。
+    /// </summary>
+    private async Task EnsureEdgeTypeExistsAsync(string spaceId, string edgeTypeName, CancellationToken ct)
+    {
+        if (await _db.EdgeTypes.AsNoTracking()
+                .AnyAsync(t => t.SpaceId == spaceId && t.Name == edgeTypeName, ct))
+            return;
+
+        var edgeType = new EdgeType
+        {
+            SpaceId = spaceId,
+            Name = edgeTypeName,
+            DisplayName = edgeTypeName == SegmentEdgeType ? "线路段边" : edgeTypeName,
+            DisplayOrder = 0,
+            Props = edgeTypeName switch
+            {
+                SegmentEdgeType =>
+                [
+                    new EdgeTypeProp
+                    {
+                        SpaceId = spaceId,
+                        EdgeTypeName = edgeTypeName,
+                        PropName = "name",
+                        DataType = "STRING",
+                        Nullable = true,
+                        DisplayName = "段名",
+                        DisplayOrder = 0
+                    }
+                ],
+                _ => []
+            }
+        };
+
+        _db.EdgeTypes.Add(edgeType);
+        await _db.SaveChangesAsync(ct);
+    }
 
     /// <summary>upsert 一条 line_segment 段边（覆盖语义：props={"name":displayName}；spaceId = 线路所属空间）。</summary>
     private void UpsertSegmentEdge(

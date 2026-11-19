@@ -38,11 +38,25 @@ public sealed class DbExceptionHandler : IExceptionHandler
 
         if (pg.SqlState == PostgresErrorCodes.ForeignKeyViolation)
         {
-            _logger.LogWarning("外键约束冲突: {Constraint}", pg.ConstraintName);
+            _logger.LogWarning("外键约束冲突: {Constraint} — {MessageText}",
+                pg.ConstraintName, pg.MessageText);
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+            var hint = pg.ConstraintName switch
+            {
+                "fk_edges_edge_type" =>
+                    "所选边类型在当前图空间中不存在，请先在「关系设置」创建该边类型",
+                _ => "外键约束冲突"
+            };
+
             await context.Response.WriteAsJsonAsync(
-                ApiResponse<object>.Fail("外键约束冲突",
-                    new { constraint = pg.ConstraintName }), ct);
+                ApiResponse<object>.Fail(hint,
+                    new
+                    {
+                        constraint = pg.ConstraintName,
+                        table = pg.TableName,
+                        pgMessage = pg.MessageText
+                    }), ct);
             return true;
         }
 
