@@ -50,6 +50,10 @@ public sealed class SubtreeService
             "CategoryTree" => await LoadRawCategoryTreeAsync(rootId, maxDepth, maxNodes, ct),
             "KnowledgeTree" => await LoadRawKnowledgeTreeAsync(rootId, maxDepth, maxNodes, ct),
             "EavTree" => await LoadRawEavTreeAsync(rootId, maxDepth, maxNodes, ct),
+            // 平面宿主兜底：Line / LineNode / SpaceNode 无树形父子关系，只加载节点自身
+            "Line" => await LoadRawFlatNodeAsync(rootId, "Line", ct),
+            "LineNode" => await LoadRawFlatNodeAsync(rootId, "LineNode", ct),
+            "SpaceNode" => await LoadRawFlatNodeAsync(rootId, "SpaceNode", ct),
             _ => new List<RawNode>()
         };
 
@@ -100,16 +104,17 @@ public sealed class SubtreeService
         string rootId, int maxDepth, int maxNodes, CancellationToken ct)
         => _db.Database.SqlQueryRaw<RawNode>("""
             WITH RECURSIVE subtree AS (
-                SELECT id, name, parent_id, 0 AS depth
-                FROM space_trees WHERE id = {0}
+                SELECT t.id, t.parent_id, 0 AS depth
+                FROM space_trees t WHERE t.id = {0}
                 UNION ALL
-                SELECT s.id, s.name, s.parent_id, t.depth + 1
-                FROM space_trees s
-                JOIN subtree t ON s.parent_id = t.id
-                WHERE t.depth < {1}
+                SELECT c.id, c.parent_id, s.depth + 1
+                FROM space_trees c
+                JOIN subtree s ON c.parent_id = s.id
+                WHERE s.depth < {1}
             )
-            SELECT id AS "Id", name AS "Name", parent_id AS "ParentId", depth AS "Depth"
-            FROM subtree ORDER BY depth, name LIMIT {2}
+            SELECT s.id AS "Id", COALESCE(n.name, '') AS "Name", s.parent_id AS "ParentId", s.depth AS "Depth"
+            FROM subtree s LEFT JOIN nodes n ON n.id = s.id
+            ORDER BY s.depth, n.name LIMIT {2}
             """, rootId, maxDepth, maxNodes)
             .ToListAsync(ct);
 
@@ -117,16 +122,17 @@ public sealed class SubtreeService
         string rootId, int maxDepth, int maxNodes, CancellationToken ct)
         => _db.Database.SqlQueryRaw<RawNode>("""
             WITH RECURSIVE subtree AS (
-                SELECT id, name, parent_id, 0 AS depth
-                FROM unit_trees WHERE id = {0}
+                SELECT t.id, t.parent_id, 0 AS depth
+                FROM unit_trees t WHERE t.id = {0}
                 UNION ALL
-                SELECT s.id, s.name, s.parent_id, t.depth + 1
-                FROM unit_trees s
-                JOIN subtree t ON s.parent_id = t.id
-                WHERE t.depth < {1}
+                SELECT c.id, c.parent_id, s.depth + 1
+                FROM unit_trees c
+                JOIN subtree s ON c.parent_id = s.id
+                WHERE s.depth < {1}
             )
-            SELECT id AS "Id", name AS "Name", parent_id AS "ParentId", depth AS "Depth"
-            FROM subtree ORDER BY depth, name LIMIT {2}
+            SELECT s.id AS "Id", COALESCE(n.name, '') AS "Name", s.parent_id AS "ParentId", s.depth AS "Depth"
+            FROM subtree s LEFT JOIN nodes n ON n.id = s.id
+            ORDER BY s.depth, n.name LIMIT {2}
             """, rootId, maxDepth, maxNodes)
             .ToListAsync(ct);
 
@@ -134,16 +140,17 @@ public sealed class SubtreeService
         string rootId, int maxDepth, int maxNodes, CancellationToken ct)
         => _db.Database.SqlQueryRaw<RawNode>("""
             WITH RECURSIVE subtree AS (
-                SELECT id, name, parent_id, 0 AS depth
-                FROM category_trees WHERE id = {0}
+                SELECT t.id, t.parent_id, 0 AS depth
+                FROM category_trees t WHERE t.id = {0}
                 UNION ALL
-                SELECT c.id, c.name, c.parent_id, t.depth + 1
+                SELECT c.id, c.parent_id, s.depth + 1
                 FROM category_trees c
-                JOIN subtree t ON c.parent_id = t.id
-                WHERE t.depth < {1}
+                JOIN subtree s ON c.parent_id = s.id
+                WHERE s.depth < {1}
             )
-            SELECT id AS "Id", name AS "Name", parent_id AS "ParentId", depth AS "Depth"
-            FROM subtree ORDER BY depth, name LIMIT {2}
+            SELECT s.id AS "Id", COALESCE(n.name, '') AS "Name", s.parent_id AS "ParentId", s.depth AS "Depth"
+            FROM subtree s LEFT JOIN nodes n ON n.id = s.id
+            ORDER BY s.depth, n.name LIMIT {2}
             """, rootId, maxDepth, maxNodes)
             .ToListAsync(ct);
 
@@ -151,16 +158,17 @@ public sealed class SubtreeService
         string rootId, int maxDepth, int maxNodes, CancellationToken ct)
         => _db.Database.SqlQueryRaw<RawNode>("""
             WITH RECURSIVE subtree AS (
-                SELECT id, name, parent_id, 0 AS depth
-                FROM knowledge_trees WHERE id = {0}
+                SELECT t.id, t.parent_id, 0 AS depth
+                FROM knowledge_trees t WHERE t.id = {0}
                 UNION ALL
-                SELECT c.id, c.name, c.parent_id, t.depth + 1
+                SELECT c.id, c.parent_id, s.depth + 1
                 FROM knowledge_trees c
-                JOIN subtree t ON c.parent_id = t.id
-                WHERE t.depth < {1}
+                JOIN subtree s ON c.parent_id = s.id
+                WHERE s.depth < {1}
             )
-            SELECT id AS "Id", name AS "Name", parent_id AS "ParentId", depth AS "Depth"
-            FROM subtree ORDER BY depth, name LIMIT {2}
+            SELECT s.id AS "Id", COALESCE(n.name, '') AS "Name", s.parent_id AS "ParentId", s.depth AS "Depth"
+            FROM subtree s LEFT JOIN nodes n ON n.id = s.id
+            ORDER BY s.depth, n.name LIMIT {2}
             """, rootId, maxDepth, maxNodes)
             .ToListAsync(ct);
 
@@ -182,10 +190,26 @@ public sealed class SubtreeService
             """, rootId, maxDepth, maxNodes)
             .ToListAsync(ct);
 
+    /// <summary>
+    /// 兜底：非树宿主（LineNode / SpaceNode）只加载节点自身，不展开子树。
+    /// 节点身份在 nodes 表，名称读穿 nodes.name；节点不存在时返回空列表。
+    /// </summary>
+    private async Task<List<RawNode>> LoadRawFlatNodeAsync(
+        string rootId, string hostType, CancellationToken ct)
+    {
+        var node = await _db.Nodes.AsNoTracking()
+            .Where(n => n.Id == rootId && n.HostType == hostType)
+            .Select(n => new { n.Id, n.Name })
+            .FirstOrDefaultAsync(ct);
+
+        if (node is null) return new List<RawNode>();
+
+        return new List<RawNode> { new(node.Id, node.Name ?? "", null, 0) };
+    }
+
     // ═══════════════════════════════════════════════════════
     // 批量加载 EAV（返回 nodeId → 渲染文本）
     // ═══════════════════════════════════════════════════════
-
     private async Task<Dictionary<string, string>> LoadEavBatchAsync(
         List<string> nodeIds, CancellationToken ct)
     {

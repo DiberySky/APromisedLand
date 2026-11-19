@@ -231,7 +231,7 @@ else
         var parameters = new DialogParameters<SpaceTreeDialogPage>
         {
             { x => x.RootId, space.Id },
-            { x => x.Title, $"空间树：{space.Name}" }
+            { x => x.SpaceName, space.Name }
         };
         var options = new DialogOptionsEx
         {

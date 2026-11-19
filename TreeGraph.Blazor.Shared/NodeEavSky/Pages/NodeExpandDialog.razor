@@ -8,27 +8,30 @@
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
 
-<DialogSky Title="@($"AI 综合：{NodeName}")"
+<DialogSky Title="AI 综合"
            CancelButtonText="关闭"
            ActionsMaxWidth="MaxWidth.Medium">
-    @* 操作行不放 ToolBarContent：MudBlazor.Extensions 宿主在标题区注入 header-actions 后，
-       Blazor 对标题区的后续更新会打到游离节点（步进器显示值冻结）；内容区更新可靠 *@
+    <ToolBarContent>
+        <MudText Typo="Typo.subtitle1" Color="Color.Info">@NodeName</MudText>
+    </ToolBarContent>
+    <ToolBarRightContent>
+        @if (SupportsDepth)
+        {
+            <NumberStepper @bind-Value="_depth" Label="包含子项" Suffix="层" Min="0" Max="10"/>
+        }
+        <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
+                       Size="Size.Small"
+                       Color="Color.Primary"
+                       Title="重新综合"
+                       OnClick="RunAsync"/>
+        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
+                       Size="Size.Small"
+                       Color="Color.Success"
+                       Title="复制 Markdown"
+                       OnClick="CopyAsync"/>
+    </ToolBarRightContent>
     <DialogContent>
         <MudContainer MaxWidth="MaxWidth.Medium" Class="pa-4">
-            <MudToolBar Dense="true" DisableGutters="true" Class="mb-3">
-                <NumberStepper @bind-Value="_depth" Label="包含子项" Suffix="层" Min="0" Max="10"/>
-                <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
-                               Size="Size.Small"
-                               Color="Color.Primary"
-                               Title="重新综合"
-                               OnClick="RunAsync"/>
-                <MudSpacer/>
-                <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
-                               Size="Size.Small"
-                               Color="Color.Success"
-                               Title="复制 Markdown"
-                               OnClick="CopyAsync"/>
-            </MudToolBar>
             @if (_loading)
             {
                 <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
@@ -65,6 +68,10 @@
     private string? _error;
     private string? _reply;
 
+    /// <summary>仅树形宿主支持展开子项；Line / LineNode / SpaceNode 为平面节点，不显示层数。</summary>
+    private bool SupportsDepth =>
+        HostType is not ("Line" or "LineNode" or "SpaceNode");
+
     protected override Task OnInitializedAsync() => RunAsync();
 
     private async Task RunAsync()
@@ -84,7 +91,7 @@
         try
         {
             var result = await MafWfApi.ExpandNodeAsync(
-                conversationId: null, InodeId, HostType, _depth);
+                conversationId: null, InodeId, HostType, SupportsDepth ? _depth : 0);
             _reply = result.Reply;
         }
         catch (Exception ex)

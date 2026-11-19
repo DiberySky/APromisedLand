@@ -57,7 +57,7 @@ public class BlazorService(IDialogService dialogService)
             { x => x.ClickNode, node },
         };
 
-        var dialog = await dialogService.ShowExAsync<SpaceTreeDialogPage>("空间注册",
+        var dialog = await dialogService.ShowExAsync<SpaceTreeDialogPage>("空间树",
             parameters, DialogOptions);
 
         var result = await dialog.Result;
