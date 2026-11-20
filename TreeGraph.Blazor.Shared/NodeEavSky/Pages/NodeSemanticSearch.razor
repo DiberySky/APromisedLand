@@ -8,6 +8,7 @@
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Search
 @using TreeGraph.Blazor.Shared.SpaceNodeSky.Dialogs
 @using TreeGraph.Blazor.Shared.SpaceNodeSky.Services
+@using TreeGraph.Blazor.Shared.SpaceSky
 @using TreeGraph.Blazor.Shared.SpaceSky.Services
 @using TreeGraph.Shared.SpaceNodeSky.Dtos
 @using TreeGraph.Blazor.Shared.LineSky
@@ -15,6 +16,7 @@
 @using TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @using TreeGraph.Blazor.Shared.TreeEavSky
+@using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Space
 @using TreeGraph.Shared.TreeEavSky.Entities
 @using TreeGraph.Shared.TreeEavSky.Abstractions
 @using MudBlazor
@@ -27,7 +29,6 @@
 @inject ILogger<NodeSemanticSearch> Logger
 @inject IDialogService DialogService
 @inject BlazorService BlazorService
-@inject NavigationManager Nav
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 
@@ -48,35 +49,6 @@
     </TopBarRightContent>
 
     <PageContent>
-        @* ═══ 已选节点（语义搜索选择器返回） ═══ *@
-        @if (_picked is not null)
-        {
-            <MudPaper Elevation="0" Class="pa-3 mt-3">
-                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                    <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Color="Color.Success" Size="Size.Small"/>
-                    <MudText Typo="Typo.body2">
-                        已选节点：<strong>@(_picked.NodeName ?? _picked.InodeId)</strong>
-                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-2">
-                            @_picked.HostType
-                        </MudChip>
-                    </MudText>
-                    <MudSpacer/>
-                    <MudIconButton Icon="@Icons.Material.Outlined.AccountTree"
-                                   Size="Size.Small"
-                                   Title="树定位"
-                                   OnClick="@(() => OpenTreeDialogAsync(_picked))"/>
-                    <MudIconButton Icon="@Icons.Material.Outlined.OpenInNew"
-                                   Size="Size.Small"
-                                   Title="打开详情"
-                                   OnClick="@(() => Nav.NavigateTo($"/inodes/{_picked.InodeId}"))"/>
-                    <MudIconButton Icon="@Icons.Material.Outlined.Close"
-                                   Size="Size.Small"
-                                   Title="清除"
-                                   OnClick="ClearPicked"/>
-                </MudStack>
-            </MudPaper>
-        }
-
         @* ═══ 错误提示 ═══ *@
         @if (!string.IsNullOrEmpty(_error))
         {
@@ -128,52 +100,93 @@
     </PageContent>
 
     <BottomBarContent>
-        @* 底部固定区：上行搜索内容录入框，下行最低相似度调节 *@
-        <MudStack Spacing="0" Class="px-2" Style="width: 100%;">
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                <MudTextField @bind-Value="_query"
-                              id="nss-query"
-                              Placeholder="输入关键词进行语义搜索（Enter 发送，Shift+Enter 换行）..."
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              Lines="3"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Outlined.Search"
-                              Immediate="true"
-                              Disabled="_searching"
-                              Style="flex: 1;"/>
-                <MudIconButton Icon="@Icons.Material.Outlined.Send"
-                               Color="Color.Primary"
-                               Disabled="@(_searching || string.IsNullOrWhiteSpace(_query))"
-                               OnClick="DoSearchAsync"/>
-            </MudStack>
+        @* 底部固定区：两列网格——左列输入框 + 设置行（设置行右缘与输入框右缘严格对齐），右列发送按钮 *@
+        <div class="px-2"
+             style="width: 100%; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; column-gap: 8px; row-gap: 4px; align-items: center;">
+            <MudTextField @bind-Value="_query"
+                          id="nss-query"
+                          Placeholder="输入关键词进行语义搜索（Enter 发送，Shift+Enter 换行）..."
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Lines="3"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Outlined.Search"
+                          Clearable="true"
+                          Immediate="true"
+                          Disabled="_searching"
+                          Style="grid-column: 1; grid-row: 1; width: 100%;"/>
+            <MudIconButton Icon="@Icons.Material.Outlined.Send"
+                           Color="Color.Primary"
+                           Disabled="@(_searching || string.IsNullOrWhiteSpace(_query))"
+                           Style="grid-column: 2; grid-row: 1;"
+                           OnClick="DoSearchAsync"/>
 
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                <MudText Typo="Typo.caption" Color="Color.Info" Style="white-space: nowrap; margin-left: 4px;">
-                    匹配严格度
-                </MudText>
-                <MudSelect T="int" @bind-Value="_level"
-                           Dense="true"
-                           Margin="Margin.Dense"
-                           Variant="Variant.Outlined"
-                           Disabled="_searching"
-                           AnchorOrigin="Origin.TopCenter"
-                           TransformOrigin="Origin.BottomCenter"
-                           Style="@LevelSelectStyle">
-                    @foreach (var lv in ScoreLevels)
+            @* 设置行：左组（空间下拉 + 快捷入口）| 弹性空列 | 右组（匹配度），右组始终贴住输入框右缘 *@
+            <div style="grid-column: 1; grid-row: 2; width: 100%; min-width: 0; display: grid; grid-template-columns: auto 1fr auto; align-items: center; column-gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 4px; min-width: 0;">
+                    @* 空间过滤：仅可选具体空间，默认取列表首个 *@
+                    <MudSelect T="string" Value="_spaceId"
+                               ValueChanged="OnSpaceChangedAsync"
+                               Dense="true"
+                               Margin="Margin.Dense"
+                               Variant="Variant.Outlined"
+                               Disabled="_searching"
+                               AnchorOrigin="Origin.TopCenter"
+                               TransformOrigin="Origin.BottomCenter"
+                               Style="min-width: 150px; flex: 0 0 auto;">
+                        @foreach (var space in _spaces)
+                        {
+                            <MudSelectItem T="string" Value="@space.Id">@space.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    @* 空间二级菜单快捷入口（对齐空间管理页）：打开树 / 空间节点 / 线路 *@
+                    <MudIconButton Icon="@Icons.Material.Outlined.AccountTree"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   Title="打开树"
+                                   Disabled="_selectedSpace is null"
+                                   OnClick="OpenSelectedSpaceTreeAsync"/>
+                    @* 线路入口：仅所选空间存在线路时显示 *@
+                    @if (_spaceHasLines)
                     {
-                        <MudSelectItem T="int" Value="lv.Level">@lv.Label</MudSelectItem>
+                        <MudIconButton Icon="@Icons.Material.Outlined.Route"
+                                       Color="Color.Success"
+                                       Size="Size.Small"
+                                       Title="线路"
+                                       OnClick="OpenSelectedSpaceLinesAsync"/>
                     }
-                </MudSelect>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Hub"
+                                   Color="Color.Info"
+                                   Size="Size.Small"
+                                   Title="空间节点"
+                                   Disabled="_selectedSpace is null"
+                                   OnClick="OpenSelectedSpaceNodesAsync"/>
+                </div>
 
-                <MudIconButton Icon="@Icons.Material.Outlined.PersonSearch"
-                               Color="Color.Primary"
-                               Size="Size.Small"
-                               Title="按语义选节点"
-                               OnClick="PickNodeAsync"
-                               Disabled="_searching"/>
-            </MudStack>
-        </MudStack>
+                @* 两组之间的弹性空列 *@
+                <div style="min-width: 0;"></div>
+
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <MudText Typo="Typo.caption" Color="Color.Info" Style="white-space: nowrap;">
+                        匹配度
+                    </MudText>
+                    <MudSelect T="int" @bind-Value="_level"
+                               Dense="true"
+                               Margin="Margin.Dense"
+                               Variant="Variant.Outlined"
+                               Disabled="_searching"
+                               AnchorOrigin="Origin.TopCenter"
+                               TransformOrigin="Origin.BottomCenter"
+                               Style="@LevelSelectStyle">
+                        @foreach (var lv in ScoreLevels)
+                        {
+                            <MudSelectItem T="int" Value="lv.Level">@lv.Label</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+            </div>
+        </div>
     </BottomBarContent>
 </PageSky>
 
@@ -224,8 +237,17 @@
     private string _lastQuery = "";
     private List<SemanticSearchItemDto> _results = new();
 
-    /// <summary>经「选节点」对话框选中的节点（null 表示未选择）。</summary>
-    private SemanticSearchItemDto? _picked;
+    /// <summary>空间下拉框数据源。</summary>
+    private List<SpaceDto> _spaces = new();
+
+    /// <summary>当前空间过滤（默认取空间列表首个）。</summary>
+    private string? _spaceId;
+
+    /// <summary>下拉框当前选中的空间（未选中为 null，快捷入口据此启用/禁用）。</summary>
+    private SpaceDto? _selectedSpace => _spaces.FirstOrDefault(s => s.Id == _spaceId);
+
+    /// <summary>所选空间是否有线路（决定「线路」入口是否显示）。</summary>
+    private bool _spaceHasLines;
 
     /// <summary>空间节点内容/设置对话框选项（顶部居中，可最大化）。</summary>
     private static readonly DialogOptionsEx SpaceNodeDialogOptions = new()
@@ -245,24 +267,115 @@
         StateHasChanged();
     }
 
-    /// <summary>打开语义搜索节点选择器，确认后在上方展示已选节点。</summary>
-    private async Task PickNodeAsync()
+    /// <summary>切换空间后按新过滤条件重跑搜索（未搜索过则仅记录条件）。</summary>
+    private async Task OnSpaceChangedAsync(string? spaceId)
     {
-        var picked = await NodePicker.PickAsync(
-            DialogService,
-            initialQuery: string.IsNullOrWhiteSpace(_query) ? null : _query.Trim(),
-            minScore: MinScore);
+        _spaceId = spaceId;
+        await RefreshSpaceCapabilitiesAsync();
+        if (!_searched || string.IsNullOrWhiteSpace(_query)) return;
+        await DoSearchAsync();
+    }
 
-        if (picked is null) return;
+    /// <summary>按所选空间探测可用入口（当前仅有线路：该空间下无线路时隐藏入口）。</summary>
+    private async Task RefreshSpaceCapabilitiesAsync()
+    {
+        _spaceHasLines = false;
+        if (_selectedSpace is { } space)
+        {
+            try
+            {
+                _spaceHasLines = (await LineApi.GetAllAsync(space.Id)).Count > 0;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "加载空间线路失败：{SpaceId}", space.Id);
+            }
+        }
 
-        _picked = picked;
         StateHasChanged();
     }
 
-    private void ClearPicked()
+    // ═══════════════════════════════════════════════════════
+    // 空间快捷入口（对齐空间管理页二级菜单）
+    // ═══════════════════════════════════════════════════════
+
+    /// <summary>打开所选空间的树：单位/类型/知识空间走各自树对话框，其余走空间树。</summary>
+    private async Task OpenSelectedSpaceTreeAsync()
     {
-        _picked = null;
-        StateHasChanged();
+        if (_selectedSpace is not { } space) return;
+
+        switch (space.Type)
+        {
+            case "Unit":
+                await BlazorService.ShowUnitTreeDialogPageAsync();
+                break;
+            case "Type":
+                await BlazorService.ShowCategoryTreeDialogPageAsync();
+                break;
+            case "Knowledge":
+                await BlazorService.ShowKnowledgeTreeDialogPageAsync();
+                break;
+            default:
+            {
+                var parameters = new DialogParameters<SpaceTreeDialogPage>
+                {
+                    { x => x.RootId, space.Id },
+                    { x => x.SpaceName, space.Name },
+                };
+                var options = new DialogOptionsEx
+                {
+                    Position = DialogPosition.TopCenter,
+                    MaxWidth = MaxWidth.Small,
+                    FullWidth = true,
+                    MaximizeButton = true,
+                    BackdropClick = false
+                };
+                await DialogService.ShowExAsync<SpaceTreeDialogPage>(string.Empty, parameters, options);
+                break;
+            }
+        }
+    }
+
+    /// <summary>打开所选空间的空间节点列表对话框。</summary>
+    private async Task OpenSelectedSpaceNodesAsync()
+    {
+        if (_selectedSpace is not { } space) return;
+
+        var parameters = new DialogParameters<SpaceNodesDialog>
+        {
+            { x => x.SpaceId, space.Id },
+            { x => x.SpaceName, space.Name },
+        };
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+        await DialogService.ShowExAsync<SpaceNodesDialog>("空间节点", parameters, options);
+    }
+
+    /// <summary>打开所选空间的线路维护对话框。</summary>
+    private async Task OpenSelectedSpaceLinesAsync()
+    {
+        if (_selectedSpace is not { } space) return;
+
+        var parameters = new DialogParameters<LinesDialog>
+        {
+            { x => x.SpaceId, space.Id },
+            { x => x.SpaceName, space.Name },
+        };
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+        await DialogService.ShowExAsync<LinesDialog>("线路", parameters, options);
     }
 
     private async Task DoSearchAsync()
@@ -282,6 +395,7 @@
                 Query = _query,
                 TopK = TopK,
                 MinScore = MinScore,
+                SpaceId = string.IsNullOrWhiteSpace(_spaceId) ? null : _spaceId,
             };
             var response = await EavApi.SemanticSearchAsync(request);
 
@@ -313,6 +427,23 @@
     {
         if (_searching || string.IsNullOrWhiteSpace(_query)) return;
         await DoSearchAsync();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _spaces = (await SpaceApi.GetAllAsync()).ToList();
+            if (_spaces.Count > 0)
+            {
+                _spaceId = _spaces[0].Id;
+                await RefreshSpaceCapabilitiesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "加载空间列表失败，空间过滤不可用");
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
