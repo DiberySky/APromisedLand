@@ -18,7 +18,8 @@ public sealed class SubtreeController : ControllerBase
         [FromQuery] int maxNodes = 50,
         CancellationToken ct = default)
     {
-        maxDepth = Math.Clamp(maxDepth, 1, 5);
+        // maxDepth=0 表示仅节点本身（AI 综合第一步），上限 5 层
+        maxDepth = Math.Clamp(maxDepth, 0, 5);
         maxNodes = Math.Clamp(maxNodes, 1, 200);
 
         var result = await _subtree.LoadAsync(

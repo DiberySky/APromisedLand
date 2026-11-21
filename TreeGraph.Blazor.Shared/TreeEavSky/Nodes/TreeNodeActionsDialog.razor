@@ -1,6 +1,7 @@
 @* TreeNodeActionsDialog.razor *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @using TreeGraph.Blazor.Shared.EdgeSky.Components
+@using TreeGraph.Blazor.Shared.NodeEavSky.Pages
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @implements IDisposable
@@ -32,15 +33,28 @@
         }
     </ToolBarContent>
     <ToolBarRightContent>
-        @* 设置修改入口上移至工具栏右侧（仅非根节点；IsBoot 为开窗参数，工具栏区内容保持静态） *@
+        @* 工具栏右侧仅保留「子项」（IsBoot 为开窗参数，工具栏区内容保持静态） *@
         @if (!IsBoot)
         {
+            @* 无子项时隐藏；懒加载树 Children 可能为 null，以后端 HasChildren 标志兜底 *@
+            @if (NodeTemplate.Node.Value!.HasChildren || NodeTemplate.Node.Children?.Count > 0)
+            {
+                @* 子项：以当前节点为根打开树对话框页 *@
+                <MudButton Variant="Variant.Text"
+                           StartIcon="@Icons.Material.Outlined.OpenInNew"
+                           Size="Size.Small"
+                           Color="Color.Primary"
+                           OnClick="OnOpenSubTree">
+                    子项
+                </MudButton>
+            }
+            @* AI 综合：复制自节点语义搜索的 ✨ 入口（框内显示进度 → 呈现综合结果） *@
             <MudButton Variant="Variant.Text"
-                       StartIcon="@Icons.Material.Outlined.EditNote"
+                       StartIcon="@Icons.Material.Outlined.AutoAwesome"
                        Size="Size.Small"
-                       Color="Color.Primary"
-                       OnClick="OnEdit">
-                设置修改
+                       Color="Color.Warning"
+                       OnClick="OnAiSummarize">
+                AI 综合
             </MudButton>
         }
     </ToolBarRightContent>
@@ -100,7 +114,7 @@
         </MudContainer>
     </DialogContent>
     <DialogLeftActions>
-        @* 底部动作统一靠左：根节点放创建子项/子项排序；非根节点的「设置修改」已上移至工具栏右侧 *@
+        @* 底部动作统一靠左：根节点放创建子项/子项排序；非根节点放「设置修改」（与取消按钮同一行水平对齐） *@
         @if (IsBoot)
         {
             <MudButton OnClick="OnAddChild"
@@ -120,15 +134,78 @@
                 </MudButton>
             }
         }
+        else
+        {
+            <MudButton OnClick="OnEdit"
+                       Variant="Variant.Text"
+                       Color="Color.Success"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Outlined.EditNote">
+                设置修改
+            </MudButton>
+        }
     </DialogLeftActions>
 </DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
+    /// <summary>树客户端服务：提供树标题等展示信息。</summary>
+    [Inject] private ITreeClientService<TItem> ClientService { get; set; } = default!;
+
+    [Inject] private IDialogService DialogService { get; set; } = default!;
+    [Inject] private BlazorService BlazorService { get; set; } = default!;
+
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
     [Parameter] public TItem? ParentNode { get; set; }
     [Parameter] public bool IsBoot { get; set; }
+
+    private Task OnOpenSubTree() => ShowSubTreeDialogAsync(NodeTemplate.Node);
+
+    /// <summary>AI 综合：打开综合对话框（复制自节点语义搜索 OpenExpandDialogAsync）。</summary>
+    private async Task OnAiSummarize()
+    {
+        var node = NodeTemplate.Node;
+        if (node.Value == null) return;
+
+        var parameters = new DialogParameters<NodeExpandDialog>
+        {
+            { x => x.InodeId, node.Value.Id },
+            { x => x.HostType, typeof(TItem).Name },
+            { x => x.NodeName, node.Value.Name },
+            // 第一步：仅当前节点 + EAV + 关系；有子项时由对话框给出「包含子项」二次提交入口
+            { x => x.InitialDepth, 0 },
+            { x => x.HasChildren, node.Value.HasChildren || node.Children?.Count > 0 },
+        };
+
+        var options = new DialogConfig
+        {
+            MaxWidth = MaxWidth.Small,
+            DragMode = MudDialogDragMode.None, // 本对话框不可移动
+        }.ToDialogOptions();
+
+        await DialogService.ShowExAsync<NodeExpandDialog>("AI 综合", parameters, options);
+    }
+
+    /// <summary>以指定节点为根打开树对话框页。</summary>
+    private async Task ShowSubTreeDialogAsync(TreeNodeItem<TItem> node)
+    {
+        if (node.Value == null) return;
+
+        var parameters = new DialogParameters<TreeDialogPageSky<TItem>>
+        {
+            { x => x.Title, ClientService.Title },
+            { x => x.TitleToolBar, node.Value.Parent?.Name ?? ParentNode?.Name ?? node.Value.Name },
+            { x => x.RootId, node.Value.Id },
+            { x => x.EditTemplate, NodeTemplate.EditTemplate },
+            { x => x.ActionTemplate, NodeTemplate.ActionTemplate },
+        };
+
+        var dialog = await DialogService.ShowExAsync<TreeDialogPageSky<TItem>>(
+            ClientService.Title, parameters, BlazorService.DialogOptions);
+
+        await dialog.Result;
+    }
 
     private void OnEdit() => CloseWithAction(NodeAction.Edit);
     private void OnAddChild() => CloseWithAction(NodeAction.AddChild);

@@ -34,13 +34,10 @@ public partial class TreeEavSky<TItem> : IDisposable
             await SetSelectedAsync(_cts.Token);
             await ExpandPendingAsync(_cts.Token);
 
-            if (ShowDialogFunc == null)
-            {
-                // 获取当前路径的第一个段作为页面标识
-                var relative = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
-                CurrentPage = relative.Split('/').FirstOrDefault();
-                _ = CurrentPageChanged.InvokeAsync(CurrentPage);
-            }
+            // 获取当前路径的第一个段作为页面标识
+            var relative = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+            CurrentPage = relative.Split('/').FirstOrDefault();
+            _ = CurrentPageChanged.InvokeAsync(CurrentPage);
         }
         catch (OperationCanceledException)
         {

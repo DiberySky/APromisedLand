@@ -60,6 +60,7 @@ public sealed class SubtreeLoader
             Name: el.GetProperty("name").GetString() ?? "",
             Path: el.TryGetProperty("path", out var p) ? p.GetString() : null,
             EavRendered: el.TryGetProperty("eavRendered", out var e) ? e.GetString() : null,
-            Children: children);
+            Children: children,
+            RelationsRendered: el.TryGetProperty("relationsRendered", out var r) ? r.GetString() : null);
     }
 }

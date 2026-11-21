@@ -14,30 +14,21 @@
     <ToolBarContent>
         <MudText Typo="Typo.subtitle1" Color="Color.Info">@NodeName</MudText>
     </ToolBarContent>
-    <ToolBarRightContent>
-        @if (SupportsDepth)
-        {
-            <NumberStepper @bind-Value="_depth" Label="包含子项" Suffix="层" Min="0" Max="10"/>
-        }
-        <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
-                       Size="Size.Small"
-                       Color="Color.Primary"
-                       Title="重新综合"
-                       OnClick="RunAsync"/>
-        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
-                       Size="Size.Small"
-                       Color="Color.Success"
-                       Title="复制 Markdown"
-                       OnClick="CopyAsync"/>
-    </ToolBarRightContent>
     <DialogContent>
+        @* MudAlert 将 ChildContent 包在 .mud-alert-message（flex item，默认收缩为内容宽）。
+           让它占满，内部 MudPaper 的 width:100% 才有全宽，justify-space-between 才能分布三项。 *@
+        <style>
+            .ne-expand-alert .mud-alert-message { flex: 1 1 0%; min-width: 0; }
+        </style>
         <MudContainer MaxWidth="MaxWidth.Medium" Class="pa-4">
             @if (_loading)
             {
                 <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
                     <MudProgressCircular Indeterminate="true" Color="Color.Secondary"/>
                     <MudText Typo="Typo.body2" Color="Color.Secondary">
-                        正在加载子树并综合，本地模型可能需要几分钟…
+                        @(_depth == 0
+                            ? "正在加载节点属性与关系并综合，本地模型可能需要几分钟…"
+                            : "正在加载子树并综合，本地模型可能需要几分钟…")
                     </MudText>
                 </MudStack>
             }
@@ -52,6 +43,36 @@
                 <div class="markdown-preview">
                     @((MarkupString)MarkdownRenderer.ToHtml(_reply))
                 </div>
+                @* 结果区操作框始终显示：刷新贴左、复制贴右；「包含子项」层数控件与 AI 重新综合仅在有子项时显示 *@
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-4 ne-expand-alert"
+                          NoIcon="true">
+                    <MudPaper Class="d-flex justify-space-between align-center flex-grow-1 gap-4"
+                              Elevation="0"
+                              Style="width:100%;">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       Title="重新综合"
+                                       OnClick="RunAsync"/>
+                        @if (HasChildren)
+                        {
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <NumberStepper @bind-Value="_includeDepth" Label="包含子项" Suffix="层"
+                                               Min="1" Max="10" Color="Color.Default"/>
+                                <MudIconButton Icon="@Icons.Material.Outlined.AutoAwesome"
+                                               Size="Size.Small"
+                                               Color="Color.Warning"
+                                               Title="包含子项重新综合"
+                                               OnClick="IncludeChildrenAsync"/>
+                            </MudStack>
+                        }
+                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
+                                       Size="Size.Small"
+                                       Color="Color.Success"
+                                       Title="复制 Markdown"
+                                       OnClick="CopyAsync"/>
+                    </MudPaper>
+                </MudAlert>
             }
         </MudContainer>
     </DialogContent>
@@ -62,7 +83,16 @@
     [Parameter, EditorRequired] public string HostType { get; set; } = "";
     [Parameter] public string? NodeName { get; set; }
 
-    private int _depth = 3;         // 子树层数：0 = 仅节点本身，默认 3 层
+    /// <summary>初始展开层数：0 = 仅节点本身（节点内容入口），默认 3（节点语义搜索入口）。</summary>
+    [Parameter] public int InitialDepth { get; set; } = DefaultChildrenDepth;
+
+    /// <summary>节点是否有子项（由调用方从树节点传入，用于第一步结果的「包含子项」提示）。</summary>
+    [Parameter] public bool HasChildren { get; set; }
+
+    private const int DefaultChildrenDepth = 3;
+
+    private int _depth = DefaultChildrenDepth;          // 子树层数：0 = 仅节点本身
+    private int _includeDepth = DefaultChildrenDepth;   // 结果区「包含子项」层数（点重新综合时生效）
     private bool _loading = true;
     private bool _running;          // 重入守卫：字段值始终准确，不依赖 DOM 渲染状态
     private string? _error;
@@ -72,7 +102,18 @@
     private bool SupportsDepth =>
         HostType is not ("Line" or "LineNode" or "SpaceNode");
 
-    protected override Task OnInitializedAsync() => RunAsync();
+    protected override Task OnInitializedAsync()
+    {
+        _depth = Math.Clamp(InitialDepth, 0, 10);
+        return RunAsync();
+    }
+
+    /// <summary>按结果区选择的层数包含子项重新综合。</summary>
+    private async Task IncludeChildrenAsync()
+    {
+        _depth = Math.Clamp(_includeDepth, 1, 10);
+        await RunAsync();
+    }
 
     private async Task RunAsync()
     {

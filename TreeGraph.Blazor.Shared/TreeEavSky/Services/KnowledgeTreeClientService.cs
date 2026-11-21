@@ -11,7 +11,6 @@ public class KnowledgeTreeClientService(TreeApiClient<KnowledgeTree> treeClient)
 {
     public string EntityType => treeClient.EntityType;
     public string Title { get; set; } = "知识树";
-    public bool NewPageShow { get; set; }
     public bool SelectLeaf { get; set; } = false;
 
     public async Task<IReadOnlyList<TreeNodeDto<KnowledgeTree>>> LoadInitialDataAsync(

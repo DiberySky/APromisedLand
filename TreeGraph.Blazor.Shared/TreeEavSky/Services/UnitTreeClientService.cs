@@ -11,7 +11,6 @@ public class UnitTreeClientService(TreeApiClient<UnitTree> treeClient) : ITreeCl
 {
     public string EntityType => treeClient.EntityType;
     public string Title { get; set; } = "计量单位";
-    public bool NewPageShow { get; set; }
     public bool SelectLeaf { get; set; } = true;
 
     public async Task<IReadOnlyList<TreeNodeDto<UnitTree>>> LoadInitialDataAsync(

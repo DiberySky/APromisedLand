@@ -2,9 +2,6 @@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
-@inject ITreeNavigationHistoryService History
-@inject ISnackbar Snackbar
-@inject BlazorService BlazorService
 @inject ITreeClientService<TItem> ClientService
 @inject MessageService Message
 
@@ -76,7 +73,4 @@ else
 
     [Parameter] public RenderFragment<TItem>? ActionTemplate { get; set; }
     [Parameter] public RenderFragment<TItem>? EditTemplate { get; set; }
-
-    [Parameter] public Func<TreeNodeItem<TItem>, Task>? ShowDialogFunc { get; set; }
-    [Parameter] public EventCallback<bool> NewPageOpenChanged { get; set; }
 }

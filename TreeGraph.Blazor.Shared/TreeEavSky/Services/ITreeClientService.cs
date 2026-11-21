@@ -9,7 +9,6 @@ public interface ITreeClientService<TTree> where TTree : class
     string EntityType { get; }
 
     string Title { get; set; }
-    bool NewPageShow { get; set; }
     bool SelectLeaf { get; set; }
 
     Task<IReadOnlyList<TreeNodeDto<TTree>>> LoadInitialDataAsync(

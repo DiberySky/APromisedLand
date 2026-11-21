@@ -33,7 +33,6 @@ public class TreeEavSkyComponentTests : BunitTestBase {
         Services.AddTreeEavSky();
 
         _clientService.SetupProperty(s => s.Title, "测试树");
-        _clientService.SetupProperty(s => s.NewPageShow, false);
         _clientService.SetupProperty(s => s.SelectLeaf, false);
         Services.AddSingleton(_clientService.Object);
     }

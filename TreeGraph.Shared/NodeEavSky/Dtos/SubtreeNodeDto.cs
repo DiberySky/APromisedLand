@@ -17,7 +17,15 @@ public sealed record SubtreeNodeDto(
     ///     - 日期：2024-03-12 | 内容：更换液压油
     /// </summary>
     string? EavRendered,
-    List<SubtreeNodeDto> Children);
+    List<SubtreeNodeDto> Children,
+    /// <summary>
+    /// 预渲染的关系文本（仅根节点有值）：出入边、边类型、对端节点名与边属性。
+    /// 例：
+    ///   关系：
+    ///     - 出：属于 → 武汉供电段（生效日期=2024-01-01）
+    ///     - 入：3号设备 -[巡检记录]-> 本节点
+    /// </summary>
+    string? RelationsRendered = null);
 
 /// <summary>
 /// 子树加载结果。

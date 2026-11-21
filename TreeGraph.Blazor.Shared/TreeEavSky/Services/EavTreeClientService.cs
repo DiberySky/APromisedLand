@@ -11,7 +11,6 @@ public class EavTreeClientService(TreeApiClient<EavTree> treeClient) : ITreeClie
 {
     public string EntityType => treeClient.EntityType;
     public string Title { get; set; } = "EAV";
-    public bool NewPageShow { get; set; }
     public bool SelectLeaf { get; set; } = true;
 
     public async Task<IReadOnlyList<TreeNodeDto<EavTree>>> LoadInitialDataAsync(

@@ -63,27 +63,7 @@ public partial class TreeEavSky<TItem>
         {
             // 触发外部回调，由调用方决定导航行为
             await OnClickItemText.InvokeAsync(node);
-
-            return;
         }
-
-        if (node.Value!.Id == RootId) return;
-        if (!ClientService.NewPageShow || !node.HasChildren) return;
-
-        if (ShowDialogFunc == null)
-        {
-            // 记录浏览历史
-            History.Push(NavigationManager.Uri, RootId, node.Value?.Id);
-
-            if (node?.Value == null) return;
-            Snackbar.Add($"点击{node.Text}", Severity.Info);
-            NavigationManager.NavigateTo($"{CurrentPage}/rootId/{node.Value.Id}", forceLoad: true, replace: true);
-
-            return;
-        }
-
-        // 触发外部回调，由调用方决定导航行为
-        await OnClickItemText.InvokeAsync(node);
     }
 
     private string? _pendingDeepClickNodeId;

@@ -430,7 +430,7 @@
 
         var result = await dialog.Result;
 
-        // 用户在树对话框中选择了节点（点击节点文本触发 ShowDialogFunc）
+        // 用户在树对话框中选择了节点
         if (result is { Canceled: false, Data: TItem selectedNode })
         {
             // 显示选中节点的信息

@@ -1,8 +1,10 @@
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using TreeGraph.Api.EdgeSky.Services;
 using TreeGraph.Persistence.Data;
 using TreeGraph.Persistence.NodeEavSky.Entities;
+using TreeGraph.Shared.EdgeSky.Dtos;
 using TreeGraph.Shared.NodeEavSky;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
@@ -15,8 +17,10 @@ public sealed class SubtreeService
 {
     private const int MaxAttrValueLen = 200;
     private const int MaxTableRows = 5;
+    private const int MaxEdges = 50;
 
     private readonly TreeGraphDbContext _db;
+    private readonly EdgeService _edgeService;
     private readonly IAttributeCache _attrCache;
     private readonly IOptionSetCache _optionSetCache;
     private readonly ICompositeTypeCache _compositeCache;
@@ -25,6 +29,7 @@ public sealed class SubtreeService
 
     public SubtreeService(
         TreeGraphDbContext db,
+        EdgeService edgeService,
         IAttributeCache attrCache,
         IOptionSetCache optionSetCache,
         ICompositeTypeCache compositeCache,
@@ -32,6 +37,7 @@ public sealed class SubtreeService
         ILogger<SubtreeService> logger)
     {
         _db = db;
+        _edgeService = edgeService;
         _attrCache = attrCache;
         _optionSetCache = optionSetCache;
         _compositeCache = compositeCache;
@@ -89,11 +95,83 @@ public sealed class SubtreeService
             }
         }
 
-        // 根节点补 Path
+        // 根节点补 Path 与关系（关系仅根节点）
         var path = await BuildPathAsync(hostType, rootId, ct);
-        root = root with { Path = path };
+        var relations = await LoadRelationsAsync(rootId, ct);
+        root = root with { Path = path, RelationsRendered = relations };
 
         return new SubtreeLoadResult(root, raw.Count, truncated);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 关系渲染（出入边 + 边类型 + 对端节点名 + 边属性）
+    // ═══════════════════════════════════════════════════════
+
+    private async Task<string?> LoadRelationsAsync(string nodeId, CancellationToken ct)
+    {
+        // 节点 → 所属图空间（未登记的宿主返回 null，如 EavTree）
+        var space = await _edgeService.GetNodeSpaceAsync(nodeId, ct);
+        if (space is null) return null;
+
+        var edges = await _edgeService.QueryAsync(
+            space.SpaceId, edgeType: null, srcVid: null, dstVid: null,
+            nodeId, direction: "either", limit: MaxEdges, offset: 0, ct);
+        if (edges.Count == 0) return null;
+
+        // 边类型 / 边属性的中文显示名（缺省回退原名称）
+        var typeNames = await _db.EdgeTypes.AsNoTracking()
+            .Where(t => t.SpaceId == space.SpaceId)
+            .Select(t => new { t.Name, t.DisplayName })
+            .ToDictionaryAsync(t => t.Name, t => t.DisplayName, ct);
+
+        var propNames = await _db.EdgeTypeProps.AsNoTracking()
+            .Where(p => p.SpaceId == space.SpaceId)
+            .Select(p => new { p.EdgeTypeName, p.PropName, p.DisplayName })
+            .ToListAsync(ct);
+        var propDisplay = propNames.ToDictionary(
+            p => (p.EdgeTypeName, p.PropName), p => p.DisplayName);
+
+        var sb = new StringBuilder();
+        sb.AppendLine("  关系：");
+
+        foreach (var e in edges)
+        {
+            var typeText = Truncate(typeNames.GetValueOrDefault(e.EdgeType), MaxAttrValueLen);
+            if (string.IsNullOrWhiteSpace(typeText)) typeText = e.EdgeType;
+
+            var propsText = FormatEdgeProps(e, propDisplay);
+
+            if (e.SrcVid == nodeId)
+                sb.Append("    - 出：").Append(typeText).Append(" → ")
+                  .Append(e.DstName ?? e.DstVid).AppendLine(propsText);
+            else
+                sb.Append("    - 入：").Append(e.SrcName ?? e.SrcVid)
+                  .Append(" -[").Append(typeText).Append("]-> 本节点").AppendLine(propsText);
+        }
+
+        if (edges.Count >= MaxEdges)
+            sb.Append("    （仅列出前 ").Append(MaxEdges).AppendLine(" 条关系）");
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private static string FormatEdgeProps(
+        EdgeDto edge, Dictionary<(string EdgeTypeName, string PropName), string?> displayMap)
+    {
+        if (edge.Props is not { Count: > 0 }) return "";
+
+        var parts = new List<string>();
+        foreach (var (key, value) in edge.Props)
+        {
+            var text = FormatJsonElement(value);
+            if (string.IsNullOrWhiteSpace(text)) continue;
+
+            var name = displayMap.GetValueOrDefault((edge.EdgeType, key));
+            if (string.IsNullOrWhiteSpace(name)) name = key;
+            parts.Add($"{name}={Truncate(text, MaxAttrValueLen)}");
+        }
+
+        return parts.Count == 0 ? "" : $"（{string.Join("；", parts)}）";
     }
 
     // ═══════════════════════════════════════════════════════

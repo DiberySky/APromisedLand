@@ -159,7 +159,9 @@ public sealed class NodeExpandService
                           new AgentSessionStoreKey(currentConversationId), ct)
                       ?? await _expandAgent.CreateSessionAsync(cancellationToken: ct);
 
-        var scopeText = maxDepth > 0 ? $"节点及其 {maxDepth} 层子树" : "节点本身（不含子项）";
+        var scopeText = maxDepth > 0
+            ? $"节点及其 {maxDepth} 层子树"
+            : "节点本身（含属性与关系，不含子项）";
         var userPrompt = $"""
             请综合描述以下{scopeText}的内容：
             {FormatSubtreeAsText(subtree)}
@@ -199,6 +201,9 @@ public sealed class NodeExpandService
 
         if (!string.IsNullOrEmpty(node.EavRendered))
             sb.AppendLine(node.EavRendered);
+
+        if (!string.IsNullOrEmpty(node.RelationsRendered))
+            sb.AppendLine(node.RelationsRendered);
 
         if (node.Children is { Count: > 0 })
         {

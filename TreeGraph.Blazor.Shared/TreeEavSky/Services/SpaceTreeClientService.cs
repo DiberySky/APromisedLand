@@ -11,7 +11,6 @@ public class SpaceTreeClientService(TreeApiClient<SpaceTree> treeClient) : ITree
 {
     public string EntityType => treeClient.EntityType;
     public string Title { get; set; } = "空间";
-    public bool NewPageShow { get; set; }
     public bool SelectLeaf { get; set; } = true;
 
     public async Task<IReadOnlyList<TreeNodeDto<SpaceTree>>> LoadInitialDataAsync(
