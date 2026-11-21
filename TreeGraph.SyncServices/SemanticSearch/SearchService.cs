@@ -274,7 +274,7 @@ public sealed class SearchService
     }
 
     /// <summary>
-    /// PG 兜底路径解析（单位/分类/知识树 + 线路节点；SpaceTree 走 BuildPath）：
+    /// PG 兜底路径解析（单位/分类/知识树 + 线路节点 + 空间节点 + 线路；SpaceTree 走 BuildPath）：
     /// payload path 缺失时回填 Path/RootId/ParentName。
     /// 整表加载后内存上溯，返回 inodeId → (Path 含自身, RootId, ParentName)。
     /// </summary>
@@ -390,6 +390,42 @@ public sealed class SearchService
                 var nodeName = spaceNodeNames.TryGetValue(row.Id, out var nn) ? nn ?? "" : "";
                 var path = string.IsNullOrEmpty(spaceName) ? nodeName : $"{spaceName} / {nodeName}";
                 result[row.Id] = (path, row.SpaceId, spaceName);
+            }
+        }
+
+        // 线路：扁平结构，路径 = 所属空间名 / 线路名，根为所属空间（与 payload pathIds[0]=SpaceId 对齐）
+        var lineRows = await _db.Lines.AsNoTracking()
+            .Where(l => inodeIds.Contains(l.Id))
+            .Select(l => new { l.Id, l.Name, l.SpaceId })
+            .ToListAsync(ct);
+        if (lineRows.Count > 0)
+        {
+            var lineSpaceIds = lineRows
+                .Select(r => r.SpaceId)
+                .Where(id => !string.IsNullOrEmpty(id))
+                .Distinct()
+                .ToList();
+            var lineSpaceNames = lineSpaceIds.Count > 0
+                ? (await _db.Spaces.AsNoTracking()
+                        .Where(s => lineSpaceIds.Contains(s.Id))
+                        .Select(s => new { s.Id, s.Name }).ToListAsync(ct))
+                    .ToDictionary(s => s.Id, s => s.Name, StringComparer.Ordinal)
+                : new Dictionary<string, string?>(StringComparer.Ordinal);
+
+            foreach (var row in lineRows)
+            {
+                if (result.ContainsKey(row.Id)) continue;
+
+                var spaceName = !string.IsNullOrEmpty(row.SpaceId)
+                                && lineSpaceNames.TryGetValue(row.SpaceId, out var sn)
+                                && !string.IsNullOrEmpty(sn)
+                    ? sn : null;
+                var lineName = row.Name ?? "";
+                var path = string.IsNullOrEmpty(spaceName) ? lineName : $"{spaceName} / {lineName}";
+                result[row.Id] = (
+                    path,
+                    string.IsNullOrEmpty(row.SpaceId) ? null : row.SpaceId,
+                    spaceName);
             }
         }
 
