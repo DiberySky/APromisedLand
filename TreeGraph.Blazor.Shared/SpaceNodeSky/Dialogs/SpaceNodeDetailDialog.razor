@@ -3,6 +3,7 @@
    「设置修改」仅返回动作，由 SpaceNodesDialog 打开编辑对话框并循环重开。 *@
 @using TreeGraph.Blazor.Shared.EdgeSky.Components
 @using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@using TreeGraph.Blazor.Shared.NodeEavSky.Pages
 @using TreeGraph.Shared.SpaceNodeSky.Dtos
 
 <style>
@@ -33,12 +34,13 @@
         <MudText Typo="Typo.subtitle1" Color="Color.Info">@SpaceName</MudText>
     </ToolBarContent>
     <ToolBarRightContent>
+        @* AI 综合：空间节点为平面节点，无子项，仅综合当前节点 + 属性 + 关系 *@
         <MudButton Variant="Variant.Text"
-                   StartIcon="@Icons.Material.Outlined.EditNote"
+                   StartIcon="@Icons.Material.Outlined.AutoAwesome"
                    Size="Size.Small"
-                   Color="Color.Primary"
-                   OnClick="OnEdit">
-            设置修改
+                   Color="Color.Warning"
+                   OnClick="OnAiSummarize">
+            AI 综合
         </MudButton>
     </ToolBarRightContent>
     <DialogContent>
@@ -74,6 +76,16 @@
             </MudExpansionPanel>
         </MudContainer>
     </DialogContent>
+    <DialogLeftActions>
+        @* 设置修改移至底部左侧，与「关闭」同一行水平对齐 *@
+        <MudButton OnClick="OnEdit"
+                   Variant="Variant.Text"
+                   Color="Color.Success"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Outlined.EditNote">
+            设置修改
+        </MudButton>
+    </DialogLeftActions>
 </DialogSky>
 
 @code {
@@ -82,6 +94,29 @@
     [Parameter, EditorRequired] public SpaceNodeDto Node { get; set; } = null!;
 
     [Parameter] public string SpaceName { get; set; } = string.Empty;
+
+    [Inject] private IDialogService DialogService { get; set; } = default!;
+
+    /// <summary>AI 综合：空间节点为平面节点，仅综合当前节点（含属性与关系），无子项。</summary>
+    private async Task OnAiSummarize()
+    {
+        var parameters = new DialogParameters<NodeExpandDialog>
+        {
+            { x => x.InodeId, Node.Id },
+            { x => x.HostType, "SpaceNode" },
+            { x => x.NodeName, Node.Name },
+            { x => x.InitialDepth, 0 },
+            { x => x.HasChildren, false },
+        };
+
+        var options = new DialogConfig
+        {
+            MaxWidth = MaxWidth.Small,
+            DragMode = MudDialogDragMode.None,
+        }.ToDialogOptions();
+
+        await DialogService.ShowExAsync<NodeExpandDialog>("AI 综合", parameters, options);
+    }
 
     private void OnEdit() => MudDialog?.Close(DialogResult.Ok(true));
 

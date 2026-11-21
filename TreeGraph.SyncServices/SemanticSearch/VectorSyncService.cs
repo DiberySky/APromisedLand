@@ -659,7 +659,8 @@ public sealed class VectorSynchronizer
     /// <summary>
     /// 解析某空间对应的 inode 范围（与空间维护页打开树的规则一致）：
     /// 动态空间 → 空间树中以空间 Id 为根的子树（含根，根作为 space 节点后续被排除）；
-    /// 单位空间 → 单位树全体节点；类型空间 → 分类树全体节点；知识库空间 → 知识树全体节点。
+    /// 单位空间 → 单位树全体节点；类型空间 → 分类树全体节点；知识库空间 → 知识树全体节点；
+    /// 任意类型空间另含归属该空间的线路及其下线路节点（与向量 payload space_id 同口径）。
     /// 空间不存在时返回空集合。
     /// </summary>
     private async Task<HashSet<string>> ResolveScopeAsync(string spaceId, CancellationToken ct)
@@ -716,6 +717,20 @@ public sealed class VectorSynchronizer
         scope.UnionWith(await _db.SpaceNodes.AsNoTracking()
             .Where(n => n.SpaceId == spaceId)
             .Select(n => n.Id).ToListAsync(ct));
+
+        // 线路与其下线路节点归属该空间（与向量 payload space_id 同口径）
+        var lineIds = await _db.Lines.AsNoTracking()
+            .Where(l => l.SpaceId == spaceId)
+            .Select(l => l.Id)
+            .ToListAsync(ct);
+        if (lineIds.Count > 0)
+        {
+            scope.UnionWith(lineIds);
+            scope.UnionWith(await _db.Nodes.AsNoTracking()
+                .Where(n => n.HostType == "LineNode" && lineIds.Contains(n.LineId))
+                .Select(n => n.Id)
+                .ToListAsync(ct));
+        }
         return scope;
     }
 

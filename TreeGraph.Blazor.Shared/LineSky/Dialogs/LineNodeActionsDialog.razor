@@ -6,6 +6,7 @@
 @using TreeGraph.Blazor.Shared.LineSky.Components
 @using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @using TreeGraph.Blazor.Shared.EdgeSky.Components
+@using TreeGraph.Blazor.Shared.NodeEavSky.Pages
 
 <style>
     /* 选项卡图标小号（对齐 TreeNodeActionsDialog） */
@@ -46,13 +47,13 @@
         <MudText Typo="Typo.subtitle1" Color="Color.Info">@LineName</MudText>
     </ToolBarContent>
     <ToolBarRightContent>
-        @* 设置修改入口（工具栏右侧，文字按钮） *@
+        @* AI 综合：线路节点为平面节点，无子项，仅综合当前节点 + 属性 + 关系 *@
         <MudButton Variant="Variant.Text"
-                   StartIcon="@Icons.Material.Outlined.EditNote"
+                   StartIcon="@Icons.Material.Outlined.AutoAwesome"
                    Size="Size.Small"
-                   Color="Color.Primary"
-                   OnClick="OnEdit">
-            设置修改
+                   Color="Color.Warning"
+                   OnClick="OnAiSummarize">
+            AI 综合
         </MudButton>
     </ToolBarRightContent>
     <DialogContent>
@@ -94,6 +95,16 @@
             </MudExpansionPanel>
         </MudContainer>
     </DialogContent>
+    <DialogLeftActions>
+        @* 设置修改移至底部左侧，与「线路节点维护」「关闭」同一行水平对齐 *@
+        <MudButton OnClick="OnEdit"
+                   Variant="Variant.Text"
+                   Color="Color.Success"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Outlined.EditNote">
+            设置修改
+        </MudButton>
+    </DialogLeftActions>
     <DialogRightActions>
         @if (ShowLineManage && !string.IsNullOrEmpty(Node.LineId))
         {
@@ -122,6 +133,29 @@
 
     private void OnEdit() => CloseWithAction(LineNodeHostAction.Edit);
     private void OnLineManage() => CloseWithAction(LineNodeHostAction.LineManage);
+
+    [Inject] private IDialogService DialogService { get; set; } = default!;
+
+    /// <summary>AI 综合：线路节点为平面节点，仅综合当前节点（含属性与关系），无子项。</summary>
+    private async Task OnAiSummarize()
+    {
+        var parameters = new DialogParameters<NodeExpandDialog>
+        {
+            { x => x.InodeId, Node.Id },
+            { x => x.HostType, "LineNode" },
+            { x => x.NodeName, Node.Name },
+            { x => x.InitialDepth, 0 },
+            { x => x.HasChildren, false },
+        };
+
+        var options = new DialogConfig
+        {
+            MaxWidth = MaxWidth.Small,
+            DragMode = MudDialogDragMode.None,
+        }.ToDialogOptions();
+
+        await DialogService.ShowExAsync<NodeExpandDialog>("AI 综合", parameters, options);
+    }
 
     private void CloseWithAction(LineNodeHostAction action)
         => MudDialog?.Close(DialogResult.Ok(action));

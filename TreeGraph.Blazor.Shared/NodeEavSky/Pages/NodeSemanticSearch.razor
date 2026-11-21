@@ -545,7 +545,7 @@
                 await ShowLineNodesDialogAsync(item);
                 break;
             case "Line":
-                await ShowLinesDialogAsync(item);
+                await ShowLineContentAsync(item);
                 break;
             default:
                 _error = $"未知的节点类型：{item.HostType}";
@@ -668,8 +668,8 @@
             await OnResultChangedAsync(item);
     }
 
-    /// <summary>线路：打开所属图空间的线路对话框并定位该线路。</summary>
-    private async Task ShowLinesDialogAsync(SemanticSearchItemDto item)
+    /// <summary>线路：打开「线路内容」只读宿主，「设置修改」在其内部进入编辑并循环重开。</summary>
+    private async Task ShowLineContentAsync(SemanticSearchItemDto item)
     {
         LineDto? line;
         try
@@ -690,22 +690,19 @@
             return;
         }
 
-        var parameters = new DialogParameters<LinesDialog>
+        // 工具栏展示所属空间名（加载失败时回退为空，由对话框内部回退显示 SpaceId）
+        string? spaceName = null;
+        try
         {
-            { x => x.SpaceId, line.SpaceId },
-            { x => x.FocusLineId, line.Id },
-        };
-
-        var options = new DialogOptionsEx
+            spaceName = (await SpaceApi.GetByIdAsync(line.SpaceId))?.Name;
+        }
+        catch (Exception ex)
         {
-            Position = DialogPosition.TopCenter,
-            MaxWidth = MaxWidth.Small,
-            FullWidth = true,
-            MaximizeButton = true,
-            BackdropClick = false
-        };
+            Logger.LogWarning(ex, "加载线路所属空间失败：{SpaceId}", line.SpaceId);
+        }
 
-        await DialogService.ShowExAsync<LinesDialog>("线路", parameters, options);
+        if (await LineActions.OperateAsync(DialogService, LineApi, line.Id, spaceName))
+            await OnResultChangedAsync(item);
     }
 
     /// <summary>取路径首段作为空间名（Path 形如「空间 / … / 本节点」）。</summary>

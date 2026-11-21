@@ -5,6 +5,7 @@ using TreeGraph.Persistence.Data;
 using TreeGraph.Persistence.NodeEavSky.Entities;
 using TreeGraph.Persistence.SpaceSky.Entities;
 using TreeGraph.Persistence.SpaceNodeSky.Entities;
+using TreeGraph.Shared.LineSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Abstractions;
 using TreeGraph.Shared.TreeEavSky.Entities;
 
@@ -31,8 +32,12 @@ public sealed class SourceTextBuilder
     /// v3：实体文本前置宿主 path_view（层级路径/所属线路 + 当前节点）。
     /// v4（仅 EAV 文本）：实体/行键值行统一 name = value。节点文本未变，故版本仍为 v3；
     ///   实体点键 entity:{id} / 行点键 row:{id} 均不含版本，格式变更需强制重建这两类点。
-    /// v5：新增 SpaceNode 宿主（层级路径 = 所属空间 > 节点名），节点文本结构扩展。</summary>
-    public const string TemplateVersion = "v5";
+    /// v5：新增 SpaceNode 宿主（层级路径 = 所属空间 > 节点名），节点文本结构扩展。
+    /// v6：Line 纳入空间过滤——payload space_id 取 lines.space_id，路径行补所属空间
+    ///   （此前归 default，按空间检索时线路恒被过滤掉）。
+    /// v7：LineNode 纳入空间过滤——space_id 取所属线路的图空间，路径补「空间 > 线路」
+    ///   （此前归 default，按空间检索时线路节点恒被过滤掉）。</summary>
+    public const string TemplateVersion = "v7";
 
     /// <summary>节点向量视图类型。</summary>
     public const string ViewType = "path_view";
@@ -135,10 +140,18 @@ public sealed class SourceTextBuilder
                     await BuildAncestorChainAsync(_db.KnowledgeTrees, knowledge.ParentId, ct);
             else if (lineNode is not null)
             {
+                // 线路节点：所属线路 > 线路所属空间（与线路同口径，保证按空间检索可见）
                 var parentLine = await _db.Lines.AsNoTracking()
                     .FirstOrDefaultAsync(l => l.Id == lineNode.LineId, ct);
                 if (parentLine is not null)
                 {
+                    var parentLineSpace = await _db.Spaces.AsNoTracking()
+                        .FirstOrDefaultAsync(s => s.Id == parentLine.SpaceId, ct);
+                    if (parentLineSpace is not null)
+                    {
+                        ancestorNames.Add(NormalizeName(parentLineSpace.Name));
+                        ancestorIds.Add(parentLineSpace.Id);
+                    }
                     ancestorNames.Add(NormalizeName(parentLine.Name));
                     ancestorIds.Add(parentLine.Id);
                 }
@@ -148,6 +161,17 @@ public sealed class SourceTextBuilder
                 // 空间节点扁平无父子层级，唯一"祖先"是所属空间
                 var parentSpace = await _db.Spaces.AsNoTracking()
                     .FirstOrDefaultAsync(s => s.Id == spaceNode.SpaceId, ct);
+                if (parentSpace is not null)
+                {
+                    ancestorNames.Add(NormalizeName(parentSpace.Name));
+                    ancestorIds.Add(parentSpace.Id);
+                }
+            }
+            else if (line is not null)
+            {
+                // 线路扁平归属图空间，唯一"祖先"是所属空间（与空间节点同口径）
+                var parentSpace = await _db.Spaces.AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.Id == line.SpaceId, ct);
                 if (parentSpace is not null)
                 {
                     ancestorNames.Add(NormalizeName(parentSpace.Name));
@@ -177,7 +201,8 @@ public sealed class SourceTextBuilder
             : spaceNode is not null ? "space_node"
             : line is not null ? "line"
             : "line_node";
-        var spaceId = await ResolveSpaceIdAsync(space, eav, unit, category, knowledge, spaceNode, inodeId, ct);
+        var spaceId = await ResolveSpaceIdAsync(
+            space, eav, unit, category, knowledge, spaceNode, line, lineNode?.LineId, inodeId, ct);
 
         // 5. 构造各实体独立文本（v3：前置宿主 path_view，实体可被路径语义命中）
         // 前缀用 EAV 等号格式（name = value），与节点向量文案分离
@@ -208,8 +233,9 @@ public sealed class SourceTextBuilder
     ///   空间树节点 → 自身或最近的空间祖先（Id ∈ spaces）；
     ///   EAV 树节点 → 无空间归属，归 "default"（仅全局检索可见）；
     ///   单位/分类/知识树节点 → 对应类型空间（当前每类型单空间假设，与对账 ResolveScope 口径一致）；
-    ///   线路节点 → 无空间归属，归 "default"（仅全局检索可见）；
-    ///   空间节点 → 自身 space_id（归属空间）。
+    ///   线路节点 → 所属线路的图空间（lines.space_id，与线路同口径）；
+    ///   空间节点 → 自身 space_id（归属空间）；
+    ///   线路 → 自身 space_id（lines.space_id，与空间节点同口径）。
     /// 无对应空间时归 "default"。
     /// </summary>
     private async Task<string> ResolveSpaceIdAsync(
@@ -219,6 +245,8 @@ public sealed class SourceTextBuilder
         CategoryTree? category,
         KnowledgeTree? knowledge,
         SpaceNode? spaceNode,
+        Line? line,
+        string? lineNodeLineId,
         string inodeId,
         CancellationToken ct)
     {
@@ -249,6 +277,22 @@ public sealed class SourceTextBuilder
         // 空间节点：直接归其所属空间（扁平结构，无祖先链）
         if (spaceNode is not null)
             return spaceIds.Contains(spaceNode.SpaceId) ? spaceNode.SpaceId : "default";
+
+        // 线路：直接归其所属图空间（扁平结构，与空间节点同口径）
+        if (line is not null)
+            return spaceIds.Contains(line.SpaceId) ? line.SpaceId : "default";
+
+        // 线路节点：归所属线路的图空间（与线路同口径）
+        if (lineNodeLineId is not null)
+        {
+            var lineSpaceId = await _db.Lines.AsNoTracking()
+                .Where(l => l.Id == lineNodeLineId)
+                .Select(l => l.SpaceId)
+                .FirstOrDefaultAsync(ct);
+            return lineSpaceId is not null && spaceIds.Contains(lineSpaceId)
+                ? lineSpaceId
+                : "default";
+        }
 
         SpaceType? spaceType = unit is not null ? SpaceType.Unit
             : category is not null ? SpaceType.Type

@@ -49,16 +49,22 @@
                                    title="向量刷新" />
                 </MudTd>
                 <MudTd Style="white-space: nowrap; text-align: right;">
-                    <MudIconButton Icon="@Icons.Material.Outlined.Delete"
-                                   Color="Color.Error"
-                                   Size="Size.Small"
-                                   OnClick="@(async () => await OpenDeleteAsync(context))"
-                                   title="删除线路" />
                     <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                    Color="Color.Primary"
                                    Size="Size.Small"
                                    OnClick="@(async () => await OpenEditAsync(context))"
                                    title="编辑线路" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                   Color="Color.Error"
+                                   Size="Size.Small"
+                                   OnClick="@(async () => await OpenDeleteAsync(context))"
+                                   title="删除线路" />
+                    @* 查看：只读「线路内容」，「设置修改」在其内部进入编辑 *@
+                    <MudIconButton Icon="@Icons.Material.Outlined.LinearScale"
+                                   Color="Color.Info"
+                                   Size="Size.Small"
+                                   OnClick="@(async () => await OpenViewAsync(context))"
+                                   title="查看线路" />
                 </MudTd>
                 <MudTd Style="white-space: nowrap; text-align: center;">
                     @* 详情：打开该线路的 LineNode 维护对话框 *@
@@ -164,6 +170,13 @@
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
+            await LoadAsync();
+    }
+
+    /// <summary>查看：只读「线路内容」宿主，「设置修改」在其内部进入编辑并循环重开。</summary>
+    private async Task OpenViewAsync(LineDto line)
+    {
+        if (await LineActions.OperateAsync(DialogService, Api, line.Id, SpaceName, Snackbar))
             await LoadAsync();
     }
 
