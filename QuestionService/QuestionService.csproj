@@ -15,7 +15,7 @@
         <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.5.3" />
         <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0" />
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="11.0.0-rc.3.26522.148">
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="11.0.0">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
@@ -23,6 +23,11 @@
         <PackageReference Include="Typesense" Version="9.2.0" />
         <PackageReference Include="WolverineFx.RabbitMQ" Version="6.64.0" />
         <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.64.1" />
+        <!-- 统一 Roslyn 组件版本：传递依赖混用 5.0.0/5.9.0 会触发 NU1608 -->
+        <PackageReference Include="Microsoft.CodeAnalysis" Version="5.9.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.9.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="5.9.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Scripting" Version="5.9.0" />
     </ItemGroup>
 
     <ItemGroup>

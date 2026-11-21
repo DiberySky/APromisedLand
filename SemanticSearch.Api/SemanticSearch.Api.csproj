@@ -10,7 +10,7 @@
         <PackageReference Include="Aspire.Elastic.Clients.Elasticsearch" Version="13.3.0" />
         <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.5.3" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0" />
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="11.0.0-rc.3.26522.148">
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="11.0.0">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
