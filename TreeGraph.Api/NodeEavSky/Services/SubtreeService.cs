@@ -18,6 +18,7 @@ public sealed class SubtreeService
     private const int MaxAttrValueLen = 200;
     private const int MaxTableRows = 5;
     private const int MaxEdges = 50;
+    private const int MaxChildEdges = 10;
 
     private readonly TreeGraphDbContext _db;
     private readonly EdgeService _edgeService;
@@ -72,6 +73,9 @@ public sealed class SubtreeService
         var nodeIds = raw.Select(n => n.Id).ToList();
         var eavMap = await LoadEavBatchAsync(nodeIds, ct);
 
+        // 批量加载关系（根节点最多 50 条、子节点最多 10 条）
+        var relationsMap = await LoadRelationsForSubtreeAsync(rootId, raw, ct);
+
         // 树形组装
         var nodeMap = raw.ToDictionary(
             n => n.Id,
@@ -80,7 +84,8 @@ public sealed class SubtreeService
                 Name: n.Name,
                 Path: null,
                 EavRendered: eavMap.GetValueOrDefault(n.Id),
-                Children: new List<SubtreeNodeDto>()));
+                Children: new List<SubtreeNodeDto>(),
+                RelationsRendered: relationsMap.GetValueOrDefault(n.Id)));
 
         if (!nodeMap.TryGetValue(rootId, out var root))
             return new SubtreeLoadResult(null, raw.Count, truncated);
@@ -95,10 +100,9 @@ public sealed class SubtreeService
             }
         }
 
-        // 根节点补 Path 与关系（关系仅根节点）
+        // 根节点补 Path（关系已在组装时统一填充）
         var path = await BuildPathAsync(hostType, rootId, ct);
-        var relations = await LoadRelationsAsync(rootId, ct);
-        root = root with { Path = path, RelationsRendered = relations };
+        root = root with { Path = path };
 
         return new SubtreeLoadResult(root, raw.Count, truncated);
     }
@@ -107,29 +111,63 @@ public sealed class SubtreeService
     // 关系渲染（出入边 + 边类型 + 对端节点名 + 边属性）
     // ═══════════════════════════════════════════════════════
 
-    private async Task<string?> LoadRelationsAsync(string nodeId, CancellationToken ct)
+    /// <summary>
+    /// 为子树内全部节点渲染关系文本（第二步：子节点也带关系）。
+    /// 整棵子树归属同一图空间，空间与边类型显示名只解析一次；
+    /// 根节点最多 <see cref="MaxEdges"/> 条，子节点最多 <see cref="MaxChildEdges"/> 条，控制提示词长度。
+    /// </summary>
+    private async Task<Dictionary<string, string?>> LoadRelationsForSubtreeAsync(
+        string rootId, List<RawNode> raw, CancellationToken ct)
     {
-        // 节点 → 所属图空间（未登记的宿主返回 null，如 EavTree）
-        var space = await _edgeService.GetNodeSpaceAsync(nodeId, ct);
-        if (space is null) return null;
+        var result = new Dictionary<string, string?>(StringComparer.Ordinal);
 
-        var edges = await _edgeService.QueryAsync(
-            space.SpaceId, edgeType: null, srcVid: null, dstVid: null,
-            nodeId, direction: "either", limit: MaxEdges, offset: 0, ct);
-        if (edges.Count == 0) return null;
+        var space = await _edgeService.GetNodeSpaceAsync(rootId, ct);
+        if (space is null) return result;
 
-        // 边类型 / 边属性的中文显示名（缺省回退原名称）
+        var (typeNames, propDisplay) = await LoadEdgeDisplayAsync(space.SpaceId, ct);
+
+        foreach (var n in raw)
+        {
+            var text = await LoadRelationsInSpaceAsync(
+                n.Id, space.SpaceId, typeNames, propDisplay,
+                n.Id == rootId ? MaxEdges : MaxChildEdges, ct);
+            if (text is not null) result[n.Id] = text;
+        }
+
+        return result;
+    }
+
+    /// <summary>加载某空间内的边类型/边属性中文显示名。</summary>
+    private async Task<(
+        Dictionary<string, string?> TypeNames,
+        Dictionary<(string EdgeTypeName, string PropName), string?> PropDisplay)>
+        LoadEdgeDisplayAsync(string spaceId, CancellationToken ct)
+    {
         var typeNames = await _db.EdgeTypes.AsNoTracking()
-            .Where(t => t.SpaceId == space.SpaceId)
+            .Where(t => t.SpaceId == spaceId)
             .Select(t => new { t.Name, t.DisplayName })
             .ToDictionaryAsync(t => t.Name, t => t.DisplayName, ct);
 
         var propNames = await _db.EdgeTypeProps.AsNoTracking()
-            .Where(p => p.SpaceId == space.SpaceId)
+            .Where(p => p.SpaceId == spaceId)
             .Select(p => new { p.EdgeTypeName, p.PropName, p.DisplayName })
             .ToListAsync(ct);
         var propDisplay = propNames.ToDictionary(
             p => (p.EdgeTypeName, p.PropName), p => p.DisplayName);
+
+        return (typeNames, propDisplay);
+    }
+
+    private async Task<string?> LoadRelationsInSpaceAsync(
+        string nodeId, string spaceId,
+        Dictionary<string, string?> typeNames,
+        Dictionary<(string EdgeTypeName, string PropName), string?> propDisplay,
+        int maxEdges, CancellationToken ct)
+    {
+        var edges = await _edgeService.QueryAsync(
+            spaceId, edgeType: null, srcVid: null, dstVid: null,
+            nodeId, direction: "either", limit: maxEdges, offset: 0, ct);
+        if (edges.Count == 0) return null;
 
         var sb = new StringBuilder();
         sb.AppendLine("  关系：");
@@ -149,8 +187,8 @@ public sealed class SubtreeService
                   .Append(" -[").Append(typeText).Append("]-> 本节点").AppendLine(propsText);
         }
 
-        if (edges.Count >= MaxEdges)
-            sb.Append("    （仅列出前 ").Append(MaxEdges).AppendLine(" 条关系）");
+        if (edges.Count >= maxEdges)
+            sb.Append("    （仅列出前 ").Append(maxEdges).AppendLine(" 条关系）");
 
         return sb.ToString().TrimEnd();
     }

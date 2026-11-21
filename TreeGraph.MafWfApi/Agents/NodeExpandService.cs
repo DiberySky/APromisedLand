@@ -46,8 +46,9 @@ public sealed class NodeExpandService
         var currentConversationId = conversationId ?? Guid.NewGuid().ToString("N");
 
         // 1. 加载子树
-        var subtree = await _subtreeLoader.LoadAsync(
+        var loaded = await _subtreeLoader.LoadAsync(
             hostType, inodeId, DefaultMaxDepth, DefaultMaxNodes, ct);
+        var subtree = loaded?.Root;
 
         if (subtree is null)
         {
@@ -82,9 +83,10 @@ public sealed class NodeExpandService
                       ?? await _expandAgent.CreateSessionAsync(cancellationToken: ct);
 
         // 4. 构造 LLM 输入，走 agent 流式管道（会话会被自动持久化）
+        var truncationNote = BuildTruncationNote(loaded!);
         var userPrompt = $"""
             请综合描述以下节点及其子树的内容：
-            {FormatSubtreeAsText(subtree)}
+            {truncationNote}{FormatSubtreeAsText(subtree)}
             """;
 
         var accumulated = new StringBuilder();
@@ -142,8 +144,9 @@ public sealed class NodeExpandService
 
         // 子树层数由调用方（UI 参数）控制：0 = 仅节点本身，默认 3 层
         var maxDepth = Math.Clamp(depth, 0, 10);
-        var subtree = await _subtreeLoader.LoadAsync(
+        var loaded = await _subtreeLoader.LoadAsync(
             hostType, inodeId, maxDepth, DefaultMaxNodes, ct);
+        var subtree = loaded?.Root;
 
         if (subtree is null)
         {
@@ -164,7 +167,7 @@ public sealed class NodeExpandService
             : "节点本身（含属性与关系，不含子项）";
         var userPrompt = $"""
             请综合描述以下{scopeText}的内容：
-            {FormatSubtreeAsText(subtree)}
+            {BuildTruncationNote(loaded!)}{FormatSubtreeAsText(subtree)}
             """;
 
         var response = await _expandAgent.RunAsync(
@@ -180,8 +183,22 @@ public sealed class NodeExpandService
             ConversationId: currentConversationId,
             AgentName: "NodeExpander",
             Reply: string.IsNullOrWhiteSpace(text) ? "（模型未返回内容）" : text,
-            Found: true);
+            Found: true,
+            Truncated: loaded!.Truncated,
+            TotalNodes: loaded.TotalNodes);
     }
+
+    /// <summary>
+    /// 子树被 maxNodes 截断时给模型的提示行（未截断返回空串），
+    /// 避免模型把「未给出的子节点」当作不存在或进行推测。
+    /// </summary>
+    private static string BuildTruncationNote(SubtreeLoadResult loaded)
+        => loaded.Truncated
+            ? $"""
+                （注意：该子树共 {loaded.TotalNodes} 个节点，受 {DefaultMaxNodes} 个节点上限限制已截断，以下仅为部分节点；请只基于所列数据分析，不要推测未列出的部分。）
+
+                """
+            : "";
 
     private static string FormatSubtreeAsText(SubtreeNodeDto node)
     {

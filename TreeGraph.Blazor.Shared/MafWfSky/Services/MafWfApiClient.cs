@@ -230,4 +230,6 @@ public sealed record NodeExpandResultDto(
     string ConversationId,
     string AgentName,
     string Reply,
-    bool Found);
+    bool Found,
+    bool Truncated = false,
+    int TotalNodes = 0);

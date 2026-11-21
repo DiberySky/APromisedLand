@@ -60,4 +60,8 @@ public sealed record NodeExpandResult(
     string ConversationId,
     string AgentName,
     string Reply,
-    bool Found);
+    bool Found,
+    /// <summary>子树是否因节点数上限（50）被截断。</summary>
+    bool Truncated = false,
+    /// <summary>截断前实际加载的节点数。</summary>
+    int TotalNodes = 0);

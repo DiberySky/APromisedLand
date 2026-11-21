@@ -20,7 +20,10 @@ public sealed class SubtreeLoader
         _logger = logger;
     }
 
-    public async Task<SubtreeNodeDto?> LoadAsync(
+    /// <summary>
+    /// 加载子树。返回值含根节点、实际节点数与是否被 maxNodes 截断（供 AI 提示与前端展示）。
+    /// </summary>
+    public async Task<SubtreeLoadResult?> LoadAsync(
         string hostType, string inodeId, int maxDepth, int maxNodes,
         CancellationToken ct)
     {
@@ -40,7 +43,12 @@ public sealed class SubtreeLoader
             if (!data.TryGetProperty("root", out var root)) return null;
             if (root.ValueKind == JsonValueKind.Null) return null;
 
-            return ParseNode(root);
+            var totalNodes = data.TryGetProperty("totalNodes", out var t)
+                             && t.TryGetInt32(out var tn) ? tn : 0;
+            var truncated = data.TryGetProperty("truncated", out var tr)
+                            && tr.ValueKind == JsonValueKind.True;
+
+            return new SubtreeLoadResult(ParseNode(root), totalNodes, truncated);
         }
         catch (Exception ex)
         {

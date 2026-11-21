@@ -19,7 +19,7 @@ public sealed record SubtreeNodeDto(
     string? EavRendered,
     List<SubtreeNodeDto> Children,
     /// <summary>
-    /// 预渲染的关系文本（仅根节点有值）：出入边、边类型、对端节点名与边属性。
+    /// 预渲染的关系文本（子树内每个节点均可有值：根节点最多 50 条、子节点最多 10 条）。
     /// 例：
     ///   关系：
     ///     - 出：属于 → 武汉供电段（生效日期=2024-01-01）
