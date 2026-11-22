@@ -1,8 +1,8 @@
 using APromisedLand.Shared.TreeGraph.Models;
-using TreeGraphApi.Entities;
-using TreeGraphApi.Repositories;
+using MafRagApiService.Entities;
+using MafRagApiService.Repositories;
 
-namespace TreeGraphApi.Services;
+namespace MafRagApiService.Services;
 
 public class TreeService : ITreeService
 {

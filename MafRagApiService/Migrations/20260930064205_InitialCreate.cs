@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace TreeGraphApi.Migrations
+namespace MafRagApiService.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration

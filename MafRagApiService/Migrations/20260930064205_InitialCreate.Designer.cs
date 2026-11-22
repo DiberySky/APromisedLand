@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using TreeGraphApi.Data;
+using MafRagApiService.Data;
 
 #nullable disable
 
-namespace TreeGraphApi.Migrations
+namespace MafRagApiService.Migrations
 {
     [DbContext(typeof(TreeDbContext))]
-    partial class TreeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930064205_InitialCreate")]
+    partial class InitialCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -22,7 +25,7 @@ namespace TreeGraphApi.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("TreeGraphApi.Entities.TreeNodeEntity", b =>
+            modelBuilder.Entity("MafRagApiService.Entities.TreeNodeEntity", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(36)
@@ -82,9 +85,9 @@ namespace TreeGraphApi.Migrations
                     b.ToTable("tree_nodes", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraphApi.Entities.TreeNodeEntity", b =>
+            modelBuilder.Entity("MafRagApiService.Entities.TreeNodeEntity", b =>
                 {
-                    b.HasOne("TreeGraphApi.Entities.TreeNodeEntity", "Parent")
+                    b.HasOne("MafRagApiService.Entities.TreeNodeEntity", "Parent")
                         .WithMany("Children")
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.Restrict);
@@ -92,7 +95,7 @@ namespace TreeGraphApi.Migrations
                     b.Navigation("Parent");
                 });
 
-            modelBuilder.Entity("TreeGraphApi.Entities.TreeNodeEntity", b =>
+            modelBuilder.Entity("MafRagApiService.Entities.TreeNodeEntity", b =>
                 {
                     b.Navigation("Children");
                 });

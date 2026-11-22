@@ -4,7 +4,7 @@ using APromisedLand.Shared.TreeGraph.Models;
 namespace APromisedLand.SharedRazor.Components.TreeGraph;
 
 /// <summary>
-/// 后端 TreeGraphApi 的 HTTP 客户端封装。BaseAddress 由 DI 容器注入时设置。
+/// 后端 MafRagApiService 的 HTTP 客户端封装。BaseAddress 由 DI 容器注入时设置。
 /// </summary>
 public sealed class TreeApiClient
 {

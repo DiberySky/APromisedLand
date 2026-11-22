@@ -95,7 +95,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APromisedLand.SharedApi", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MafVectorSearchApi", "MafVectorSearchApi\MafVectorSearchApi.csproj", "{06E71B4A-414D-4F3F-A8CE-514F5F0D55E3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraphApi", "TreeGraphApi\TreeGraphApi.csproj", "{4062DADF-5D9E-4285-8DFF-92644592ACF7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MafRagApiService", "MafRagApiService\MafRagApiService.csproj", "{4062DADF-5D9E-4285-8DFF-92644592ACF7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MafRagTreeGraph", "MafRagTreeGraph\MafRagTreeGraph.csproj", "{B760ED49-6A1B-4F9B-82EB-5C27B759A2FB}"
 EndProject

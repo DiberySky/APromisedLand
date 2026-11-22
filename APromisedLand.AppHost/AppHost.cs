@@ -82,12 +82,12 @@ void MafRagApi()
     builder.AddMafVectorSearchApi(context);   // 向量搜索服务（需先于 MafSampleApi 声明）
     builder.AddMafSampleApi(context);
 
-    // ★ 新增:泛型树形数据 API(复用 TreeDb,固定端口 5753)
-    builder.AddTreeGraphApi(context);
+    // ★ 新增:MafRagApiService(泛型树形数据 API,复用 TreeDb,固定端口 5753)
+    builder.AddMafRagApiService(context);
     
     builder.AddVllm(context);
 
-    // ★ 新增:TreeGraph 前端 Blazor Server(固定端口 5763,调用 TreeGraphApi)
+    // ★ 新增:TreeGraph 前端 Blazor Server(固定端口 5763,调用 MafRagApiService)
     builder.AddMafRagTreeGraph(context);
 }
 

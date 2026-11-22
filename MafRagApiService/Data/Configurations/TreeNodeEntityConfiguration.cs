@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using TreeGraphApi.Entities;
+using MafRagApiService.Entities;
 
-namespace TreeGraphApi.Data.Configurations;
+namespace MafRagApiService.Data.Configurations;
 
 public class TreeNodeEntityConfiguration : IEntityTypeConfiguration<TreeNodeEntity>
 {

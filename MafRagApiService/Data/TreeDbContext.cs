@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using TreeGraphApi.Entities;
+using MafRagApiService.Entities;
 
-namespace TreeGraphApi.Data;
+namespace MafRagApiService.Data;
 
 public class TreeDbContext : DbContext
 {

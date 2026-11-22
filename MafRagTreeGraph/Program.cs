@@ -11,10 +11,10 @@ builder.Services.AddRazorComponents()
 // MudBlazor
 builder.Services.AddMudServices();
 
-// TreeApiClient:指向后端 TreeGraphApi (Aspire 编排后端口 5753)
+// TreeApiClient:指向后端 MafRagApiService (Aspire 编排后端口 5753)
 builder.Services.AddHttpClient<TreeApiClient>(client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["TreeGraphApi:BaseUrl"]
+    client.BaseAddress = new Uri(builder.Configuration["MafRagApiService:BaseUrl"]
         ?? "http://localhost:5753");
 });
 

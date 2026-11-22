@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using TreeGraphApi.Data;
-using TreeGraphApi.Entities;
+using MafRagApiService.Data;
+using MafRagApiService.Entities;
 
-namespace TreeGraphApi.Repositories;
+namespace MafRagApiService.Repositories;
 
 public class TreeRepository : ITreeRepository
 {

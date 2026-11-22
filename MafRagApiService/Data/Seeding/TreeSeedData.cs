@@ -1,4 +1,4 @@
-namespace TreeGraphApi.Data.Seeding;
+namespace MafRagApiService.Data.Seeding;
 
 /// <summary>
 /// 演示用种子数据。可按业务需要替换。

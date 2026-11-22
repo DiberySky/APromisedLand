@@ -1,6 +1,6 @@
 using APromisedLand.Shared.TreeGraph.Models;
 
-namespace TreeGraphApi.Services;
+namespace MafRagApiService.Services;
 
 /// <summary>
 /// 服务层契约,对外暴露 DTO 而非 Entity(优化 #5:DTO 隔离)。

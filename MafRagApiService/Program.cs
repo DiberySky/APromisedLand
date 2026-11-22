@@ -1,11 +1,11 @@
 using Aspire.Npgsql.EntityFrameworkCore.PostgreSQL;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using TreeGraphApi.Data;
-using TreeGraphApi.Data.Seeding;
-using TreeGraphApi.Entities;
-using TreeGraphApi.Repositories;
-using TreeGraphApi.Services;
+using MafRagApiService.Data;
+using MafRagApiService.Data.Seeding;
+using MafRagApiService.Entities;
+using MafRagApiService.Repositories;
+using MafRagApiService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

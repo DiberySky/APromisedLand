@@ -1,6 +1,6 @@
-using TreeGraphApi.Entities;
+using MafRagApiService.Entities;
 
-namespace TreeGraphApi.Repositories;
+namespace MafRagApiService.Repositories;
 
 public interface ITreeRepository
 {

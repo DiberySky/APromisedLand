@@ -51,8 +51,8 @@ public class AppHostResourceContext
     /// <summary>TreeGraph.FileStorageApi(独立微服务,端口 5326,复用 FileMetadataDb + SeaweedS3)。</summary>
     public IResourceBuilder<ProjectResource>? TreeGraphFileStorageApi { get; set; }
 
-    /// <summary>泛型树形数据 API(基于 TreeDb,无 ltree,纯递归 CTE + LIKE)。</summary>
-    public IResourceBuilder<ProjectResource>? TreeGraphApi { get; set; }
+    /// <summary>MafRagApiService(泛型树形数据 API,基于 TreeDb,无 ltree,纯递归 CTE + LIKE)。</summary>
+    public IResourceBuilder<ProjectResource>? MafRagApiService { get; set; }
 
     /// <summary>EAV 动态类型 API(复用 TreeGraphDb,端口 5773)。</summary>
     public IResourceBuilder<ProjectResource>? TreeGraphEavApi { get; set; }
@@ -74,7 +74,7 @@ public class AppHostResourceContext
     // ── 前端 ──
     public IResourceBuilder<ProjectResource>? BlazorWeb { get; set; }
 
-    /// <summary>TreeGraph 前端 Blazor Server 应用(端口 5763,调用 TreeGraphApi)。</summary>
+    /// <summary>TreeGraph 前端 Blazor Server 应用(端口 5763,调用 MafRagApiService)。</summary>
     public IResourceBuilder<ProjectResource>? MafRagTreeGraph { get; set; }
 
     // Database & RabbitMQ

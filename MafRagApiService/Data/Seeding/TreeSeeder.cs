@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using TreeGraphApi.Entities;
+using MafRagApiService.Entities;
 
-namespace TreeGraphApi.Data.Seeding;
+namespace MafRagApiService.Data.Seeding;
 
 public class TreeSeeder
 {

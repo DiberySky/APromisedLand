@@ -4,7 +4,7 @@ namespace APromisedLand.AppHost.Extensions;
 
 /// <summary>
 /// MafRagTreeGraph 前端 Blazor Server 应用的 Aspire 编排扩展。
-/// 固定主机端口 5763,通过环境变量注入 TreeGraphApi 的 http 端点。
+/// 固定主机端口 5763,通过环境变量注入 MafRagApiService 的 http 端点。
 /// </summary>
 public static class MafRagTreeGraphExtension
 {
@@ -18,22 +18,22 @@ public static class MafRagTreeGraphExtension
             .AddProject<Projects.MafRagTreeGraph>("MafRagTreeGraph")
             .WithHttpEndpoint(port: MafRagTreeGraphHttpPort, name: "http");
 
-        // 注入 TreeGraphApi 端点(由 TreeGraphApiExtension 声明,端口 5753)
+        // 注入 MafRagApiService 端点(由 MafRagApiServiceExtension 声明,端口 5753)
         // MafRagTreeGraph 的 Program.cs 通过 AddHttpClient<TreeApiClient> 读取
-        // TreeGraphApi__BaseUrl 或硬编码 localhost:5753,这里用 WithReference 注入
-        if (context.TreeGraphApi is not null)
+        // MafRagApiService__BaseUrl 或硬编码 localhost:5753,这里用 WithReference 注入
+        if (context.MafRagApiService is not null)
         {
-            var treeGraphApiEndpoint = context.TreeGraphApi.GetEndpoint("http");
+            var mafRagApiServiceEndpoint = context.MafRagApiService.GetEndpoint("http");
 
             context.MafRagTreeGraph
-                .WaitFor(context.TreeGraphApi)
-                .WithEnvironment("TreeGraphApi__BaseUrl", treeGraphApiEndpoint);
+                .WaitFor(context.MafRagApiService)
+                .WithEnvironment("MafRagApiService__BaseUrl", mafRagApiServiceEndpoint);
 
-            Console.WriteLine($"[MafRagTreeGraph] TreeGraphApi 端点 → {treeGraphApiEndpoint}");
+            Console.WriteLine($"[MafRagTreeGraph] MafRagApiService 端点 → {mafRagApiServiceEndpoint}");
         }
         else
         {
-            Console.WriteLine("[MafRagTreeGraph] ⚠️ context.TreeGraphApi 为 null,未注入后端端点");
+            Console.WriteLine("[MafRagTreeGraph] ⚠️ context.MafRagApiService 为 null,未注入后端端点");
         }
 
         context.MafRagTreeGraph

@@ -1,9 +1,9 @@
 using APromisedLand.Shared.TreeGraph.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TreeGraphApi.Services;
+using MafRagApiService.Services;
 
-namespace TreeGraphApi.Controllers;
+namespace MafRagApiService.Controllers;
 
 [ApiController]
 [Route("api/tree")]

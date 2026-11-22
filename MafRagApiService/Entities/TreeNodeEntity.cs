@@ -1,4 +1,4 @@
-namespace TreeGraphApi.Entities;
+namespace MafRagApiService.Entities;
 
 /// <summary>
 /// 树节点实体(数据库模型)。

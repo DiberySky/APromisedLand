@@ -6,13 +6,13 @@
 
 <MudText Typo="Typo.h4">TreeGraph Demo</MudText>
 <MudText Typo="Typo.body2" Color="Color.Info" Class="mb-4">
-    通用泛型树组件 + 后端 TreeGraphApi(端口 5753 + PostgreSQL TreeGraphDb,无 ltree)
+    通用泛型树组件 + 后端 MafRagApiService(端口 5753 + PostgreSQL TreeGraphDb,无 ltree)
 </MudText>
 
 @if (_loadFailed)
 {
     <MudAlert Severity="Severity.Error" Class="mb-4">
-        无法连接到 TreeGraphApi,请确认后端服务已启动(默认 http://localhost:5753)。
+        无法连接到 MafRagApiService,请确认后端服务已启动(默认 http://localhost:5753)。
     </MudAlert>
 }
 

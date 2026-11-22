@@ -1,4 +1,4 @@
-namespace TreeGraphApi.Data.Seeding;
+namespace MafRagApiService.Data.Seeding;
 
 /// <summary>
 /// 声明式种子节点。Id 默认留空,由 TreeSeeder 自动生成 GUID。
