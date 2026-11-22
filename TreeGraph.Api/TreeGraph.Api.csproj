@@ -8,17 +8,19 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.64.1" />
-        <PackageReference Include="WolverineFx.EntityFrameworkCore" Version="6.64.1" />
-        <PackageReference Include="WolverineFx.Postgresql" Version="6.64.1" />
-        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.64.1" />
+        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.64.2" />
+        <PackageReference Include="WolverineFx.EntityFrameworkCore" Version="6.64.2" />
+        <PackageReference Include="WolverineFx.Postgresql" Version="6.64.2" />
+        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.64.2" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0" />
-        <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.6.5" />
+        <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="17.0.0-preview.1.26567.5" />
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="11.0.0" />
         <!-- 统一 Roslyn 组件版本：WolverineFx 运行时编译链混用 5.0.0/5.9.0 会触发 NU1608 -->
-        <PackageReference Include="Microsoft.CodeAnalysis" Version="5.9.0" />
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.9.0" />
-        <PackageReference Include="Microsoft.CodeAnalysis.Scripting" Version="5.9.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis" Version="5.12.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.12.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Scripting" Version="5.12.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.12.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.12.0" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="11.0.0">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

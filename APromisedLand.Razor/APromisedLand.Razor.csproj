@@ -12,13 +12,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="CodeBeam.MudBlazor.Extensions" Version="9.3.1" />
+    <PackageReference Include="CodeBeam.MudBlazor.Extensions" Version="9.14.0" />
     <PackageReference Include="FluentValidation" Version="12.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="11.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="11.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="11.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="11.0.0" />
-    <PackageReference Include="MudBlazor" Version="9.13.0" />
+    <PackageReference Include="MudBlazor" Version="9.14.0" />
     <PackageReference Include="MudBlazor.Extensions" Version="9.13.1" />
   </ItemGroup>
 
