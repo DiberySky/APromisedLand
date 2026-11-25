@@ -3,4 +3,6 @@ html, body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin
 .loading-shell { display: grid; place-items: center; min-height: 100vh; color: #555; }
 #blazor-error-ui { display: none; position: fixed; bottom: 0; left: 0; right: 0; padding: .75rem 1.25rem; background: #b32121; color: white; z-index: 10000; }
 #blazor-error-ui a { color: white; text-decoration: underline; }
-.page-padded { padding: 1rem; }
+/* MudBlazor 9 的顶部内边距依赖 --mud-appbar-height，运行时未注入导致失效，这里显式兜底 */
+.mud-main-content { padding-top: 80px !important; }
+.page-padded { padding-right: 1rem; padding-bottom: 1rem; padding-left: 1rem; }

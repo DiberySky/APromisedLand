@@ -2,6 +2,7 @@
   "id": "apromisedland",
   "realm": "apromisedland",
   "displayName": "A promised land",
+  "loginTheme": "treegraph",
   "enabled": true,
   "registrationAllowed": false,
   "sslRequired": "external",

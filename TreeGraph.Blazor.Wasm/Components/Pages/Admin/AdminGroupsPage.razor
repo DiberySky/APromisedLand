@@ -17,7 +17,7 @@
     <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Outlined.Add" OnClick='() => OpenCreateAsync(null, string.Empty)'>新建顶层组</MudButton>
 </MudStack>
 
-<MudTable T="GroupRow" Items="_rows" Dense="true" Hover="true" Loading="_loading">
+<MudTable T="IdentityGroup" Items="_rows" Dense="true" Hover="true" Loading="_loading">
     <HeaderContent>
         <MudTh>组名</MudTh>
         <MudTh>路径</MudTh>
@@ -26,20 +26,20 @@
     </HeaderContent>
     <RowTemplate>
         <MudTd>
-            <div style="padding-left: @(context.Depth * 24)px">
-                @if (context.Group.IsSpaceGroup)
+            <div style="padding-left: @(DepthOf(context) * 24)px">
+                @if (context.IsSpaceGroup)
                 {
                     <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Filled" Class="mr-1">空间</MudChip>
                 }
-                @context.Group.Name
+                @context.Name
             </div>
         </MudTd>
-        <MudTd><MudText Typo="Typo.caption">@context.Group.Path</MudText></MudTd>
-        <MudTd>@(context.Group.Description ?? "—")</MudTd>
+        <MudTd><MudText Typo="Typo.caption">@context.Path</MudText></MudTd>
+        <MudTd>@(context.Description ?? "—")</MudTd>
         <MudTd>
-            <MudTooltip Text="成员"><MudIconButton Icon="@Icons.Material.Outlined.Person" Color="Color.Default" Size="Size.Small" OnClick='() => ShowMembersAsync(context.Group)' /></MudTooltip>
-            <MudTooltip Text="新建子组"><MudIconButton Icon="@Icons.Material.Outlined.Add" Color="Color.Primary" Size="Size.Small" OnClick='() => OpenCreateAsync(context.Group.Id, context.Group.Name)' /></MudTooltip>
-            <MudTooltip Text="删除"><MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick='() => ConfirmDeleteAsync(context.Group)' /></MudTooltip>
+            <MudTooltip Text="成员"><MudIconButton Icon="@Icons.Material.Outlined.Person" Color="Color.Default" Size="Size.Small" OnClick='() => ShowMembersAsync(context)' /></MudTooltip>
+            <MudTooltip Text="新建子组"><MudIconButton Icon="@Icons.Material.Outlined.Add" Color="Color.Primary" Size="Size.Small" OnClick='() => OpenCreateAsync(context.Id, context.Name)' /></MudTooltip>
+            <MudTooltip Text="删除"><MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick='() => ConfirmDeleteAsync(context)' /></MudTooltip>
         </MudTd>
     </RowTemplate>
     <NoRecordsContent>
@@ -48,7 +48,7 @@
 </MudTable>
 
 @code {
-    private IReadOnlyList<GroupRow> _rows = [];
+    private IReadOnlyList<IdentityGroup> _rows = [];
     private bool _loading;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
@@ -71,16 +71,32 @@
         }
     }
 
-    private static List<GroupRow> Flatten(IEnumerable<IdentityGroup> groups, int depth = 0, List<GroupRow>? acc = null)
+    private static List<IdentityGroup> Flatten(IEnumerable<IdentityGroup> groups)
     {
-        acc ??= [];
-        foreach (var g in groups.OrderBy(g => g.Path, StringComparer.Ordinal))
+        var all = new List<IdentityGroup>();
+
+        void Walk(IEnumerable<IdentityGroup> nodes)
         {
-            acc.Add(new GroupRow(g, depth));
-            if (g.Children.Count > 0)
-                Flatten(g.Children, depth + 1, acc);
+            foreach (var g in nodes)
+            {
+                all.Add(g);
+                Walk(g.Children);
+            }
         }
-        return acc;
+
+        Walk(groups);
+        return [.. all.OrderBy(g => g.Path, StringComparer.Ordinal)];
+    }
+
+    /// <summary>由 Keycloak 组路径（如 <c>/spaces/space-x</c>）推算层级深度，顶层为 0。</summary>
+    private static int DepthOf(IdentityGroup group)
+    {
+        var separators = 0;
+        foreach (var c in group.Path)
+        {
+            if (c == '/') separators++;
+        }
+        return Math.Max(0, separators - 1);
     }
 
     private async Task OpenCreateAsync(string? parentId, string parentName)
@@ -134,6 +150,4 @@
             Snackbar.Add($"删除失败：{ex.Message}", Severity.Error);
         }
     }
-
-    private sealed record GroupRow(IdentityGroup Group, int Depth);
 }

@@ -68,6 +68,9 @@
         <Content Include="KeycloakRealmpart.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+        <Content Include="KeycloakThemes\**\*">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
         <None Update="Notes\Dockerfile">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>

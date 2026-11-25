@@ -17,7 +17,7 @@ public class RealmKeysAdminServiceTests
             req.RequestUri!.AbsolutePath == RealmPath + "/keys"
                 ? StubHttpMessageHandler.Json(
                     """
-                    [{"providerId":"k-1","kid":"kid-1","status":"ACTIVE","type":"RSA","algorithm":"RS256","providerPriority":100,"validTo":1760000000000}]
+                    {"keys":[{"providerId":"k-1","kid":"kid-1","status":"ACTIVE","type":"RSA","algorithm":"RS256","providerPriority":100,"validTo":1760000000000}]}
                     """)
                 : new HttpResponseMessage(HttpStatusCode.NotFound));
 
@@ -41,7 +41,7 @@ public class RealmKeysAdminServiceTests
                 deleteCalls++;
 
             return req.RequestUri!.AbsolutePath == RealmPath + "/keys"
-                ? StubHttpMessageHandler.Json("""[{"providerId":"k-1","status":"ACTIVE"}]""")
+                ? StubHttpMessageHandler.Json("""{"keys":[{"providerId":"k-1","status":"ACTIVE"}]}""")
                 : new HttpResponseMessage(HttpStatusCode.NoContent);
         });
 
@@ -66,7 +66,7 @@ public class RealmKeysAdminServiceTests
             }
 
             return req.RequestUri!.AbsolutePath == RealmPath + "/keys"
-                ? StubHttpMessageHandler.Json("""[{"providerId":"k-1","status":"PASSIVE"}]""")
+                ? StubHttpMessageHandler.Json("""{"keys":[{"providerId":"k-1","status":"PASSIVE"}]}""")
                 : new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
@@ -83,7 +83,7 @@ public class RealmKeysAdminServiceTests
     {
         var (client, runner, _) = TestDefaults.CreateServices(req =>
             req.RequestUri!.AbsolutePath == RealmPath + "/keys"
-                ? StubHttpMessageHandler.Json("""[{"providerId":"other","status":"PASSIVE"}]""")
+                ? StubHttpMessageHandler.Json("""{"keys":[{"providerId":"other","status":"PASSIVE"}]}""")
                 : new HttpResponseMessage(HttpStatusCode.NotFound));
 
         var service = new RealmKeysAdminService(client, runner);
@@ -109,7 +109,7 @@ public class RealmKeysAdminServiceTests
             if (req.Method == HttpMethod.Get && path == RealmPath + "/keys")
                 return StubHttpMessageHandler.Json(
                     """
-                    [{"providerId":"new-key","kid":"kid-new","status":"ACTIVE","type":"RSA","algorithm":"RS256","providerPriority":100}]
+                    {"keys":[{"providerId":"new-key","kid":"kid-new","status":"ACTIVE","type":"RSA","algorithm":"RS256","providerPriority":100}]}
                     """);
 
             return new HttpResponseMessage(HttpStatusCode.NotFound);

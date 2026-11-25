@@ -107,7 +107,7 @@ public sealed class RealmKeysAdminService : IRealmKeysAdminService
     {
         var response = await _client.GetAsync("keys", Module, ct).ConfigureAwait(false);
         return response.IsSuccess
-            ? response.Deserialize<List<KcKeyMetadata>>() ?? []
+            ? response.Deserialize<KcKeysResponse>()?.Keys ?? []
             : [];
     }
 

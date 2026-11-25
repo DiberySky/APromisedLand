@@ -106,7 +106,8 @@ public sealed class KeycloakBootstrapService : IHostedService
                 ct,
                 pkceOnly: true,
                 postLogoutRedirectUri: wasmBaseUrl + "/",
-                updateExisting: true)
+                updateExisting: true,
+                fullScopeAllowed: true)
             .ConfigureAwait(false);
 
         var adminClientId = await EnsureClientAsync(
@@ -246,7 +247,8 @@ public sealed class KeycloakBootstrapService : IHostedService
         CancellationToken ct,
         bool pkceOnly = false,
         string? postLogoutRedirectUri = null,
-        bool updateExisting = false)
+        bool updateExisting = false,
+        bool fullScopeAllowed = false)
     {
         var attributes = new Dictionary<string, string>();
         if (pkceOnly) attributes["pkce.code.challenge.method"] = "S256";
@@ -269,7 +271,7 @@ public sealed class KeycloakBootstrapService : IHostedService
             webOrigins,
             rootUrl,
             baseUrl = rootUrl,
-            fullScopeAllowed = false,
+            fullScopeAllowed,
             attributes
         };
 

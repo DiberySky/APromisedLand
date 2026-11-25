@@ -24,11 +24,14 @@ public static class KeycloakExtension
         resourceContext.KeycloakAdminClientSecret = adminClientSecret;
 
         var realmJsonPath = Path.Combine(AppContext.BaseDirectory, RealmJsonFileName);
+        // 开发调试主题：预填测试账号密码，仅在本地调试期挂载。
+        var themePath = Path.Combine(AppContext.BaseDirectory, "KeycloakThemes", "treegraph");
 
         resourceContext.Keycloak = builder
             .AddKeycloak("Keycloak", KeycloakHttpPort, adminUser, adminPassword)
             .WithImageTag("26.6")
             .WithDataVolume("keycloak-data")
+            .WithBindMount(themePath, "/opt/keycloak/themes/treegraph", isReadOnly: true)
             .WithEnvironment("TREEGRAPH_WEB_CLIENT_SECRET", webClientSecret)
             .WithEnvironment("TREEGRAPH_ADMIN_CLIENT_SECRET", adminClientSecret)
             // Quarkus 默认单请求头上限约 50KB，本地 localhost 各端口共享 Cookie 罐，

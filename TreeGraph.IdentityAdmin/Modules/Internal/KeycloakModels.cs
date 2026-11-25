@@ -210,6 +210,13 @@ internal sealed class KcEvent
     public Dictionary<string, string>? Details { get; set; }
 }
 
+/// <summary>/admin/realms/{realm}/keys 响应：active 映射 + keys 数组（不是裸数组）。</summary>
+internal sealed class KcKeysResponse
+{
+    public Dictionary<string, string>? Active { get; set; }
+    public List<KcKeyMetadata>? Keys { get; set; }
+}
+
 /// <summary>Keycloak 密钥元数据（/admin/realms/{realm}/keys）。</summary>
 internal sealed class KcKeyMetadata
 {
