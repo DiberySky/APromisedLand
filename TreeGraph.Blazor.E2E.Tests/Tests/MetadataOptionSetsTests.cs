@@ -8,7 +8,9 @@ namespace TreeGraph.Blazor.E2E.Tests.Tests;
 
 /// <summary>
 /// /metadata/option-sets 页面 E2E。
-/// 注意：MudBlazor 9 展开面板 header 类名是 .mud-expand-panel-header。
+///
+/// 当前 UI 为平铺 MudTable：行操作为「管理选项定义」图标，选项的增删与
+/// 「设为默认」都在弹出的「选项定义」对话框中完成（不再是展开面板）。
 /// </summary>
 public class MetadataOptionSetsTests : E2ETestBase
 {
@@ -19,6 +21,20 @@ public class MetadataOptionSetsTests : E2ETestBase
         BaseAddress = new Uri(Fixture.Settings.ApiBaseUrl)
     };
 
+    private const string PageTitleSelector = "h5:has-text('选项集定义管理')";
+
+    private static ILocator RowOf(IPage page, string text)
+        => page.Locator($".mud-table-row:has-text('{text}')").First;
+
+    /// <summary>打开某选项集的「选项定义」对话框。</summary>
+    private static async Task<ILocator> OpenItemsDialogAsync(IPage page, string setName)
+    {
+        var row = RowOf(page, setName);
+        await row.WaitForAsync();
+        await BlazorHelpers.ClickAsync(page, row.Locator("button[title='管理选项定义']").First);
+        return await BlazorHelpers.WaitForDialogAsync(page);
+    }
+
     // ============================================================
     // 场景 1：页面加载 + 显示自建选项集
     // ============================================================
@@ -26,7 +42,6 @@ public class MetadataOptionSetsTests : E2ETestBase
     [Fact]
     public async Task Page_Loads_ShowsCreatedSet()
     {
-        // 种子已清空（EavSeeder 空实现）：自建一个选项集后断言列表可见
         var setName = MetadataHelpers.Unique("e2e_seed");
         using var http = NewHttp();
         try
@@ -37,7 +52,7 @@ public class MetadataOptionSetsTests : E2ETestBase
             createResp.EnsureSuccessStatusCode();
 
             await BlazorHelpers.GoToAsync(Page, "/metadata/option-sets");
-            await Page.WaitForSelectorAsync("h5:has-text('选项集管理')");
+            await Page.WaitForSelectorAsync(PageTitleSelector);
             await BlazorHelpers.WaitForLoadingCompleteAsync(Page);
 
             await Page.WaitForSelectorAsync($"text={setName}");
@@ -62,6 +77,7 @@ public class MetadataOptionSetsTests : E2ETestBase
         try
         {
             await BlazorHelpers.GoToAsync(Page, "/metadata/option-sets");
+            await Page.WaitForSelectorAsync(PageTitleSelector);
             await BlazorHelpers.WaitForLoadingCompleteAsync(Page);
 
             await BlazorHelpers.ClickAsync(Page,
@@ -69,15 +85,13 @@ public class MetadataOptionSetsTests : E2ETestBase
 
             var dlg = await BlazorHelpers.WaitForDialogAsync(Page);
 
-            // 实体类型（默认 Shared，不用改）
-            // 集合名
-            await BlazorHelpers.FillMudTextFieldAsync(
-                dlg.Locator(".mud-input-control:has-text('集合名')").First,
-                setName);
-            // 显示名
             await BlazorHelpers.FillMudTextFieldAsync(
                 dlg.Locator(".mud-input-control:has-text('显示名')").First,
                 displayName);
+            // 中文显示名不会自动生成内部标识，必须显式填写
+            await BlazorHelpers.FillMudTextFieldAsync(
+                dlg.Locator(".mud-input-control:has-text('内部标识')").First,
+                setName);
 
             await BlazorHelpers.ClickAsync(Page,
                 dlg.Locator("button:has-text('创建')").Last);
@@ -85,13 +99,10 @@ public class MetadataOptionSetsTests : E2ETestBase
             await BlazorHelpers.WaitForSnackbarAsync(Page, "创建成功");
             await BlazorHelpers.WaitForSnackbarGoneAsync(Page);
 
-            // 展开面板出现
-            await Page.WaitForSelectorAsync(
-                $"{MudSelectors.ExpandPanel}:has-text('{displayName}')");
+            await RowOf(Page, displayName).WaitForAsync();
         }
         finally
         {
-            // ★ 兜底清理（UI 建的，拿不到 ID，按 name 反查）
             await MetadataHelpers.TryDeleteOptionSetByNameAsync(http, setName);
         }
     }
@@ -103,9 +114,9 @@ public class MetadataOptionSetsTests : E2ETestBase
     [Fact]
     public async Task AddItem_ToNewSet_ShowsInList()
     {
-        // 前置：API 建选项集
         using var http = NewHttp();
         var setName = MetadataHelpers.Unique("e2e_items");
+        var itemValue = MetadataHelpers.Unique("e2e_val");
 
         string? setId = null;
         try
@@ -120,39 +131,34 @@ public class MetadataOptionSetsTests : E2ETestBase
             setId = created!.Data!.OptionSetId;
 
             await BlazorHelpers.GoToAsync(Page, "/metadata/option-sets");
+            await Page.WaitForSelectorAsync(PageTitleSelector);
             await BlazorHelpers.WaitForLoadingCompleteAsync(Page);
 
-            // 展开我们建的那个面板
-            var panel = Page.Locator(
-                $"{MudSelectors.ExpandPanel}:has-text('{setName}')").First;
-            await BlazorHelpers.ExpandPanelAsync(Page, panel);
+            var itemsDialog = await OpenItemsDialogAsync(Page, setName);
 
-            // 点"添加选项"
             await BlazorHelpers.ClickAsync(Page,
-                panel.Locator("button:has-text('添加选项')").First);
+                itemsDialog.Locator("button[title='添加选项']").First);
 
-            var dlg = await BlazorHelpers.WaitForDialogAsync(Page);
+            var itemDialog = await BlazorHelpers.WaitForDialogAsync(Page);
 
             await BlazorHelpers.FillMudTextFieldAsync(
-                dlg.Locator(".mud-input-control:has-text('Value')").First,
-                "e2e_val");
-            await BlazorHelpers.FillMudTextFieldAsync(
-                dlg.Locator(".mud-input-control:has-text('Label')").First,
+                itemDialog.Locator(".mud-input-control:has-text('显示名')").First,
                 "E2E标签");
+            await BlazorHelpers.FillMudTextFieldAsync(
+                itemDialog.Locator(".mud-input-control:has-text('内部标识')").First,
+                itemValue);
 
             await BlazorHelpers.ClickAsync(Page,
-                dlg.Locator("button:has-text('保存')").Last);
+                itemDialog.Locator("button:has-text('保存')").Last);
 
             await BlazorHelpers.WaitForSnackbarAsync(Page, "添加成功");
             await BlazorHelpers.WaitForSnackbarGoneAsync(Page);
 
-            // 行出现
-            await panel.Locator(".mud-table-row:has-text('e2e_val')")
+            await itemsDialog.Locator($".mud-table-row:has-text('{itemValue}')")
                 .First.WaitForAsync();
         }
         finally
         {
-            // ★ 兜底清理（API 建的，有 ID）
             if (setId is not null)
                 await MetadataHelpers.TryDeleteOptionSetAsync(http, setId);
         }
@@ -165,7 +171,6 @@ public class MetadataOptionSetsTests : E2ETestBase
     [Fact]
     public async Task SetDefault_ShowsStarIcon()
     {
-        // 前置：API 建选项集 + 2 个选项
         using var http = NewHttp();
         var setName = MetadataHelpers.Unique("e2e_default");
 
@@ -189,29 +194,26 @@ public class MetadataOptionSetsTests : E2ETestBase
             }
 
             await BlazorHelpers.GoToAsync(Page, "/metadata/option-sets");
+            await Page.WaitForSelectorAsync(PageTitleSelector);
             await BlazorHelpers.WaitForLoadingCompleteAsync(Page);
 
-            var panel = Page.Locator(
-                $"{MudSelectors.ExpandPanel}:has-text('{setName}')").First;
-            await BlazorHelpers.ExpandPanelAsync(Page, panel);
+            var itemsDialog = await OpenItemsDialogAsync(Page, setName);
 
-            // 等表格出现（限定 tbody，避免 has-text('a') 匹配到含 "Value" 文本的表头行）
-            var rowA = panel.Locator(".mud-table-body .mud-table-row:has-text('a')").First;
+            // 显示名 A / B，避免 has-text('a') 命中其它文本
+            var rowA = itemsDialog.Locator(".mud-table-body .mud-table-row:has-text('A')").First;
             await rowA.WaitForAsync();
 
-            // 点"设为默认"（星号）
             await BlazorHelpers.ClickAsync(Page,
                 rowA.Locator("button[title='设为默认']").First);
 
             await BlazorHelpers.WaitForSnackbarAsync(Page, "设为默认");
             await BlazorHelpers.WaitForSnackbarGoneAsync(Page);
 
-            // 校验 a 行有实心星
-            await rowA.Locator(".mud-icon-root").First.WaitForAsync();
+            await itemsDialog.Locator(".mud-table-body .mud-table-row:has-text('A')")
+                .First.Locator(".mud-icon-root").First.WaitForAsync();
         }
         finally
         {
-            // ★ 兜底清理（API 建的，有 ID）
             if (setId is not null)
                 await MetadataHelpers.TryDeleteOptionSetAsync(http, setId);
         }

@@ -1,0 +1,136 @@
+@page "/admin/spaces"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IGroupsAdminService GroupsService
+@inject IAdminActorAccessor ActorAccessor
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>空间管理</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">空间管理</MudText>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        <MudTextField @bind-Value="_newSpaceId"
+                      Label="空间 ID"
+                      Variant="Variant.Outlined"
+                      Placeholder="如 1001"
+                      Style="width: 200px" />
+        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Outlined.Add" Disabled="@_creating" OnClick="CreateSpaceAsync">
+            @(_creating ? "创建中..." : "创建空间")
+        </MudButton>
+    </MudStack>
+</MudStack>
+
+<MudText Typo="Typo.caption" Class="mb-3">
+    空间以 Keycloak 组承载（前缀 space-，位于 /spaces 下）；空间组的删除需通过业务侧解绑，不在此页提供。
+</MudText>
+
+<MudTable T="IdentityGroup" Items="_spaces" Dense="true" Hover="true" Loading="_loading">
+    <HeaderContent>
+        <MudTh>空间 ID</MudTh>
+        <MudTh>路径</MudTh>
+        <MudTh>描述</MudTh>
+        <MudTh>操作</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>
+            <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Filled">@(context.Name.ToSpaceId())</MudChip>
+        </MudTd>
+        <MudTd><MudText Typo="Typo.caption">@context.Path</MudText></MudTd>
+        <MudTd>@(context.Description ?? "—")</MudTd>
+        <MudTd>
+            <MudTooltip Text="成员"><MudIconButton Icon="@Icons.Material.Outlined.Person" Color="Color.Default" Size="Size.Small" OnClick='() => ShowMembersAsync(context)' /></MudTooltip>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Typo="Typo.body2">暂无空间。</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private IReadOnlyList<IdentityGroup> _spaces = [];
+    private string _newSpaceId = string.Empty;
+    private bool _loading;
+    private bool _creating;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var tree = await GroupsService.GetTreeAsync(brief: false);
+            _spaces = Flatten(tree).Where(g => g.IsSpaceGroup).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载空间失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static List<IdentityGroup> Flatten(IEnumerable<IdentityGroup> groups, List<IdentityGroup>? acc = null)
+    {
+        acc ??= [];
+        foreach (var g in groups.OrderBy(g => g.Path, StringComparer.Ordinal))
+        {
+            acc.Add(g);
+            if (g.Children.Count > 0)
+                Flatten(g.Children, acc);
+        }
+        return acc;
+    }
+
+    private async Task CreateSpaceAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newSpaceId))
+        {
+            Snackbar.Add("请填写空间 ID", Severity.Warning);
+            return;
+        }
+
+        _creating = true;
+        try
+        {
+            var result = await GroupsService.EnsureSpaceGroupAsync(
+                ActorAccessor.GetRequiredActor(),
+                _newSpaceId.Trim());
+            if (result.Success)
+            {
+                Snackbar.Add($"空间已就绪：{_newSpaceId.Trim()}", Severity.Success);
+                _newSpaceId = string.Empty;
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "创建失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"创建失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+
+    private async Task ShowMembersAsync(IdentityGroup group)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(GroupMembersDialog.GroupId)] = group.Id,
+            [nameof(GroupMembersDialog.GroupTitle)] = $"空间 {group.Name.ToSpaceId()}"
+        };
+        await DialogService.ShowAsync<GroupMembersDialog>("空间成员", parameters);
+    }
+}

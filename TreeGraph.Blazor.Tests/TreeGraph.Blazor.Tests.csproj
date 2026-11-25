@@ -17,12 +17,10 @@
         </PackageReference>
         <!-- ★ 新增：bUnit 组件测试框架 -->
         <PackageReference Include="bunit" Version="2.15.2" />
-        <!-- ★ 新增：启动级 smoke 测试（WebApplicationFactory<Program>） -->
-        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="11.0.0" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\TreeGraph.Blazor\TreeGraph.Blazor.csproj" />
+        <ProjectReference Include="..\TreeGraph.Blazor.Shared\TreeGraph.Blazor.Shared.csproj" />
         <ProjectReference Include="..\TreeGraph.Shared\TreeGraph.Shared.csproj" />
     </ItemGroup>
 

@@ -9,6 +9,18 @@ public class AppHostResourceContext
     // Keycloak
     public IResourceBuilder<KeycloakResource>? Keycloak { get; set; }
 
+    /// <summary>Keycloak 管理员用户名参数。</summary>
+    public IResourceBuilder<ParameterResource>? KeycloakUsername { get; set; }
+
+    /// <summary>Keycloak 管理员密码参数（secret）。</summary>
+    public IResourceBuilder<ParameterResource>? KeycloakPassword { get; set; }
+
+    /// <summary>Blazor 登录客户端 treegraph-web 的密钥参数（secret）。</summary>
+    public IResourceBuilder<ParameterResource>? KeycloakWebClientSecret { get; set; }
+
+    /// <summary>管理调用客户端 treegraph-admin 的密钥参数（secret）。</summary>
+    public IResourceBuilder<ParameterResource>? KeycloakAdminClientSecret { get; set; }
+
     // ── 基础设施 ──
     public IResourceBuilder<PostgresServerResource>? Postgres { get; set; }
 
@@ -40,6 +52,9 @@ public class AppHostResourceContext
     public IResourceBuilder<PostgresDatabaseResource>? FileMetadataDb { get; set; }
     public IResourceBuilder<PostgresDatabaseResource>? VectorAdminDb { get; set; }
 
+    /// <summary>身份管理审计库（独立迁移历史）。</summary>
+    public IResourceBuilder<PostgresDatabaseResource>? IdentityAdminDb { get; set; }
+
     // ── 业务微服务 ──
     public IResourceBuilder<ProjectResource>? FileStorageApi { get; set; }
     public IResourceBuilder<ProjectResource>? MafWorkFlowApi { get; set; }
@@ -63,8 +78,11 @@ public class AppHostResourceContext
     /// <summary>Qdrant 向量数据库（语义搜索，gRPC 6334 / REST 6333）。</summary>
     public IResourceBuilder<QdrantServerResource>? Qdrant { get; set; }
 
-    /// <summary>TreeGraph 管理台 Blazor Server 应用(端口 5783,调用 TreeGraphEavApi)。</summary>
-    public IResourceBuilder<ProjectResource>? TreeGraphBlazor { get; set; }
+    /// <summary>TreeGraph 纯 WASM 静态宿主（独立 HTTPS 端口 5787）。</summary>
+    public IResourceBuilder<ProjectResource>? TreeGraphBlazorWasm { get; set; }
+
+    /// <summary>WASM 身份管理 API（端口 5785，独占 Bootstrap 与 IdentityAdminDb 迁移）。</summary>
+    public IResourceBuilder<ProjectResource>? TreeGraphIdentityAdminApi { get; set; }
 
     /// <summary>向量搜索服务（文本向量化 + 语义检索 + 重排序）。</summary>
     public IResourceBuilder<ProjectResource>? MafVectorSearchApi { get; set; }

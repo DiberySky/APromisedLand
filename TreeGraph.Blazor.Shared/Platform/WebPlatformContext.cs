@@ -30,7 +30,8 @@ public class WebPlatformContext : IPlatformContext
         int width;
         try
         {
-            width = await _js.InvokeAsync<int>("eval", "window.innerWidth");
+            // 通过已注册的 JS 函数获取视口宽度，避免 CSP eval 限制
+            width = await _js.InvokeAsync<int>("treeGraphPlatform.getViewportWidth");
         }
         catch (InvalidOperationException)
         {

@@ -1,0 +1,69 @@
+@page "/admin/user-federation"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IFederationAdminService FederationService
+@inject IAdminActorAccessor ActorAccessor
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>用户联邦</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">用户联邦（User Federation）</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenCreateAsync">新建 LDAP/AD</MudButton>
+</MudStack>
+
+<MudTable T="UserFederationProviderSummary" Items="_providers" Dense="true" Hover="true" Loading="_loading">
+    <HeaderContent>
+        <MudTh>名称</MudTh>
+        <MudTh>Provider</MudTh>
+        <MudTh>状态</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd><a href="/admin/user-federation/@context.Id" class="text-primary">@context.Name</a></MudTd>
+        <MudTd>@context.ProviderName</MudTd>
+        <MudTd>
+            <MudChip T="string" Size="Size.Small" Color="@(context.Enabled ? Color.Success : Color.Error)" Variant="Variant.Filled">
+                @(context.Enabled ? "启用" : "禁用")
+            </MudChip>
+        </MudTd>
+        <MudTd><MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick='() => ConfirmDeleteAsync(context)' /></MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText Typo="Typo.body2">暂无联邦提供方。</MudText></NoRecordsContent>
+</MudTable>
+
+@code {
+    private IReadOnlyList<UserFederationProviderSummary> _providers = [];
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try { _providers = await FederationService.ListAsync(); }
+        catch (Exception ex) { Snackbar.Add($"加载失败：{ex.Message}", Severity.Error); }
+        finally { _loading = false; }
+    }
+
+    private async Task OpenCreateAsync()
+    {
+        var dialog = await DialogService.ShowAsync<CreateLdapFederationDialog>("新建 LDAP/AD 联邦");
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled) await LoadAsync();
+    }
+
+    private async Task ConfirmDeleteAsync(UserFederationProviderSummary p)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync("确认删除", $"删除联邦「{p.Name}」？",
+            yesText: "删除", cancelText: "取消");
+        if (confirmed != true) return;
+        var result = await FederationService.DeleteAsync(ActorAccessor.GetRequiredActor(), p.Id);
+        if (result.Success) { Snackbar.Add("已删除", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(result.Error ?? "删除失败", Severity.Error);
+    }
+}

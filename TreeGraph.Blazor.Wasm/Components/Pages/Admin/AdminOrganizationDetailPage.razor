@@ -1,0 +1,189 @@
+@page "/admin/organizations/{OrganizationId}"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IOrganizationsAdminService OrganizationsService
+@inject IAdminActorAccessor ActorAccessor
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>组织详情</PageTitle>
+
+@if (_notFound)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">未找到组织。</MudAlert>
+    <MudButton Variant="Variant.Outlined" OnClick='() => Nav.NavigateTo("/admin/organizations")'>返回列表</MudButton>
+}
+else if (_detail is null)
+{
+    <MudText>加载中...</MudText>
+}
+else
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+        <div>
+            <MudText Typo="Typo.h4">@_detail.Name</MudText>
+            <MudText Typo="Typo.body2">Alias：@_detail.Alias</MudText>
+        </div>
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.ArrowBack" OnClick='() => Nav.NavigateTo("/admin/organizations")'>返回列表</MudButton>
+    </MudStack>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">基本信息</MudText>
+        <MudGrid Style="max-width: 760px">
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_name" Label="名称" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_redirectUrl" Label="Redirect URL" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12"><MudTextField @bind-Value="_description" Label="描述" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12"><MudTextField @bind-Value="_domains" Label="域名（逗号分隔）" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12"><MudCheckBox @bind-Value="_enabled" Label="启用" Color="Color.Primary" /></MudItem>
+        </MudGrid>
+        <MudStack Row="true" Spacing="2" Class="mt-2">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@_saving" OnClick="SaveAsync">@(_saving ? "保存中..." : "保存")</MudButton>
+            <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="ConfirmDeleteAsync">删除组织</MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">成员（@_members.Count）</MudText>
+        <MudStack Row="true" Spacing="2" Class="mb-3">
+            <MudTextField @bind-Value="_memberUserId" Label="用户 ID" Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@_addingMember" OnClick="AddMemberAsync">添加成员</MudButton>
+        </MudStack>
+        <MudTable T="OrganizationMember" Items="_members" Dense="true" Hover="true">
+            <HeaderContent>
+                <MudTh>用户名</MudTh><MudTh>邮箱</MudTh><MudTh>姓名</MudTh><MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Username</MudTd>
+                <MudTd>@context.Email</MudTd>
+                <MudTd>@($"{context.FirstName} {context.LastName}".Trim())</MudTd>
+                <MudTd>
+                    <MudTooltip Text="移除成员">
+                        <MudIconButton Icon="@Icons.Material.Outlined.PersonRemove" Color="Color.Error" Size="Size.Small" OnClick='() => RemoveMemberAsync(context)' />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent><MudText Typo="Typo.body2">暂无成员。</MudText></NoRecordsContent>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public string OrganizationId { get; set; } = string.Empty;
+
+    private OrganizationDetail? _detail;
+    private IReadOnlyList<OrganizationMember> _members = [];
+    private bool _notFound;
+    private bool _saving;
+
+    private string _name = string.Empty;
+    private string? _description, _redirectUrl, _domains;
+    private bool _enabled;
+
+    private string? _memberUserId;
+    private bool _addingMember;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _detail = await OrganizationsService.GetAsync(OrganizationId);
+        if (_detail is null) { _notFound = true; return; }
+
+        _name = _detail.Name ?? string.Empty;
+        _description = _detail.Description;
+        _redirectUrl = _detail.RedirectUrl;
+        _domains = string.Join(',', _detail.Domains);
+        _enabled = _detail.Enabled;
+        _members = await OrganizationsService.ListMembersAsync(OrganizationId);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            Snackbar.Add("名称不能为空", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var domains = (_domains ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            var result = await OrganizationsService.UpdateAsync(
+                ActorAccessor.GetRequiredActor(),
+                OrganizationId,
+                new UpdateOrganizationRequest(_name.Trim(), _enabled, _description, _redirectUrl, domains));
+
+            if (result.Success) { Snackbar.Add("已保存", Severity.Success); await LoadAsync(); }
+            else Snackbar.Add(result.Error ?? "保存失败", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"保存失败：{ex.Message}", Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    private async Task AddMemberAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_memberUserId))
+        {
+            Snackbar.Add("请填写用户 ID", Severity.Warning);
+            return;
+        }
+
+        _addingMember = true;
+        try
+        {
+            var result = await OrganizationsService.AddMemberAsync(
+                ActorAccessor.GetRequiredActor(), OrganizationId, _memberUserId.Trim());
+
+            if (result.Success)
+            {
+                Snackbar.Add("成员已添加", Severity.Success);
+                _memberUserId = null;
+                _members = await OrganizationsService.ListMembersAsync(OrganizationId);
+            }
+            else Snackbar.Add(result.Error ?? "添加失败", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"添加失败：{ex.Message}", Severity.Error); }
+        finally { _addingMember = false; }
+    }
+
+    private async Task RemoveMemberAsync(OrganizationMember member)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认移除成员",
+            $"将「{member.Username ?? member.UserId}」移出该组织？",
+            yesText: "移除",
+            cancelText: "取消");
+        if (confirmed != true) return;
+
+        var result = await OrganizationsService.RemoveMemberAsync(
+            ActorAccessor.GetRequiredActor(), OrganizationId, member.UserId);
+
+        if (result.Success)
+        {
+            Snackbar.Add("已移除", Severity.Success);
+            _members = await OrganizationsService.ListMembersAsync(OrganizationId);
+        }
+        else Snackbar.Add(result.Error ?? "移除失败", Severity.Error);
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除组织",
+            $"删除组织「{_name}」？",
+            yesText: "删除",
+            cancelText: "取消");
+        if (confirmed != true) return;
+
+        var result = await OrganizationsService.DeleteAsync(ActorAccessor.GetRequiredActor(), OrganizationId);
+        if (result.Success) { Snackbar.Add("已删除", Severity.Success); Nav.NavigateTo("/admin/organizations"); }
+        else Snackbar.Add(result.Error ?? "删除失败", Severity.Error);
+    }
+}

@@ -1,5 +1,6 @@
 using APromisedLand.AppHost;
 using APromisedLand.AppHost.Extensions;
+using Microsoft.Extensions.Configuration;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -17,6 +18,10 @@ void TreeGraph()
 {
     builder.AddPostgres(context);
     builder.AddRedis(context);
+
+    // ★ Keycloak 身份引擎（本机离线验证暂用 26.6）。必须早于 AddTreeGraphBlazorWasm，
+    //   以便前端注入 Keycloak 服务发现与客户端密钥参数。
+    builder.AddKeycloak(context);
 
     // ★ NebulaGraph 图数据库容器组（graphd/metad/storaged/console/studio:17001）
     builder.AddNebulaGraph(context);
@@ -53,10 +58,8 @@ void TreeGraph()
     //   替代已停用的旧 MAFWorkFlowApi)
     builder.AddTreeGraphMafWfApi(context);
 
-    // ★ TreeGraph 管理台 Blazor Server(固定端口 5783,引用 EavApi + SyncServices + FileStorageApi + MafWfApi)
-    //   必须在 AddTreeGraphMafWfApi 之后调用：否则扩展内 WithReference(TreeGraphMafWfApi)
-    //   因资源尚未声明被条件跳过，Blazor 服务发现无法解析 treegraphmafwfapi。
-    builder.AddTreeGraphBlazor(context);
+    builder.AddTreeGraphIdentityAdminApi(context);
+    builder.AddTreeGraphBlazorWasm(context);
     builder.AddTreeGraphBlazorMaui(context);
 
     // ★ TreeGraph.Maui(MAUI+Blazor 混合模板起步项目,引用 EavApi 供后续服务发现)

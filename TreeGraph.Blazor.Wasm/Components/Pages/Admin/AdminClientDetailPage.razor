@@ -1,0 +1,451 @@
+@page "/admin/clients/{ClientId}"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IClientsAdminService ClientsService
+@inject IClientScopesAdminService ScopesService
+@inject IClientLogoutAdminService LogoutService
+@inject IRolesAdminService RolesService
+@inject IAdminActorAccessor ActorAccessor
+@inject StepUpGuard StepUp
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>客户端详情</PageTitle>
+
+@if (_notFound)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">未找到客户端。</MudAlert>
+    <MudButton Variant="Variant.Outlined" OnClick='() => Nav.NavigateTo("/admin/clients")'>返回列表</MudButton>
+}
+else if (_detail is null)
+{
+    <MudText>加载中...</MudText>
+}
+else
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+        <MudText Typo="Typo.h4">@(_detail.Name ?? _detail.ClientId)</MudText>
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.ArrowBack" OnClick='() => Nav.NavigateTo("/admin/clients")'>返回列表</MudButton>
+    </MudStack>
+
+    <MudText Typo="Typo.body2" Class="mb-3">
+        Client ID：<b>@_detail.ClientId</b>
+        ｜ 协议：@(_detail.Protocol ?? "—")
+        ｜ 认证器：@(_detail.ClientAuthenticatorType ?? "—")
+        ｜ <MudChip T="string" Size="Size.Small" Color="@(_detail.PublicClient ? Color.Default : Color.Warning)" Variant="Variant.Filled">@(_detail.PublicClient ? "公开" : "机密")</MudChip>
+    </MudText>
+
+    <MudTabs Elevation="0" Rounded="true">
+        <MudTabPanel Text="设置">
+            <MudStack Class="mt-3" Style="max-width: 720px">
+                <MudTextField @bind-Value="_name" Label="名称" Variant="Variant.Outlined" Class="mb-2" />
+                <MudTextField @bind-Value="_description" Label="描述" Variant="Variant.Outlined" Class="mb-2" />
+                <MudTextField @bind-Value="_rootUrl" Label="Root URL" Variant="Variant.Outlined" Class="mb-2" />
+                <MudTextField @bind-Value="_baseUrl" Label="Base URL" Variant="Variant.Outlined" Class="mb-2" />
+                <MudTextField @bind-Value="_redirectUrisText" Label="Redirect URI（每行一个）" Variant="Variant.Outlined" Lines="3" Class="mb-2" />
+                <MudTextField @bind-Value="_webOriginsText" Label="Web Origin（每行一个）" Variant="Variant.Outlined" Lines="2" Class="mb-2" />
+                <MudCheckBox @bind-Value="_enabled" Label="启用" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_standardFlow" Label="Standard Flow" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_implicitFlow" Label="Implicit Flow" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_directAccess" Label="Direct Access Grants" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_serviceAccount" Label="Service Account" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_fullScopeAllowed" Label="Full Scope Allowed" Color="Color.Primary" />
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Class="mt-2" Disabled="@_saving" OnClick="SaveSettingsAsync">
+                    @(_saving ? "保存中..." : "保存设置")
+                </MudButton>
+            </MudStack>
+        </MudTabPanel>
+
+        <MudTabPanel Text="凭证">
+            <div class="mt-3" Style="max-width: 720px">
+                @if (_detail.PublicClient)
+                {
+                    <MudAlert Severity="Severity.Info">公开客户端没有 client secret。</MudAlert>
+                }
+                else
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2" Class="mb-3">
+                        <MudTextField @bind-Value="_secret" Label="Client Secret" Variant="Variant.Outlined"
+                                      InputType="@(_showSecret ? InputType.Text : InputType.Password)"
+                                      Style="width: 420px" ReadOnly="true" />
+                        <MudIconButton Icon="@(_showSecret ? Icons.Material.Outlined.VisibilityOff : Icons.Material.Outlined.Visibility)"
+                                       OnClick="@(() => _showSecret = !_showSecret)" />
+                        <MudButton Variant="Variant.Outlined" OnClick="LoadSecretAsync">读取密钥</MudButton>
+                        <MudButton Color="Color.Warning" Variant="Variant.Filled" OnClick="RegenerateSecretAsync">轮换密钥</MudButton>
+                    </MudStack>
+                    @if (!string.IsNullOrEmpty(_secret))
+                    {
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">密钥仅显示一次，请妥善保存。轮换后旧密钥立即失效。</MudAlert>
+                    }
+                }
+            </div>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Service Account 角色">
+            <div class="mt-3">
+                @if (!_detail.ServiceAccountsEnabled)
+                {
+                    <MudAlert Severity="Severity.Info">该客户端未启用 Service Account。</MudAlert>
+                }
+                else
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2" Class="mb-3">
+                        <MudSelect T="string" @bind-Value="_selectedRole" Label="选择角色" Variant="Variant.Outlined" Style="width: 280px">
+                            @foreach (var r in _roles)
+                            {
+                                <MudSelectItem Value="@(r.Name)">@r.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@string.IsNullOrEmpty(_selectedRole)" OnClick="AddRoleAsync">添加</MudButton>
+                    </MudStack>
+                    <MudSimpleTable Dense="true">
+                        <thead><tr><th>角色</th><th></th></tr></thead>
+                        <tbody>
+                            @if (_saRoles.Count == 0)
+                            {
+                                <tr><td colspan="2"><MudText Typo="Typo.body2">暂无角色。</MudText></td></tr>
+                            }
+                            @foreach (var role in _saRoles)
+                            {
+                                <tr>
+                                    <td>@role</td>
+                                    <td><MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick='() => RemoveRoleAsync(role)' /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </div>
+        </MudTabPanel>
+
+        <MudTabPanel Text="已分配 Scope">
+            <div class="mt-3">
+                <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2" Class="mb-3">
+                    <MudSelect T="string" @bind-Value="_selectedScope" Label="选择 Scope" Variant="Variant.Outlined" Style="width: 280px">
+                        @foreach (var s in _allScopes)
+                        {
+                            <MudSelectItem Value="@(s.Id)">@s.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="string" @bind-Value="_scopeAssignment" Variant="Variant.Outlined" Style="width: 160px">
+                        <MudSelectItem Value="@("default")">Default</MudSelectItem>
+                        <MudSelectItem Value="@("optional")">Optional</MudSelectItem>
+                    </MudSelect>
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@string.IsNullOrEmpty(_selectedScope)" OnClick="AssignScopeAsync">分配</MudButton>
+                </MudStack>
+
+                <MudText Typo="Typo.subtitle2">Default Scopes</MudText>
+                <div class="mb-3">
+                    @if (_detail.DefaultClientScopes.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2">无。</MudText>
+                    }
+                    @foreach (var name in _detail.DefaultClientScopes)
+                    {
+                        <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Class="ma-1" OnClose='() => RemoveScopeAsync(name, isDefault: true)'>
+                            @name
+                        </MudChip>
+                    }
+                </div>
+
+                <MudText Typo="Typo.subtitle2">Optional Scopes</MudText>
+                <div>
+                    @if (_detail.OptionalClientScopes.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2">无。</MudText>
+                    }
+                    @foreach (var name in _detail.OptionalClientScopes)
+                    {
+                        <MudChip T="string" Color="Color.Secondary" Variant="Variant.Filled" Class="ma-1" OnClose='() => RemoveScopeAsync(name, isDefault: false)'>
+                            @name
+                        </MudChip>
+                    }
+                </div>
+            </div>
+        </MudTabPanel>
+
+        <MudTabPanel Text="登出传播">
+            <div class="mt-3" style="max-width: 720px">
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3">
+                    back-channel 由 Keycloak 服务端回调客户端注销端点；front-channel 通过浏览器 iframe 传播。
+                </MudAlert>
+                <MudCheckBox @bind-Value="_backchannelSessionRequired" Label="Back-channel 要求注销会话" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_backchannelRevokeOffline" Label="Back-channel 撤销离线令牌" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_frontchannelSessionRequired" Label="Front-channel 要求注销会话" Color="Color.Primary" />
+                <MudTextField @bind-Value="_frontchannelLogoutUrl" Label="Front-channel Logout URL" Variant="Variant.Outlined" Class="mb-3 mt-2" />
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@_savingLogout" OnClick="SaveLogoutAsync">
+                    @(_savingLogout ? "保存中..." : "保存登出配置")
+                </MudButton>
+            </div>
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    [Parameter] public string ClientId { get; set; } = string.Empty;
+
+    private IdentityClientDetail? _detail;
+    private bool _notFound;
+    private bool _saving;
+
+    // 设置
+    private string? _name, _description, _rootUrl, _baseUrl;
+    private string _redirectUrisText = string.Empty, _webOriginsText = string.Empty;
+    private bool _enabled, _standardFlow, _implicitFlow, _directAccess, _serviceAccount, _fullScopeAllowed;
+
+    // 凭证
+    private string? _secret;
+    private bool _showSecret;
+
+    // Service Account 角色
+    private IReadOnlyList<string> _saRoles = [];
+    private IReadOnlyList<IdentityRole> _roles = [];
+    private string? _selectedRole;
+
+    // 已分配 Scope
+    private IReadOnlyList<IdentityClientScope> _allScopes = [];
+    private string? _selectedScope;
+    private string _scopeAssignment = "default";
+
+    // 登出传播
+    private bool _backchannelSessionRequired, _backchannelRevokeOffline, _frontchannelSessionRequired;
+    private string? _frontchannelLogoutUrl;
+    private bool _savingLogout;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _detail = await ClientsService.GetAsync(ClientId);
+        if (_detail is null)
+        {
+            _notFound = true;
+            return;
+        }
+        PopulateSettings();
+        await Task.WhenAll(LoadScopesAsync(), LoadRolesAsync(), LoadServiceAccountRolesAsync(), LoadLogoutAsync());
+    }
+
+    private async Task LoadLogoutAsync()
+    {
+        var settings = await LogoutService.GetAsync(ClientId);
+        if (settings is null)
+            return;
+
+        _backchannelSessionRequired = settings.BackchannelLogoutSessionRequired;
+        _backchannelRevokeOffline = settings.BackchannelLogoutRevokeOfflineTokens;
+        _frontchannelSessionRequired = settings.FrontchannelLogoutSessionRequired;
+        _frontchannelLogoutUrl = settings.FrontchannelLogoutUrl;
+    }
+
+    private async Task SaveLogoutAsync()
+    {
+        _savingLogout = true;
+        try
+        {
+            var result = await LogoutService.UpdateAsync(
+                ActorAccessor.GetRequiredActor(),
+                ClientId,
+                new UpdateClientLogoutSettingsRequest(
+                    BackchannelLogoutSessionRequired: _backchannelSessionRequired,
+                    BackchannelLogoutRevokeOfflineTokens: _backchannelRevokeOffline,
+                    FrontchannelLogoutSessionRequired: _frontchannelSessionRequired,
+                    FrontchannelLogoutUrl: _frontchannelLogoutUrl));
+
+            if (result.Success) Snackbar.Add("登出传播配置已保存", Severity.Success);
+            else Snackbar.Add(result.Error ?? "保存失败", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"保存失败：{ex.Message}", Severity.Error); }
+        finally { _savingLogout = false; }
+    }
+
+    private void PopulateSettings()
+    {
+        _name = _detail!.Name;
+        _description = _detail.Description;
+        _rootUrl = _detail.RootUrl;
+        _baseUrl = _detail.BaseUrl;
+        _redirectUrisText = string.Join('\n', _detail.RedirectUris);
+        _webOriginsText = string.Join('\n', _detail.WebOrigins);
+        _enabled = _detail.Enabled;
+        _standardFlow = _detail.StandardFlowEnabled;
+        _implicitFlow = _detail.ImplicitFlowEnabled;
+        _directAccess = _detail.DirectAccessGrantsEnabled;
+        _serviceAccount = _detail.ServiceAccountsEnabled;
+        _fullScopeAllowed = _detail.FullScopeAllowed;
+    }
+
+    private static IReadOnlyList<string> Split(string? input) =>
+        (input ?? string.Empty).Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToArray();
+
+    private async Task SaveSettingsAsync()
+    {
+        _saving = true;
+        try
+        {
+            var result = await ClientsService.UpdateAsync(
+                ActorAccessor.GetRequiredActor(),
+                ClientId,
+                new UpdateClientRequest(
+                    Name: _name,
+                    Description: _description,
+                    Enabled: _enabled,
+                    RedirectUris: Split(_redirectUrisText),
+                    WebOrigins: Split(_webOriginsText),
+                    StandardFlowEnabled: _standardFlow,
+                    ImplicitFlowEnabled: _implicitFlow,
+                    DirectAccessGrantsEnabled: _directAccess,
+                    ServiceAccountsEnabled: _serviceAccount,
+                    RootUrl: _rootUrl,
+                    BaseUrl: _baseUrl,
+                    FullScopeAllowed: _fullScopeAllowed));
+            if (result.Success)
+            {
+                Snackbar.Add("设置已保存", Severity.Success);
+                _detail = await ClientsService.GetAsync(ClientId);
+                if (_detail is not null) PopulateSettings();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "保存失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"保存失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task LoadSecretAsync()
+    {
+        var result = await ClientsService.GetSecretAsync(ClientId);
+        if (result.Success && result.Value is not null)
+        {
+            _secret = result.Value.Secret;
+            _showSecret = true;
+        }
+        else
+        {
+            Snackbar.Add(result.Error ?? "读取密钥失败", Severity.Error);
+        }
+    }
+
+    private async Task RegenerateSecretAsync()
+    {
+        if (!await StepUp.EnsureFreshAsync("client.regenerate-secret", $"/admin/clients/{ClientId}")) return;
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认轮换",
+            "轮换后旧密钥立即失效，依赖该密钥的应用需要同步更新。确定继续？",
+            yesText: "轮换", cancelText: "取消");
+        if (confirmed != true) return;
+
+        var result = await ClientsService.RegenerateSecretAsync(ActorAccessor.GetRequiredActor(), ClientId);
+        if (result.Success && result.Value is not null)
+        {
+            _secret = result.Value.Secret;
+            _showSecret = true;
+            Snackbar.Add("密钥已轮换", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add(result.Error ?? "轮换失败", Severity.Error);
+        }
+    }
+
+    private async Task LoadRolesAsync()
+    {
+        try { _roles = await RolesService.ListAsync(); } catch { /* 角色列表加载失败不阻塞页面 */ }
+    }
+
+    private async Task LoadScopesAsync()
+    {
+        try { _allScopes = await ScopesService.ListAsync(); } catch { /* ignore */ }
+    }
+
+    private async Task LoadServiceAccountRolesAsync()
+    {
+        if (!_detail!.ServiceAccountsEnabled) return;
+        var result = await ClientsService.GetServiceAccountRolesAsync(ClientId);
+        _saRoles = result.Success && result.Value is not null ? result.Value.RealmRoleNames : [];
+    }
+
+    private async Task AddRoleAsync()
+    {
+        if (string.IsNullOrEmpty(_selectedRole)) return;
+        var result = await ClientsService.AddServiceAccountRoleAsync(ActorAccessor.GetRequiredActor(), ClientId, _selectedRole);
+        if (result.Success)
+        {
+            Snackbar.Add("角色已添加", Severity.Success);
+            _selectedRole = null;
+            await LoadServiceAccountRolesAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.Error ?? "添加失败", Severity.Error);
+        }
+    }
+
+    private async Task RemoveRoleAsync(string role)
+    {
+        var result = await ClientsService.RemoveServiceAccountRoleAsync(ActorAccessor.GetRequiredActor(), ClientId, role);
+        if (result.Success)
+        {
+            Snackbar.Add("角色已移除", Severity.Success);
+            await LoadServiceAccountRolesAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.Error ?? "移除失败", Severity.Error);
+        }
+    }
+
+    private string? ScopeNameToId(string name) => _allScopes.FirstOrDefault(s => s.Name == name)?.Id;
+
+    private async Task AssignScopeAsync()
+    {
+        if (string.IsNullOrEmpty(_selectedScope)) return;
+        var isDefault = _scopeAssignment == "default";
+        var result = isDefault
+            ? await ScopesService.AddDefaultScopeToClientAsync(ActorAccessor.GetRequiredActor(), ClientId, _selectedScope)
+            : await ScopesService.AddOptionalScopeToClientAsync(ActorAccessor.GetRequiredActor(), ClientId, _selectedScope);
+        if (result.Success)
+        {
+            Snackbar.Add("Scope 已分配", Severity.Success);
+            _detail = await ClientsService.GetAsync(ClientId);
+            _selectedScope = null;
+        }
+        else
+        {
+            Snackbar.Add(result.Error ?? "分配失败", Severity.Error);
+        }
+    }
+
+    private async Task RemoveScopeAsync(string scopeName, bool isDefault)
+    {
+        var scopeId = ScopeNameToId(scopeName);
+        if (scopeId is null)
+        {
+            Snackbar.Add("找不到对应 scope id", Severity.Warning);
+            return;
+        }
+        var result = isDefault
+            ? await ScopesService.RemoveDefaultScopeFromClientAsync(ActorAccessor.GetRequiredActor(), ClientId, scopeId)
+            : await ScopesService.RemoveOptionalScopeFromClientAsync(ActorAccessor.GetRequiredActor(), ClientId, scopeId);
+        if (result.Success)
+        {
+            Snackbar.Add("Scope 已移除", Severity.Success);
+            _detail = await ClientsService.GetAsync(ClientId);
+        }
+        else
+        {
+            Snackbar.Add(result.Error ?? "移除失败", Severity.Error);
+        }
+    }
+}

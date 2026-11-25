@@ -1,0 +1,10 @@
+@inject WasmOidcSession Session
+@inject NavigationManager Navigation
+<MudText Class="pa-4">正在跳转身份提供方…</MudText>
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        await Session.BeginLoginAsync(string.IsNullOrEmpty(relative) ? "/" : "/" + relative);
+    }
+}

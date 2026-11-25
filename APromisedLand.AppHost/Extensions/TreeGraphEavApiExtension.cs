@@ -1,4 +1,5 @@
 using Aspire.Hosting;
+using Microsoft.Extensions.Configuration;
 
 namespace APromisedLand.AppHost.Extensions;
 
@@ -85,6 +86,18 @@ public static class TreeGraphEavApiExtension
         {
             Console.WriteLine("[TreeGraphEavApi] ⚠️ context.TreeGraphFileStorageApi 为 null，文件存储将连接 localhost:5060");
         }
+
+        // ★ 身份校验：Redis（撤销标记）+ Keycloak JWT 参数
+        context.TreeGraphEavApi.WireIfPresent(context.Redis);
+
+        context.TreeGraphEavApi
+            .WithEnvironment("Keycloak__Authority", "https://localhost:8323/realms/apromisedland")
+            .WithEnvironment("Keycloak__Audience", "treegraph-web")
+            .WithEnvironment("Keycloak__AdditionalAudiences__0", "treegraph-wasm")
+            .WithEnvironment("Keycloak__RequireHttpsMetadata", "false")
+            .WithEnvironment("Cors__WasmOrigins__0", "https://localhost:5787")
+            .WithEnvironment("Identity__RequireAuthenticatedApi",
+                builder.Configuration.GetValue<bool>("Frontend:LegacyTrafficRetired").ToString());
 
         context.TreeGraphEavApi.WithOtlpExporter();
 

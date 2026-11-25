@@ -9,22 +9,23 @@ namespace APromisedLand.AppHost.Tests;
 /// <summary>
 /// 语义搜索编排接线回归测试（模型级，不启动 Docker/DCP）：
 /// 核心 API 只保留业务依赖，SyncServices 独立承载搜索/同步并等待核心健康，
-/// MafWfApi 与 Blazor 同时获得核心和 SyncServices 两个不同地址。
+/// MafWfApi 获得核心和 SyncServices 两个不同地址。
 /// </summary>
 public class SemanticSearchWiringTests
 {
     private sealed record Wiring(
         IResource EavApi,
         IResource SyncServices,
+        IResource FileStorageApi,
         IResource MafWfApi,
-        IResource Blazor,
         QdrantServerResource Qdrant,
         IResourceWithConnectionString RabbitMq,
         ContainerResource VllmEmbed);
 
-    private static Wiring Build()
+    private static Wiring Build(bool legacyTrafficRetired = false)
     {
-        var builder = DistributedApplication.CreateBuilder();
+        var builder = DistributedApplication.CreateBuilder(
+            ["--Frontend:LegacyTrafficRetired", legacyTrafficRetired.ToString()]);
         var context = new AppHostResourceContext();
 
         builder.AddPostgres(context);
@@ -32,16 +33,16 @@ public class SemanticSearchWiringTests
         builder.AddRabbitMq(context);
         builder.AddQdrant(context);
         builder.AddVllm(context);
+        builder.AddTreeGraphFileStorageApi(context);
         builder.AddTreeGraphEavApi(context);
         builder.AddTreeGraphSyncServices(context);
         builder.AddTreeGraphMafWfApi(context);
-        builder.AddTreeGraphBlazor(context);
 
         return new Wiring(
             builder.Resources.Single(r => r.Name == "treegrapheavapi"),
             builder.Resources.Single(r => r.Name == "treegraphsyncservices"),
+            builder.Resources.Single(r => r.Name == "treegraphfilestorageapi"),
             builder.Resources.Single(r => r.Name == "TreeGraphMafWfApi"),
-            builder.Resources.Single(r => r.Name == "treegraphblazor"),
             builder.Resources.OfType<QdrantServerResource>().Single(r => r.Name == "Qdrant"),
             builder.Resources.OfType<IResourceWithConnectionString>()
                 .Single(r => r.Name == "RabbitMQ"),
@@ -137,16 +138,27 @@ public class SemanticSearchWiringTests
         Assert.NotSame(core, sync);
     }
 
-    [Fact]
-    public void Blazor_等待SyncServices并获得独立服务发现地址()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void 业务API_全局认证开关仅跟随旧流量退役标志(bool legacyTrafficRetired)
     {
-        var wiring = Build();
-        var env = EnvVars(wiring.Blazor);
+        var wiring = Build(legacyTrafficRetired);
+        var businessApis = new[]
+        {
+            wiring.EavApi,
+            wiring.SyncServices,
+            wiring.FileStorageApi,
+            wiring.MafWfApi
+        };
 
-        Assert.Contains(wiring.Blazor.Annotations.OfType<WaitAnnotation>(),
-            w => ReferenceEquals(w.Resource, wiring.SyncServices));
-        Assert.Contains("services__treegrapheavapi__http__0", env.Keys);
-        Assert.Contains("services__treegraphsyncservices__http__0", env.Keys);
+        foreach (var api in businessApis)
+        {
+            var env = EnvVars(api);
+            Assert.Equal(
+                legacyTrafficRetired.ToString(),
+                env["Identity__RequireAuthenticatedApi"]?.ToString());
+        }
     }
 
     private static Dictionary<string, object> EnvVars(IResource resource)

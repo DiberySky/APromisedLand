@@ -122,7 +122,7 @@ public sealed class FilesController(IFileMetadataService files) : ControllerBase
 
         var actualStart = start ?? 0;
         var actualEnd = end ?? result.Metadata.Size - 1;
-        var total = result.TotalLength ?? result.Metadata.Size;
+        var total = result.Metadata.Size;
         var length = actualEnd - actualStart + 1;
 
         Response.StatusCode = StatusCodes.Status206PartialContent;

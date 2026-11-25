@@ -1,5 +1,8 @@
 using Amazon.S3;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Caching.Distributed;
 using TreeGraph.FileStorageApi.Data;
+using TreeGraph.Shared.Identity;
 using TreeGraph.FileStorageApi.Files;
 using TreeGraph.FileStorageApi.Security;
 using TreeGraph.FileStorageApi.Storage;
@@ -12,6 +15,47 @@ using Microsoft.Extensions.Options;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddRedisDistributedCache("Redis");
+
+// 双跑期间接受旧 Web 与 WASM audience；不全局要求认证，保持既有 API 契约。
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = builder.Configuration["Keycloak:Authority"];
+        options.TokenValidationParameters.ValidAudiences = new[] { builder.Configuration["Keycloak:Audience"] }
+            .Concat(builder.Configuration.GetSection("Keycloak:AdditionalAudiences").Get<string[]>() ?? [])
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        options.RequireHttpsMetadata = builder.Configuration.GetValue<bool>("Keycloak:RequireHttpsMetadata");
+        options.TokenValidationParameters.RoleClaimType = IdentityClaimTypes.Roles;
+        options.TokenValidationParameters.NameClaimType = IdentityClaimTypes.PreferredUsername;
+        // 关闭 inbound claim 类型映射：Keycloak 的 sub/roles 短名会被默认映射为 WS-Federation 长名，
+        // 导致 FindFirst("sub") 与 RoleClaimType="roles" 失效（401/403）。保持短名以匹配 IdentityClaimTypes。
+        options.MapInboundClaims = false;
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var sub = context.Principal?.FindFirst(IdentityClaimTypes.Subject)?.Value;
+                if (string.IsNullOrWhiteSpace(sub)) return;
+
+                try
+                {
+                    var cache = context.HttpContext.RequestServices.GetRequiredService<IDistributedCache>();
+                    var revoked = await cache.GetStringAsync(IdentityConstants.RevocationKeyPrefix + sub);
+                    if (!string.IsNullOrEmpty(revoked)) context.Fail("账号已被禁用");
+                }
+                catch (Exception)
+                {
+                    // 与既有业务 API 双跑策略一致：撤销存储暂不可达时不阻断旧客户端。
+                }
+            }
+        };
+    });
+builder.Services.AddAuthorization();
 
 // ── 调用者上下文 ──
 builder.Services.AddHttpContextAccessor();
@@ -78,7 +122,8 @@ builder.Services
 
 builder.Services.AddHostedService<UploadSessionCleanupService>();
 
-// ── CORS ──
+// ── CORS：旧前端保留 credentials；WASM 使用独立、精确且无 credentials 的策略 ──
+var wasmOrigins = builder.Configuration.GetSection("Cors:WasmOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
@@ -92,6 +137,12 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod()
               .AllowCredentials();
     });
+    options.AddPolicy("TreeGraphWasm", policy =>
+        policy.WithOrigins(wasmOrigins)
+            .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+            .WithHeaders("Authorization", "Content-Type", "Range", "X-Chunk-Sha256")
+            .WithExposedHeaders("Content-Length", "Content-Range", "Content-Disposition", "Accept-Ranges", "ETag")
+            .SetPreflightMaxAge(TimeSpan.FromMinutes(10)));
 });
 
 builder.Services.AddControllers();
@@ -126,7 +177,14 @@ else
     app.UseExceptionHandler();
 }
 
-app.UseCors("Frontend");
+app.UseWhen(
+    context => wasmOrigins.Contains(context.Request.Headers.Origin.ToString(), StringComparer.Ordinal),
+    branch => branch.UseCors("TreeGraphWasm"));
+app.UseWhen(
+    context => !wasmOrigins.Contains(context.Request.Headers.Origin.ToString(), StringComparer.Ordinal),
+    branch => branch.UseCors("Frontend"));
+app.UseAuthentication();
+app.UseAuthorization();
 
 // 全局捕获 InvalidTenantException → 400（BadHttpRequestException 从服务层抛出时变 500）
 app.Use(async (context, next) =>
@@ -145,7 +203,9 @@ app.Use(async (context, next) =>
 });
 
 app.UseRouting();
-app.MapControllers();
+var controllers = app.MapControllers();
+if (app.Configuration.GetValue<bool>("Identity:RequireAuthenticatedApi"))
+    controllers.RequireAuthorization();
 app.MapDefaultEndpoints();
 
 app.Run();

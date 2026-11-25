@@ -1,0 +1,139 @@
+@page "/admin/groups"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IGroupsAdminService GroupsService
+@inject IAdminActorAccessor ActorAccessor
+@inject StepUpGuard StepUp
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>组管理</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">组管理</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Outlined.Add" OnClick='() => OpenCreateAsync(null, string.Empty)'>新建顶层组</MudButton>
+</MudStack>
+
+<MudTable T="GroupRow" Items="_rows" Dense="true" Hover="true" Loading="_loading">
+    <HeaderContent>
+        <MudTh>组名</MudTh>
+        <MudTh>路径</MudTh>
+        <MudTh>描述</MudTh>
+        <MudTh>操作</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>
+            <div style="padding-left: @(context.Depth * 24)px">
+                @if (context.Group.IsSpaceGroup)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Filled" Class="mr-1">空间</MudChip>
+                }
+                @context.Group.Name
+            </div>
+        </MudTd>
+        <MudTd><MudText Typo="Typo.caption">@context.Group.Path</MudText></MudTd>
+        <MudTd>@(context.Group.Description ?? "—")</MudTd>
+        <MudTd>
+            <MudTooltip Text="成员"><MudIconButton Icon="@Icons.Material.Outlined.Person" Color="Color.Default" Size="Size.Small" OnClick='() => ShowMembersAsync(context.Group)' /></MudTooltip>
+            <MudTooltip Text="新建子组"><MudIconButton Icon="@Icons.Material.Outlined.Add" Color="Color.Primary" Size="Size.Small" OnClick='() => OpenCreateAsync(context.Group.Id, context.Group.Name)' /></MudTooltip>
+            <MudTooltip Text="删除"><MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick='() => ConfirmDeleteAsync(context.Group)' /></MudTooltip>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Typo="Typo.body2">暂无组。</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private IReadOnlyList<GroupRow> _rows = [];
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var tree = await GroupsService.GetTreeAsync(brief: false);
+            _rows = Flatten(tree);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载组失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static List<GroupRow> Flatten(IEnumerable<IdentityGroup> groups, int depth = 0, List<GroupRow>? acc = null)
+    {
+        acc ??= [];
+        foreach (var g in groups.OrderBy(g => g.Path, StringComparer.Ordinal))
+        {
+            acc.Add(new GroupRow(g, depth));
+            if (g.Children.Count > 0)
+                Flatten(g.Children, depth + 1, acc);
+        }
+        return acc;
+    }
+
+    private async Task OpenCreateAsync(string? parentId, string parentName)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(CreateGroupDialog.ParentId)] = parentId,
+            [nameof(CreateGroupDialog.ParentName)] = parentName
+        };
+        var dialog = await DialogService.ShowAsync<CreateGroupDialog>("新建组", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+            await LoadAsync();
+    }
+
+    private async Task ShowMembersAsync(IdentityGroup group)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(GroupMembersDialog.GroupId)] = group.Id,
+            [nameof(GroupMembersDialog.GroupTitle)] = group.Name
+        };
+        await DialogService.ShowAsync<GroupMembersDialog>("组成员", parameters);
+    }
+
+    private async Task ConfirmDeleteAsync(IdentityGroup group)
+    {
+        if (!await StepUp.EnsureFreshAsync("group.delete", "/admin/groups")) return;
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除组「{group.Name}」？其子组将一并删除。",
+            yesText: "删除", cancelText: "取消");
+        if (confirmed != true) return;
+
+        try
+        {
+            var result = await GroupsService.DeleteAsync(ActorAccessor.GetRequiredActor(), group.Id);
+            if (result.Success)
+            {
+                Snackbar.Add("组已删除", Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "删除失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除失败：{ex.Message}", Severity.Error);
+        }
+    }
+
+    private sealed record GroupRow(IdentityGroup Group, int Depth);
+}

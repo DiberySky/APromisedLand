@@ -1,0 +1,105 @@
+@page "/admin/roles"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IRolesAdminService RolesService
+@inject IAdminActorAccessor ActorAccessor
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>角色管理</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">角色管理</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenCreateAsync">新建角色</MudButton>
+</MudStack>
+
+<MudTable T="IdentityRole" Items="_roles" Dense="true" Hover="true" Loading="_loading">
+    <HeaderContent>
+        <MudTh>角色名</MudTh>
+        <MudTh>描述</MudTh>
+        <MudTh>类型</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>@context.Name</MudTd>
+        <MudTd>@(context.Description ?? "—")</MudTd>
+        <MudTd>
+            @if (context.BuiltIn)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled">内置</MudChip>
+            }
+            @if (context.Composite)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled" Class="ml-1">复合</MudChip>
+            }
+        </MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick='() => ConfirmDeleteAsync(context.Name)' />
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Typo="Typo.body2">暂无角色。</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private IReadOnlyList<IdentityRole> _roles = [];
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _roles = await RolesService.ListAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载角色失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCreateAsync()
+    {
+        var dialog = await DialogService.ShowAsync<CreateRoleDialog>("新建角色");
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+            await LoadAsync();
+    }
+
+    private async Task ConfirmDeleteAsync(string roleName)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除角色「{roleName}」？已分配该角色的用户将失去对应权限。",
+            yesText: "删除", cancelText: "取消");
+        if (confirmed != true) return;
+
+        try
+        {
+            var result = await RolesService.DeleteAsync(ActorAccessor.GetRequiredActor(), roleName);
+            if (result.Success)
+            {
+                Snackbar.Add("角色已删除", Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "删除失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除失败：{ex.Message}", Severity.Error);
+        }
+    }
+}

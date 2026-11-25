@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TreeGraph.Blazor</RootNamespace>
+    <AssemblyName>TreeGraph.Blazor.Wasm</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="11.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="11.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="11.0.0" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TreeGraph.Blazor.Shared\TreeGraph.Blazor.Shared.csproj" />
+    <ProjectReference Include="..\TreeGraph.Shared\TreeGraph.Shared.csproj" />
+  </ItemGroup>
+</Project>

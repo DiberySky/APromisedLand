@@ -1,0 +1,113 @@
+@page "/admin/auth-flows/{Alias}"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IAuthFlowsAdminService AuthFlowsService
+@inject IAdminActorAccessor ActorAccessor
+@inject StepUpGuard StepUp
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>认证流详情</PageTitle>
+
+@if (_notFound)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">未找到认证流。</MudAlert>
+    <MudButton Variant="Variant.Outlined" OnClick='() => Nav.NavigateTo("/admin/auth-flows")'>返回列表</MudButton>
+}
+else if (_detail is null)
+{
+    <MudText>加载中...</MudText>
+}
+else
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+        <div>
+            <MudText Typo="Typo.h4">@_detail.Flow.Alias</MudText>
+            <MudText Typo="Typo.body2">@(_detail.Flow.Description ?? "（无描述）") · @_detail.Flow.ProviderId</MudText>
+        </div>
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.ArrowBack" OnClick='() => Nav.NavigateTo("/admin/auth-flows")'>返回列表</MudButton>
+    </MudStack>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">执行项（Executions）</MudText>
+        <MudTable T="AuthenticationFlowExecution" Items="_detail.Executions" Dense="true">
+            <HeaderContent>
+                <MudTh>显示名</MudTh><MudTh>Provider</MudTh><MudTh>优先级</MudTh><MudTh>要求级别</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@(context.DisplayName ?? context.FlowAlias)</MudTd>
+                <MudTd>@context.ProviderId</MudTd>
+                <MudTd>@(context.Priority?.ToString() ?? "-")</MudTd>
+                <MudTd Style="max-width: 220px">
+                    <MudSelect T="string" Value="@(context.Requirement)"
+                               ValueChanged="@(async req => await UpdateRequirementAsync(context, req))"
+                               Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense">
+                        @foreach (var r in Requirements) { <MudSelectItem Value="@(r)">@r</MudSelectItem> }
+                    </MudSelect>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent><MudText Typo="Typo.body2">无执行项。</MudText></NoRecordsContent>
+        </MudTable>
+    </MudPaper>
+
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">流绑定（修改将自动备份 realm）</MudText>
+        @if (_bindings.Count == 0)
+        {
+            <MudText Typo="Typo.body2">无绑定。</MudText>
+        }
+        else
+        {
+            @foreach (var b in _bindings)
+            {
+                <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Class="mb-2">
+                    <MudText Style="min-width: 180px"><b>@b.BindingType</b></MudText>
+                    <MudSelect T="string" Value="@(b.FlowAlias)"
+                               ValueChanged="@(async alias => await UpdateBindingAsync(b.BindingType, alias))"
+                               Variant="Variant.Outlined" Style="min-width: 320px">
+                        @foreach (var a in _allAliases) { <MudSelectItem Value="@(a)">@a</MudSelectItem> }
+                    </MudSelect>
+                </MudStack>
+            }
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public string Alias { get; set; } = string.Empty;
+
+    private static readonly string[] Requirements = { "REQUIRED", "ALTERNATIVE", "OPTIONAL", "DISABLED" };
+
+    private AuthenticationFlowDetail? _detail;
+    private IReadOnlyList<AuthenticationFlowBinding> _bindings = [];
+    private IReadOnlyList<string> _allAliases = [];
+    private bool _notFound;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _detail = await AuthFlowsService.GetAsync(Alias);
+        if (_detail is null) { _notFound = true; return; }
+        _allAliases = (await AuthFlowsService.ListAsync()).Select(f => f.Alias).ToList();
+        _bindings = await AuthFlowsService.ListBindingsAsync();
+    }
+
+    private async Task UpdateRequirementAsync(AuthenticationFlowExecution exec, string requirement)
+    {
+        var result = await AuthFlowsService.UpdateExecutionAsync(ActorAccessor.GetRequiredActor(), Alias, exec.Id, requirement);
+        if (result.Success) Snackbar.Add("已更新要求级别", Severity.Success);
+        else Snackbar.Add(result.Error ?? "更新失败", Severity.Error);
+    }
+
+    private async Task UpdateBindingAsync(string bindingType, string? flowAlias)
+    {
+        if (string.IsNullOrEmpty(flowAlias)) return;
+        if (!await StepUp.EnsureFreshAsync("auth-flow.update-binding", $"/admin/auth-flows/{Alias}")) return;
+
+        var result = await AuthFlowsService.UpdateBindingAsync(ActorAccessor.GetRequiredActor(), bindingType, flowAlias);
+        if (result.Success) Snackbar.Add($"绑定已更新：{bindingType} → {flowAlias}（已自动备份）", Severity.Success);
+        else Snackbar.Add(result.Error ?? "更新绑定失败", Severity.Error);
+    }
+}

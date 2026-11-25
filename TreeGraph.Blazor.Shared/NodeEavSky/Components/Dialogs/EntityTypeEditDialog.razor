@@ -4,14 +4,14 @@
 @inject ISnackbar Snackbar
 @using TreeGraph.Blazor.Shared.MafWfSky.Components
 
-<DialogSky Title="@(Editing is null ? "新建属性定义" : "编辑属性定义")"
+<DialogSky Title="@(Editing is null ? "新建实体类型" : "编辑实体类型")"
                SubmitButtonVisible="true"
                SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
                SubmitButtonDisabled="@_submitting"
                OnSubmitClick="SaveAsync">
     <DialogContent>
         <MudTextField @bind-Value="_form.DisplayName"
-                      Label="属性定义名称"
+                      Label="实体类型名称"
                       Placeholder="请输入中文名称"
                       Variant="Variant.Outlined"
                       Margin="Margin.Dense"

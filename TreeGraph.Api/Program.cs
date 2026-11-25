@@ -1,4 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Caching.Distributed;
+using TreeGraph.Api.Infrastructure;
+using TreeGraph.Shared.Identity;
 using TreeGraph.Persistence.Data;
 using TreeGraph.Api.Data.Seeding;
 using TreeGraph.Api.LineSky.Services;
@@ -16,6 +20,66 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ★ Aspire ServiceDefaults：服务发现、健康检查、OpenTelemetry
 builder.AddServiceDefaults();
+
+// ★ 身份与访问管理：JwtBearer + Redis 撤销标记 + ICurrentUser
+builder.AddRedisDistributedCache("Redis");
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
+// ★ 空间授权原语（ISpaceResolver 的 EF 实现）；过滤器经 [RequireSpaceAccess] 按需激活，
+//   待 Blazor→Api 身份传播就绪后再挂到具体端点，当前不改变 Api 匿名可达的既有行为。
+builder.Services.AddSpaceAuthorization();
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = builder.Configuration["Keycloak:Authority"];
+        var audiences = new[] { builder.Configuration["Keycloak:Audience"] }
+            .Concat(builder.Configuration.GetSection("Keycloak:AdditionalAudiences").Get<string[]>() ?? [])
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        options.TokenValidationParameters.ValidAudiences = audiences;
+        options.RequireHttpsMetadata = builder.Configuration.GetValue<bool>("Keycloak:RequireHttpsMetadata");
+        options.TokenValidationParameters.RoleClaimType = IdentityClaimTypes.Roles;
+        options.TokenValidationParameters.NameClaimType = IdentityClaimTypes.PreferredUsername;
+        // 关闭 inbound claim 类型映射：Keycloak 的 sub/roles 短名会被默认映射为 WS-Federation 长名，
+        // 导致 FindFirst("sub") 与 RoleClaimType="roles" 失效（401/403）。保持短名以匹配 IdentityClaimTypes。
+        options.MapInboundClaims = false;
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var sub = context.Principal?.FindFirst(IdentityClaimTypes.Subject)?.Value;
+                if (string.IsNullOrWhiteSpace(sub))
+                    return;
+
+                try
+                {
+                    var cache = context.HttpContext.RequestServices.GetRequiredService<IDistributedCache>();
+                    var revoked = await cache.GetStringAsync(IdentityConstants.RevocationKeyPrefix + sub);
+                    if (!string.IsNullOrEmpty(revoked))
+                        context.Fail("账号已被禁用");
+                }
+                catch (Exception)
+                {
+                    // 撤销存储不可达时不阻断请求，等待下次校验。
+                }
+            }
+        };
+    });
+// 激活开关：默认关闭以保持既有匿名调用行为；确认安全模型后设为 true。
+var requireAuthenticatedApi = builder.Configuration.GetValue<bool>("Identity:RequireAuthenticatedApi");
+builder.Services.AddAuthorization();
+var wasmOrigins = builder.Configuration.GetSection("Cors:WasmOrigins").Get<string[]>() ?? [];
+builder.Services.AddCors(options => options.AddPolicy("TreeGraphWasm", policy =>
+{
+    policy.WithOrigins(wasmOrigins)
+        .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+        .WithHeaders("Authorization", "Content-Type", "Range", "X-Chunk-Sha256")
+        .WithExposedHeaders("Content-Length", "Content-Range", "Content-Disposition", "ETag")
+        .SetPreflightMaxAge(TimeSpan.FromMinutes(10));
+}));
 
 // Add services to the container.
 builder.Services.AddControllers(options =>
@@ -157,10 +221,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-// ★ 研发阶段：暂不启用身份验证/授权管道
-//   UseAuthorization() 会解析 IAuthorizationPolicyProvider，
-//   未 AddAuthorization() 时首次请求抛 InvalidOperationException。
-// app.UseAuthorization();
+// ★ 身份验证 / 授权管道；CORS 预检本身不要求 JWT。
+app.UseCors("TreeGraphWasm");
+app.UseAuthentication();
+app.UseAuthorization();
 
 // ★ 全局异常处理
 app.UseExceptionHandler();
@@ -168,7 +232,9 @@ app.UseExceptionHandler();
 if (!isTesting)
     app.UseMiddleware<TreeGraphWriteTransactionMiddleware>();
 
-app.MapControllers();
+var controllers = app.MapControllers();
+if (requireAuthenticatedApi)
+    controllers.RequireAuthorization();
 
 // ★ Aspire 默认端点（/health、/alive），供 Dashboard 探测
 app.MapDefaultEndpoints();

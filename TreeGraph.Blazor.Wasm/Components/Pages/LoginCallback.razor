@@ -1,0 +1,22 @@
+@page "/authentication/login-callback"
+@inject WasmOidcSession Session
+@inject NavigationManager Navigation
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+  @if (_error is null) { <MudText>正在完成登录…</MudText>; }
+  else { <MudAlert Severity="Severity.Error">@_error</MudAlert>; }
+</MudContainer>
+@code {
+    private string? _error;
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var returnUrl = await Session.CompleteLoginAsync();
+            Navigation.NavigateTo(returnUrl, replace: true);
+        }
+        catch (Exception ex)
+        {
+            _error = "登录失败：" + ex.Message;
+        }
+    }
+}

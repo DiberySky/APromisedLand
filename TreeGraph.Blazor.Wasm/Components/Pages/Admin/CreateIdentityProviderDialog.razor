@@ -1,0 +1,94 @@
+@using Microsoft.AspNetCore.Components
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using TreeGraph.Shared.Identity.Admin
+@inject IIdentityProvidersAdminService IdpService
+@inject IAdminActorAccessor ActorAccessor
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent><MudText Typo="Typo.h6">新建身份提供方</MudText></TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_alias" Label="Alias" Variant="Variant.Outlined" Class="mb-3" Required="true" />
+        <MudSelect T="string" @bind-Value="_providerId" Label="Provider ID" Variant="Variant.Outlined" Class="mb-3">
+            @foreach (var p in ProviderPresets)
+            {
+                <MudSelectItem Value="@(p)">@p</MudSelectItem>
+            }
+        </MudSelect>
+        <MudTextField @bind-Value="_displayName" Label="显示名称" Variant="Variant.Outlined" Class="mb-3" />
+        <MudCheckBox @bind-Value="_enabled" Label="启用" Color="Color.Primary" Class="mb-3" />
+        <MudTextField @bind-Value="_configJson" Label="Config（JSON）" Variant="Variant.Outlined" Lines="6"
+                      Placeholder='例：{ "clientId": "...", "clientSecret": "...", "authorizationUrl": "..." }' />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@_submitting" OnClick="CreateAsync">
+            @(_submitting ? "创建中..." : "创建")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private static readonly string[] ProviderPresets =
+    {
+        "keycloak-oidc", "oidc", "saml", "github", "google", "facebook", "twitter", "linkedin", "microsoft", "apple"
+    };
+
+    private string _alias = string.Empty;
+    private string _providerId = "keycloak-oidc";
+    private string? _displayName;
+    private bool _enabled = true;
+    private string? _configJson;
+    private bool _submitting;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private static IReadOnlyDictionary<string, string> ParseConfig(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new Dictionary<string, string>();
+        var node = JsonNode.Parse(json);
+        return node is JsonObject obj
+            ? obj.ToDictionary(p => p.Key, p => p.Value?.ToString() ?? string.Empty)
+            : new Dictionary<string, string>();
+    }
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_alias))
+        {
+            Snackbar.Add("请填写 Alias", Severity.Warning);
+            return;
+        }
+        IReadOnlyDictionary<string, string> config;
+        try { config = ParseConfig(_configJson); }
+        catch (Exception ex) { Snackbar.Add($"Config JSON 解析失败：{ex.Message}", Severity.Error); return; }
+
+        _submitting = true;
+        try
+        {
+            var result = await IdpService.CreateAsync(
+                ActorAccessor.GetRequiredActor(),
+                new SaveIdentityProviderRequest(_alias.Trim(), _providerId, _displayName, _enabled, Config: config));
+            if (result.Success)
+            {
+                Snackbar.Add($"身份提供方已创建：{_alias}", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "创建失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"创建失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

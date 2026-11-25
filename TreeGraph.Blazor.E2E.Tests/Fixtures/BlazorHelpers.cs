@@ -335,13 +335,15 @@ public static class BlazorHelpers
     public static async Task<ILocator> WaitForDialogAsync(
         IPage page, int timeoutMs = 10000)
     {
+        // 取最后一个：MudBlazor 叠加对话框时先打开的那个仍留在 DOM 中，
+        // 只有最后打开的是当前可交互对话框（如「选项定义」→「添加选项」）。
         var dialog = page.Locator(".mud-dialog");
-        await dialog.First.WaitForAsync(new LocatorWaitForOptions
+        await dialog.Last.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = timeoutMs
         });
-        return dialog.First;
+        return dialog.Last;
     }
 
     // ============================================================

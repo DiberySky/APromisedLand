@@ -15,6 +15,68 @@ public class InodeFlowTests : E2ETestBase
 {
     public InodeFlowTests(PlaywrightFixture fixture) : base(fixture) { }
 
+    /// <summary>
+    /// 从类型卡片进入绑定编辑页。
+    /// 声明类型后不会自动创建绑定：首次点击会弹出「新建绑定」对话框，
+    /// 已存在绑定则直接导航。两条路径都要覆盖。
+    /// </summary>
+    private async Task OpenBindingEditorAsync(ILocator entryButton, string bindingName)
+    {
+        await BlazorHelpers.ClickAsync(Page, entryButton);
+
+        var createDlg = Page.Locator(".mud-dialog:has-text('新建绑定')");
+        try
+        {
+            await createDlg.First.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 4000
+            });
+
+            await BlazorHelpers.FillMudTextFieldAsync(
+                createDlg.Last.Locator(".mud-input-control:has-text('绑定名')").First,
+                bindingName);
+
+            await BlazorHelpers.ClickAsync(Page,
+                createDlg.Last.Locator("button:has-text('新建')").Last);
+        }
+        catch (TimeoutException)
+        {
+            // 已存在绑定，点击后直接导航。
+        }
+
+        await Page.WaitForURLAsync("**/bindings/**");
+    }
+
+    /// <summary>
+    /// 在 iNode 详情页声明一个类型。
+    /// 直接访问详情页时首次渲染晚于脚本加载，必须先等按钮出现并用
+    /// 带 SignalR 就绪检查的点击，否则对话框内容（MudSelect）尚未渲染。
+    /// </summary>
+    private async Task DeclareTypeAsync(string typeName)
+    {
+        // 必须等页面首次加载完成：类型列表在 LoadAsync 中拉取，
+        // 提前打开对话框会得到空的 AvailableTypes（没有 MudSelect）。
+        await Page.WaitForSelectorAsync("text=该 iNode 尚未声明任何类型");
+
+        var declareBtn = Page.Locator("button:has-text('声明新类型')").First;
+        await declareBtn.WaitForAsync();
+        await BlazorHelpers.ClickAsync(Page, declareBtn);
+
+        var dialog = await BlazorHelpers.WaitForDialogAsync(Page);
+        var select = dialog.Locator(".mud-select").First;
+        await select.WaitForAsync();
+        await BlazorHelpers.ClickAsync(Page, select);
+
+        var option = Page.Locator($".mud-list-item:has-text('{typeName}')").First;
+        await option.WaitForAsync();
+        await BlazorHelpers.ClickAsync(Page, option);
+
+        await BlazorHelpers.ClickAsync(Page, dialog.Locator("button:has-text('声明')").Last);
+        await BlazorHelpers.WaitForSnackbarAsync(Page, "声明成功");
+        await BlazorHelpers.WaitForSnackbarGoneAsync(Page);
+    }
+
     // ============================================================
     // 场景 1：从列表页进入空 iNode，声明类型
     // ============================================================
@@ -97,19 +159,13 @@ public class InodeFlowTests : E2ETestBase
             "SignalR 应处于连接状态");
 
         // 声明
-        await Page.Locator("button:has-text('声明新类型')").First.ClickAsync();
-        var dialog = await BlazorHelpers.WaitForDialogAsync(Page);
-        await dialog.Locator(".mud-select").First.ClickAsync();
-        await Page.Locator($".mud-list-item:has-text('{typeName}')").First.ClickAsync();
-        await dialog.Locator("button:has-text('声明')").Last.ClickAsync();
-        await BlazorHelpers.WaitForSnackbarAsync(Page, "声明成功");
-        await BlazorHelpers.WaitForSnackbarGoneAsync(Page);
+        await DeclareTypeAsync(typeName);
 
         // 2. 点"填写"进入编辑页
         var card = Page.Locator($".mud-card:has-text('{typeName}')").First;
-        await BlazorHelpers.ClickAndNavigateAsync(
-            Page, card.Locator("button:has-text('填写')"),
-            $"**/inodes/{inodeId}/types/**");
+        await OpenBindingEditorAsync(
+            card.Locator(".mud-card-actions button").First,
+            MetadataHelpers.Unique("e2e_bind"));
 
         // 3. 填表单
         await BlazorHelpers.WaitForLoadingCompleteAsync(Page);
@@ -170,10 +226,9 @@ public class InodeFlowTests : E2ETestBase
         await BlazorHelpers.WaitForSnackbarAsync(Page, "声明成功");
         await BlazorHelpers.WaitForSnackbarGoneAsync(Page);
 
-        await BlazorHelpers.ClickAndNavigateAsync(
-            Page,
-            Page.Locator($".mud-card:has-text('{typeName}') button:has-text('填写')").First,
-            $"**/inodes/{inodeId}/types/**");
+        await OpenBindingEditorAsync(
+            Page.Locator($".mud-card:has-text('{typeName}') .mud-card-actions button").First,
+            MetadataHelpers.Unique("e2e_bind"));
         await BlazorHelpers.WaitForLoadingCompleteAsync(Page);
 
         var whField = Page.Locator(".mud-input-control:has-text('仓库')").First;
@@ -187,9 +242,10 @@ public class InodeFlowTests : E2ETestBase
         var backBtn = Page.Locator("button:has-text('返回 iNode')").First;
         await BlazorHelpers.ClickAndNavigateAsync(Page, backBtn, $"**/inodes/{inodeId}");
 
-        // 校验"已填写"
+        // 校验"已绑定"（多绑定时显示"N 条绑定"），不再显示"未填写"
         var card = Page.Locator($".mud-card:has-text('{typeName}')").First;
-        await card.Locator("text=已填写").WaitForAsync();
+        await card.Locator(".mud-chip").First.WaitForAsync();
+        Assert.DoesNotContain("未填写", await card.InnerTextAsync());
     }
 
     // ============================================================
@@ -216,10 +272,9 @@ public class InodeFlowTests : E2ETestBase
         await BlazorHelpers.WaitForSnackbarAsync(Page, "声明成功");
         await BlazorHelpers.WaitForSnackbarGoneAsync(Page);
 
-        await BlazorHelpers.ClickAndNavigateAsync(
-            Page,
-            Page.Locator($".mud-card:has-text('{typeName}') button:has-text('填写')").First,
-            $"**/inodes/{inodeId}/types/**");
+        await OpenBindingEditorAsync(
+            Page.Locator($".mud-card:has-text('{typeName}') .mud-card-actions button").First,
+            MetadataHelpers.Unique("e2e_bind"));
         await BlazorHelpers.WaitForLoadingCompleteAsync(Page);
 
         // 第一次保存
@@ -282,10 +337,9 @@ public class InodeFlowTests : E2ETestBase
         await BlazorHelpers.WaitForSnackbarAsync(Page, "声明成功");
         await BlazorHelpers.WaitForSnackbarGoneAsync(Page);
 
-        await BlazorHelpers.ClickAndNavigateAsync(
-            Page,
-            Page.Locator($".mud-card:has-text('{typeName}') button:has-text('填写')").First,
-            $"**/inodes/{inodeId}/types/**");
+        await OpenBindingEditorAsync(
+            Page.Locator($".mud-card:has-text('{typeName}') .mud-card-actions button").First,
+            MetadataHelpers.Unique("e2e_bind"));
         await BlazorHelpers.WaitForLoadingCompleteAsync(Page);
 
         var xField = Page.Locator(".mud-input-control:has-text('X')").First;
@@ -295,17 +349,19 @@ public class InodeFlowTests : E2ETestBase
         Assert.Contains("保存成功", saved);
         await BlazorHelpers.WaitForSnackbarGoneAsync(Page);
 
-        // 删除
-        var deleteBtn = Page.Locator("button:has-text('删除实体')").First;
-        await deleteBtn.ClickAsync();
+        // 删除：入口在绑定编辑页顶部的「删除绑定」图标
+        await BlazorHelpers.ClickAsync(Page,
+            Page.Locator("button[title='删除绑定']").First);
 
-        // 确认对话框
         var confirmDlg = await BlazorHelpers.WaitForDialogAsync(Page);
-        var yesBtn = confirmDlg.Locator("button:has-text('永久删除')").First;
-        await BlazorHelpers.ClickAndNavigateAsync(
-            Page, yesBtn, $"**/inodes/{inodeId}");
+        await BlazorHelpers.ClickAsync(Page,
+            confirmDlg.Locator("button:has-text('永久删除')").First);
 
-        // 卡片显示"未填写"
+        await BlazorHelpers.WaitForSnackbarAsync(Page, "已删除");
+        await BlazorHelpers.WaitForSnackbarGoneAsync(Page);
+
+        // 删除成功后自动返回 iNode 详情
+        await Page.WaitForURLAsync($"**/inodes/{inodeId}");
         var card = Page.Locator($".mud-card:has-text('{typeName}')").First;
         await card.Locator("text=未填写").WaitForAsync();
     }
@@ -348,10 +404,9 @@ public class InodeFlowTests : E2ETestBase
         await BlazorHelpers.WaitForSnackbarAsync(Page, "声明成功");
         await BlazorHelpers.WaitForSnackbarGoneAsync(Page);
 
-        await BlazorHelpers.ClickAndNavigateAsync(
-            Page,
-            Page.Locator($".mud-card:has-text('{typeName}') button:has-text('填写')").First,
-            $"**/inodes/{inodeId}/types/**");
+        await OpenBindingEditorAsync(
+            Page.Locator($".mud-card:has-text('{typeName}') .mud-card-actions button").First,
+            MetadataHelpers.Unique("e2e_bind"));
         await BlazorHelpers.WaitForLoadingCompleteAsync(Page);
 
         var noteField = Page.Locator(".mud-input-control:has-text('备注')").First;

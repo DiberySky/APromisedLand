@@ -1,0 +1,156 @@
+@page "/admin/users"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IUsersAdminService UsersService
+@inject IAdminActorAccessor ActorAccessor
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>用户管理</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">用户管理</MudText>
+
+<MudTable T="IdentityUserSummary"
+          ServerData="LoadUsers"
+          @ref="_table"
+          RowsPerPage="25"
+          Hover="true"
+          Dense="true"
+          Loading="_loading"
+          LoadingProgressColor="Color.Primary">
+    <ToolBarContent>
+        <MudTextField @bind-Value="_search"
+                      Placeholder="搜索用户名/邮箱"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Outlined.Search"
+                      Immediate="true"
+                      Class="mr-3"
+                      Style="width:280px" />
+        <MudSelect T="string"
+                   @bind-Value="_statusFilter"
+                   @bind-Value:after="ReloadAsync"
+                   Label="状态"
+                   Variant="Variant.Outlined"
+                   Class="mr-3"
+                   Style="width:140px">
+            <MudSelectItem T="string" Value="@("all")">全部</MudSelectItem>
+            <MudSelectItem T="string" Value="@("enabled")">已启用</MudSelectItem>
+            <MudSelectItem T="string" Value="@("disabled")">已禁用</MudSelectItem>
+        </MudSelect>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Outlined.Refresh"
+                   OnClick="ReloadAsync">刷新</MudButton>
+        <div class="flex-grow-1"></div>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Success"
+                   StartIcon="@Icons.Material.Outlined.PersonAdd"
+                   OnClick="OpenCreateAsync">新建用户</MudButton>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>用户名</MudTh>
+        <MudTh>邮箱</MudTh>
+        <MudTh>姓名</MudTh>
+        <MudTh>状态</MudTh>
+        <MudTh>创建时间</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd @onclick="() => GoDetail(context.Id)" Class="cursor-pointer">
+            <MudText Typo="Typo.body2">@context.Username</MudText>
+        </MudTd>
+        <MudTd @onclick="() => GoDetail(context.Id)" Class="cursor-pointer">
+            @(context.Email ?? "—")
+            @if (context.EmailVerified)
+            {
+                <MudIcon Icon="@Icons.Material.Outlined.VerifiedUser" Size="Size.Small" Color="Color.Success" Class="ml-1" />
+            }
+        </MudTd>
+        <MudTd @onclick="() => GoDetail(context.Id)" Class="cursor-pointer">
+            @($"{context.FirstName} {context.LastName}".Trim())
+        </MudTd>
+        <MudTd @onclick="() => GoDetail(context.Id)" Class="cursor-pointer">
+            @if (context.Enabled)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">启用</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Filled">禁用</MudChip>
+            }
+        </MudTd>
+        <MudTd @onclick="() => GoDetail(context.Id)" Class="cursor-pointer">
+            @(context.CreatedTimestamp.HasValue
+                ? DateTimeOffset.FromUnixTimeMilliseconds(context.CreatedTimestamp.Value).LocalDateTime.ToString("yyyy-MM-dd HH:mm")
+                : "—")
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Typo="Typo.body2">暂无用户。</MudText>
+    </NoRecordsContent>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<IdentityUserSummary> _table = default!;
+    private bool _loading;
+    private string? _search;
+    private string _statusFilter = "all";
+
+    private async Task<TableData<IdentityUserSummary>> LoadUsers(TableState state, CancellationToken ct)
+    {
+        _loading = true;
+        try
+        {
+            bool? enabled = _statusFilter switch
+            {
+                "enabled" => true,
+                "disabled" => false,
+                _ => null
+            };
+
+            var request = new AdminPageRequest(
+                Search: _search,
+                Page: state.Page + 1,
+                PageSize: state.PageSize,
+                Enabled: enabled);
+
+            var result = await UsersService.SearchAsync(request, ct);
+            return new TableData<IdentityUserSummary>
+            {
+                Items = result.Items,
+                TotalItems = result.Total
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载用户失败：{ex.Message}", Severity.Error);
+            return new TableData<IdentityUserSummary> { Items = [], TotalItems = 0 };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task ReloadAsync() => _table!.ReloadServerData();
+
+    private void GoDetail(string id) => Nav.NavigateTo($"/admin/users/{id}");
+
+    private async Task OpenCreateAsync()
+    {
+        var dialog = await DialogService.ShowAsync<CreateUserDialog>("新建用户");
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await ReloadAsync();
+        }
+    }
+}

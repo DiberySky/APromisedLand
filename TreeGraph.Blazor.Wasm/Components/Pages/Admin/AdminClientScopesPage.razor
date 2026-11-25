@@ -1,0 +1,138 @@
+@page "/admin/client-scopes"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IClientScopesAdminService ScopesService
+@inject IAdminActorAccessor ActorAccessor
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>客户端作用域</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">客户端作用域（Client Scopes）</MudText>
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Refresh" OnClick="LoadAsync">刷新</MudButton>
+</MudStack>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudText Typo="Typo.subtitle1" Class="mb-2">新建作用域</MudText>
+    <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2">
+        <MudTextField @bind-Value="_newName" Label="名称" Variant="Variant.Outlined" Required="true" Style="width: 240px" />
+        <MudTextField @bind-Value="_newDescription" Label="描述" Variant="Variant.Outlined" Style="width: 280px" />
+        <MudTextField @bind-Value="_newProtocol" Label="协议" Variant="Variant.Outlined" Style="width: 160px" />
+        <MudButton Color="Color.Success" Variant="Variant.Filled" Disabled="@_creating" OnClick="CreateScopeAsync">
+            @(_creating ? "创建中..." : "创建")
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+<MudTable T="IdentityClientScope" Items="_scopes" Dense="true" Hover="true" Loading="_loading">
+    <HeaderContent>
+        <MudTh>名称</MudTh>
+        <MudTh>描述</MudTh>
+        <MudTh>协议</MudTh>
+        <MudTh>类型</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd><a href="/admin/client-scopes/@context.Id" class="text-primary">@context.Name</a></MudTd>
+        <MudTd>@(context.Description ?? "—")</MudTd>
+        <MudTd>@(context.Protocol ?? "—")</MudTd>
+        <MudTd>
+            @if (context.IsDefault)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled">默认</MudChip>
+            }
+        </MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick='() => ConfirmDeleteAsync(context)' />
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText Typo="Typo.body2">暂无作用域。</MudText></NoRecordsContent>
+</MudTable>
+
+@code {
+    private IReadOnlyList<IdentityClientScope> _scopes = [];
+    private bool _loading;
+    private string _newName = string.Empty;
+    private string? _newDescription;
+    private string _newProtocol = "openid-connect";
+    private bool _creating;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _scopes = await ScopesService.ListAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载作用域失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CreateScopeAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newName))
+        {
+            Snackbar.Add("请填写名称", Severity.Warning);
+            return;
+        }
+        _creating = true;
+        try
+        {
+            var result = await ScopesService.CreateAsync(
+                ActorAccessor.GetRequiredActor(),
+                new SaveClientScopeRequest(_newName.Trim(), _newDescription, _newProtocol));
+            if (result.Success)
+            {
+                Snackbar.Add($"作用域已创建：{_newName}", Severity.Success);
+                _newName = string.Empty;
+                _newDescription = null;
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "创建失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"创建失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+
+    private async Task ConfirmDeleteAsync(IdentityClientScope scope)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除作用域「{scope.Name}」？",
+            yesText: "删除", cancelText: "取消");
+        if (confirmed != true) return;
+
+        var result = await ScopesService.DeleteAsync(ActorAccessor.GetRequiredActor(), scope.Id);
+        if (result.Success)
+        {
+            Snackbar.Add("作用域已删除", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.Error ?? "删除失败", Severity.Error);
+        }
+    }
+}

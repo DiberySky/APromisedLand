@@ -1,0 +1,72 @@
+@page "/admin/export"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using System.Text
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IExportAdminService ExportService
+@inject IAdminActorAccessor ActorAccessor
+@inject ISnackbar Snackbar
+
+<PageTitle>Realm 导出</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Realm Partial Export</MudText>
+<MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
+    Partial export 中的 client secret 会被掩码，不能作为完整恢复源；仅用于查看配置或认证流变更前的备份。
+</MudAlert>
+
+<MudPaper Class="pa-4 mb-4" Style="max-width: 640px">
+    <MudText Typo="Typo.subtitle1" Class="mb-2">导出选项</MudText>
+    <MudCheckBox @bind-Value="_exportGroupsAndRoles" Label="导出组与角色" Color="Color.Primary" />
+    <MudCheckBox @bind-Value="_exportClients" Label="导出客户端" Color="Color.Primary" />
+    <MudCheckBox @bind-Value="_exportClientsSecrets" Label="包含客户端密钥（仍会掩码）" Color="Color.Primary" />
+    <MudButton Color="Color.Primary" Variant="Variant.Filled" Class="mt-3" Disabled="@_exporting" OnClick="ExportAsync">
+        @(_exporting ? "导出中..." : "导出")
+    </MudButton>
+</MudPaper>
+
+@if (_result is not null)
+{
+    <MudPaper Class="pa-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
+            <MudText Typo="Typo.subtitle1">导出结果（@_result.SuggestedFileName，@_result.ExportedAt:local）</MudText>
+            @if (!string.IsNullOrEmpty(ExportHref))
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Outlined.Download"
+                           Href="@ExportHref" Download="@_result.SuggestedFileName">下载 JSON</MudButton>
+            }
+        </MudStack>
+        <MudTextField Value="_result.Json" Label="导出 JSON" Variant="Variant.Outlined" Lines="16" ReadOnly="true" />
+    </MudPaper>
+}
+
+@code {
+    private bool _exportGroupsAndRoles = true;
+    private bool _exportClients = true;
+    private bool _exportClientsSecrets;
+    private bool _exporting;
+    private RealmExportResult? _result;
+
+    private string? ExportHref => _result is null
+        ? null
+        : $"data:application/json;charset=utf-8;base64,{Convert.ToBase64String(Encoding.UTF8.GetBytes(_result.Json))}";
+
+    private async Task ExportAsync()
+    {
+        _exporting = true;
+        try
+        {
+            var result = await ExportService.ExportAsync(ActorAccessor.GetRequiredActor(),
+                new RealmExportOptions(_exportGroupsAndRoles, _exportClients, _exportClientsSecrets));
+            if (result.Success && result.Value is not null)
+            {
+                _result = result.Value;
+                Snackbar.Add("导出完成", Severity.Success);
+            }
+            else Snackbar.Add(result.Error ?? "导出失败", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"导出失败：{ex.Message}", Severity.Error); }
+        finally { _exporting = false; }
+    }
+}

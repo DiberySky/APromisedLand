@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Microsoft.Extensions.Configuration;
 
 namespace APromisedLand.AppHost.Extensions;
 
@@ -41,6 +42,14 @@ public static class TreeGraphFileStorageApiExtension
 
         ConfigureDatabase(api, resourceContext);
         ConfigureObjectStorage(api, resourceContext);
+        api.WireIfPresent(resourceContext.Redis)
+            .WithEnvironment("Keycloak__Authority", "https://localhost:8323/realms/apromisedland")
+            .WithEnvironment("Keycloak__Audience", "treegraph-web")
+            .WithEnvironment("Keycloak__AdditionalAudiences__0", "treegraph-wasm")
+            .WithEnvironment("Keycloak__RequireHttpsMetadata", "false")
+            .WithEnvironment("Cors__WasmOrigins__0", "https://localhost:5787")
+            .WithEnvironment("Identity__RequireAuthenticatedApi",
+                builder.Configuration.GetValue<bool>("Frontend:LegacyTrafficRetired").ToString());
         ConfigureUploadCleanup(api);
         ConfigureObservability(api);
 

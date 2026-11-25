@@ -1,5 +1,8 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using TreeGraph.Persistence.Data;
+using TreeGraph.Shared.Identity;
 using TreeGraph.SyncServices.GraphSync;
 using TreeGraph.SyncServices.Messaging;
 using TreeGraph.SyncServices.SemanticSearch;
@@ -11,6 +14,55 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ★ Aspire ServiceDefaults：服务发现、健康检查、OpenTelemetry
 builder.AddServiceDefaults();
+builder.AddRedisDistributedCache("Redis");
+builder.Services.AddHttpContextAccessor();
+
+// 双跑期间接受旧 Web 与 WASM audience；认证仅填充用户上下文，不全局改变匿名 API 行为。
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = builder.Configuration["Keycloak:Authority"];
+        options.TokenValidationParameters.ValidAudiences = new[] { builder.Configuration["Keycloak:Audience"] }
+            .Concat(builder.Configuration.GetSection("Keycloak:AdditionalAudiences").Get<string[]>() ?? [])
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        options.RequireHttpsMetadata = builder.Configuration.GetValue<bool>("Keycloak:RequireHttpsMetadata");
+        options.TokenValidationParameters.RoleClaimType = IdentityClaimTypes.Roles;
+        options.TokenValidationParameters.NameClaimType = IdentityClaimTypes.PreferredUsername;
+        // 关闭 inbound claim 类型映射：Keycloak 的 sub/roles 短名会被默认映射为 WS-Federation 长名，
+        // 导致 FindFirst("sub") 与 RoleClaimType="roles" 失效（401/403）。保持短名以匹配 IdentityClaimTypes。
+        options.MapInboundClaims = false;
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var sub = context.Principal?.FindFirst(IdentityClaimTypes.Subject)?.Value;
+                if (string.IsNullOrWhiteSpace(sub)) return;
+
+                try
+                {
+                    var cache = context.HttpContext.RequestServices.GetRequiredService<IDistributedCache>();
+                    var revoked = await cache.GetStringAsync(IdentityConstants.RevocationKeyPrefix + sub);
+                    if (!string.IsNullOrEmpty(revoked)) context.Fail("账号已被禁用");
+                }
+                catch (Exception)
+                {
+                    // 与既有业务 API 双跑策略一致：撤销存储暂不可达时不阻断旧客户端。
+                }
+            }
+        };
+    });
+builder.Services.AddAuthorization();
+
+var wasmOrigins = builder.Configuration.GetSection("Cors:WasmOrigins").Get<string[]>() ?? [];
+builder.Services.AddCors(options => options.AddPolicy("TreeGraphWasm", policy =>
+    policy.WithOrigins(wasmOrigins)
+        .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+        .WithHeaders("Authorization", "Content-Type")
+        .SetPreflightMaxAge(TimeSpan.FromMinutes(10))));
 
 builder.Services.AddControllers(options =>
     {
@@ -53,7 +105,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
-app.MapControllers();
+app.UseCors("TreeGraphWasm");
+app.UseAuthentication();
+app.UseAuthorization();
+var controllers = app.MapControllers();
+if (app.Configuration.GetValue<bool>("Identity:RequireAuthenticatedApi"))
+    controllers.RequireAuthorization();
 
 // ★ Aspire 默认端点（/health、/alive），供 Dashboard 探测
 app.MapDefaultEndpoints();

@@ -8,11 +8,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.64.2" />
-        <PackageReference Include="WolverineFx.EntityFrameworkCore" Version="6.64.2" />
-        <PackageReference Include="WolverineFx.Postgresql" Version="6.64.2" />
-        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.64.2" />
+        <PackageReference Include="WolverineFx.RabbitMQ" Version="7.0.0-beta.1" />
+        <PackageReference Include="WolverineFx.EntityFrameworkCore" Version="7.0.0-beta.1" />
+        <PackageReference Include="WolverineFx.Postgresql" Version="7.0.0-beta.1" />
+        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="7.0.0-beta.1" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="11.0.0" />
+        <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" Version="17.0.0" />
         <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="17.0.0-preview.1.26567.5" />
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="11.0.0" />
         <!-- 统一 Roslyn 组件版本：WolverineFx 运行时编译链混用 5.0.0/5.9.0 会触发 NU1608 -->

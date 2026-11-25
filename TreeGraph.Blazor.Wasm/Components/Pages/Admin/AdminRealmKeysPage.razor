@@ -1,0 +1,114 @@
+@page "/admin/realm-keys"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IRealmKeysAdminService KeysService
+@inject IAdminActorAccessor ActorAccessor
+@inject StepUpGuard StepUp
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Realm 密钥</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">Realm 签名密钥</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenGenerateAsync">生成新密钥</MudButton>
+</MudStack>
+
+<MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-3">
+    密钥误操作会导致全站令牌校验失败。删除前请确认该密钥已为 PASSIVE 且客户端已刷新 JWKS。
+</MudAlert>
+
+<MudTable T="RealmSigningKey" Items="_keys" Dense="true" Hover="true" Loading="_loading">
+    <HeaderContent>
+        <MudTh>Kid</MudTh>
+        <MudTh>类型</MudTh>
+        <MudTh>算法</MudTh>
+        <MudTh>状态</MudTh>
+        <MudTh>优先级</MudTh>
+        <MudTh>有效期至</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>@context.Kid</MudTd>
+        <MudTd>@context.Type</MudTd>
+        <MudTd>@context.Algorithm</MudTd>
+        <MudTd>
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@StatusColor(context)">
+                @context.Status
+            </MudChip>
+        </MudTd>
+        <MudTd>@context.ProviderPriority</MudTd>
+        <MudTd>@FormatValidTo(context.ValidTo)</MudTd>
+        <MudTd>
+            <MudTooltip Text="@(context.IsActive ? "活动密钥不可删除" : "删除密钥")">
+                <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                               Color="Color.Error"
+                               Size="Size.Small"
+                               Disabled="@(context.IsActive)"
+                               OnClick='() => ConfirmDeleteAsync(context)' />
+            </MudTooltip>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText Typo="Typo.body2">暂无密钥。</MudText></NoRecordsContent>
+</MudTable>
+
+@code {
+    private IReadOnlyList<RealmSigningKey> _keys = [];
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try { _keys = await KeysService.ListAsync(); }
+        catch (Exception ex) { Snackbar.Add($"加载失败：{ex.Message}", Severity.Error); }
+        finally { _loading = false; }
+    }
+
+    private async Task OpenGenerateAsync()
+    {
+        if (!await StepUp.EnsureFreshAsync("realm-key.generate", "/admin/realm-keys")) return;
+
+        var dialog = await DialogService.ShowAsync<CreateRealmKeyDialog>("生成新签名密钥");
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled) await LoadAsync();
+    }
+
+    private async Task ConfirmDeleteAsync(RealmSigningKey key)
+    {
+        if (!await StepUp.EnsureFreshAsync("realm-key.delete", "/admin/realm-keys")) return;
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除密钥",
+            $"删除密钥「{key.Kid}」（{key.Algorithm}，{key.Status}）？",
+            yesText: "删除",
+            cancelText: "取消");
+        if (confirmed != true) return;
+
+        var result = await KeysService.DeleteAsync(ActorAccessor.GetRequiredActor(), key.ProviderId);
+        if (result.Success) { Snackbar.Add("已删除", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(result.Error ?? "删除失败", Severity.Error);
+    }
+
+    private static string FormatValidTo(string? validTo)
+    {
+        if (!long.TryParse(validTo, out var epoch))
+            return "-";
+
+        return DateTimeOffset.FromUnixTimeMilliseconds(epoch).ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+    }
+
+    private static Color StatusColor(RealmSigningKey key)
+    {
+        if (key.IsActive)
+            return Color.Success;
+
+        return string.Equals(key.Status, "DISABLED", StringComparison.OrdinalIgnoreCase)
+            ? Color.Error
+            : Color.Default;
+    }
+}

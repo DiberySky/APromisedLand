@@ -3,55 +3,229 @@
   "realm": "apromisedland",
   "displayName": "A promised land",
   "enabled": true,
-  "registrationAllowed": true,
+  "registrationAllowed": false,
   "sslRequired": "external",
+  "bruteForceProtected": true,
+  "passwordPolicy": "length(12) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1)",
+  "accessTokenLifespan": 600,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
   "defaultGroups": ["/diberysky"],
+  "roles": {
+    "realm": [
+      {
+        "name": "app-admin",
+        "description": "管理台入口与高危操作",
+        "composite": false
+      },
+      {
+        "name": "app-editor",
+        "description": "业务写权限",
+        "composite": false
+      },
+      {
+        "name": "app-viewer",
+        "description": "业务只读",
+        "composite": false
+      }
+    ]
+  },
   "clients": [
     {
-      "id": "diberysky",
-      "clientId": "diberysky",
-      "name": "DiberySky",
-      "description": "DiberySky",
+      "clientId": "treegraph-web",
+      "name": "TreeGraph Web",
+      "description": "Blazor Server 管理台登录客户端",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "bearerOnly": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "diberysky-secret",
-      "redirectUris": [],
-      "webOrigins": [],
-      "fullScopeAllowed": false,
+      "secret": "${TREEGRAPH_WEB_CLIENT_SECRET}",
       "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "rootUrl": "http://localhost:5783",
+      "baseUrl": "http://localhost:5783",
+      "redirectUris": ["http://localhost:5783/signin-oidc"],
+      "webOrigins": ["http://localhost:5783"],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:5783/signout-callback-oidc"
+      },
       "protocolMappers": [
         {
-          "name": "group members",
+          "name": "realm roles to roles claim",
           "protocol": "openid-connect",
-          "protocolMapper": "oidc-group-membership-mapper",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
           "consentRequired": false,
           "config": {
-            "full.path": "false",
-            "id.token.claim": "false",
-            "access.token.claim": "true",
             "claim.name": "roles",
             "jsonType.label": "String",
-            "userinfo.token.claim": "false",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
             "introspection.token.claim": "true"
           }
         },
         {
-          "name": "diberysky",
+          "name": "groups to groups claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "treegraph-web audience",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.custom.audience": "diberysky",
+            "included.custom.audience": "treegraph-web",
             "access.token.claim": "true",
             "id.token.claim": "false",
             "introspection.token.claim": "true"
           }
         }
       ]
+    },
+    {
+      "clientId": "treegraph-maui",
+      "name": "TreeGraph MAUI",
+      "description": "MAUI 客户端登录（公共客户端 + PKCE）",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "redirectUris": ["treegraph://callback"],
+      "webOrigins": ["+"],
+      "protocolMappers": [
+        {
+          "name": "realm roles to roles claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "groups to groups claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "treegraph-wasm",
+      "name": "TreeGraph WebAssembly",
+      "description": "纯 WASM 管理台公共客户端（Authorization Code + PKCE S256）",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "rootUrl": "https://localhost:5787",
+      "baseUrl": "https://localhost:5787",
+      "redirectUris": ["https://localhost:5787/authentication/login-callback"],
+      "webOrigins": ["https://localhost:5787"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://localhost:5787/"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm roles to roles claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "groups to groups claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "treegraph-wasm audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "treegraph-wasm",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "treegraph-admin",
+      "name": "TreeGraph Admin API",
+      "description": "管理调用 service account（client_credentials）",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${TREEGRAPH_ADMIN_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": true,
+      "redirectUris": [],
+      "webOrigins": []
     }
   ],
   "groups": [
@@ -74,40 +248,40 @@
       "realmRoles": [],
       "clientRoles": {},
       "subGroups": []
+    },
+    {
+      "name": "spaces",
+      "path": "/spaces",
+      "attributes": {
+        "description": ["空间成员组容器"]
+      },
+      "realmRoles": [],
+      "clientRoles": {},
+      "subGroups": []
     }
   ],
   "users": [
     {
-      "username": "dibery",
+      "username": "service-account-treegraph-admin",
       "enabled": true,
-      "firstName": "Admin",
-      "lastName": "Chen",
-      "email": "admin@diberysky.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "Pa$$w0rd",
-          "temporary": false
-        }
-      ],
-      "groups": ["/Admin"]
-    },
-    {
-      "username": "tian",
-      "enabled": true,
-      "firstName": "天天",
-      "lastName": "Chen",
-      "email": "tian@diberysky.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "Pa$$w0rd",
-          "temporary": false
-        }
-      ],
-      "groups": ["/diberysky"]
+      "serviceAccountClientId": "treegraph-admin",
+      "realmRoles": [],
+      "clientRoles": {
+        "realm-management": [
+          "view-realm",
+          "manage-realm",
+          "view-users",
+          "query-users",
+          "manage-users",
+          "view-clients",
+          "manage-clients",
+          "view-identity-providers",
+          "manage-identity-providers",
+          "view-events",
+          "manage-events",
+          "query-groups"
+        ]
+      }
     }
   ]
 }

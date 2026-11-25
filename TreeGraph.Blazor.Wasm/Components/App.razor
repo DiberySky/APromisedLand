@@ -1,0 +1,26 @@
+@inject WasmOidcSession Session
+<CascadingAuthenticationState>
+  <Router AppAssembly="typeof(Program).Assembly"
+          AdditionalAssemblies="new[] { typeof(TreeGraph.Blazor.Shared.NodeEavSky.Pages.Attributes.AttributesList).Assembly }"
+          NotFoundPage="typeof(Pages.NotFound)">
+    <Found Context="routeData">
+      <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
+        <NotAuthorized Context="authState">
+          @if (authState.User.Identity?.IsAuthenticated == true)
+          {
+            <MudContainer MaxWidth="MaxWidth.Small" Class="mt-8"><MudAlert Severity="Severity.Error">无权访问（403）。</MudAlert></MudContainer>
+          }
+          else
+          {
+            <RedirectToLogin />
+          }
+        </NotAuthorized>
+        <Authorizing><MudText Class="pa-4">正在校验身份…</MudText></Authorizing>
+      </AuthorizeRouteView>
+      <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+  </Router>
+</CascadingAuthenticationState>
+@code {
+    protected override Task OnInitializedAsync() => Session.InitializeAsync();
+}

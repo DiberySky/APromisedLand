@@ -134,6 +134,12 @@ public sealed class MafAgentService
         var workflowAgent = await GetWorkflowAgentAsync(ct);
         var session = await workflowAgent.CreateSessionAsync(cancellationToken: ct);
 
+        // 追踪最后一个 agent（Critic）的名字和累积文本，循环结束后手动发 final 事件
+        // （不能依赖 update.FinishReason —— Sequential workflow 里它永远不是 Stop）
+        // agent 切换时清空 finalText，只保留最后一个 agent 的输出作为最终稿
+        var lastAgentName = string.Empty;
+        var lastAgentText = new System.Text.StringBuilder();
+
         await foreach (var update in workflowAgent
             .RunStreamingAsync(topic, session, cancellationToken: ct))
         {
@@ -148,16 +154,31 @@ public sealed class MafAgentService
             if (string.IsNullOrEmpty(delta))
                 continue;
 
-            var isFinal = update.FinishReason == ChatFinishReason.Stop;
-
             var authorName = update.AuthorName;
             if (string.IsNullOrEmpty(authorName))
                 authorName = "unknown";
 
+            // agent 切换时，重置累积器以只保留最后一个 agent（Critic）的文本
+            if (lastAgentName.Length > 0 && !authorName.Equals(lastAgentName, StringComparison.Ordinal))
+                lastAgentText.Clear();
+
+            lastAgentName = authorName;
+            lastAgentText.Append(delta);
+
+            // 始终发增量事件，isFinal=false（由循环退出后的补发事件标记结束）
             yield return new WorkflowStreamEvent(
                 Agent: authorName,
                 Delta: delta,
-                IsFinal: isFinal);
+                IsFinal: false);
+        }
+
+        // ★ 循环退出后，补发 final 事件 —— UI 据此设置 _finalAnswer（= Critic 输出）
+        if (lastAgentName.Length > 0 && lastAgentText.Length > 0)
+        {
+            yield return new WorkflowStreamEvent(
+                Agent: lastAgentName,
+                Delta: lastAgentText.ToString(),
+                IsFinal: true);
         }
     }
 

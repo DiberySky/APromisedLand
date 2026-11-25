@@ -1,0 +1,259 @@
+@page "/admin/client-scopes/{ScopeId}"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IClientScopesAdminService ScopesService
+@inject IAdminActorAccessor ActorAccessor
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>作用域详情</PageTitle>
+
+@if (_notFound)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">未找到作用域。</MudAlert>
+    <MudButton Variant="Variant.Outlined" OnClick='() => Nav.NavigateTo("/admin/client-scopes")'>返回列表</MudButton>
+}
+else if (_scope is null)
+{
+    <MudText>加载中...</MudText>
+}
+else
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+        <MudText Typo="Typo.h4">@_scope.Name</MudText>
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.ArrowBack" OnClick='() => Nav.NavigateTo("/admin/client-scopes")'>返回列表</MudButton>
+    </MudStack>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-2">基本信息</MudText>
+        <MudStack Style="max-width: 560px">
+            <MudTextField @bind-Value="_editName" Label="名称" Variant="Variant.Outlined" Class="mb-2" />
+            <MudTextField @bind-Value="_editDescription" Label="描述" Variant="Variant.Outlined" Class="mb-2" />
+            <MudText Typo="Typo.body2">协议：@(_scope.Protocol ?? "—")</MudText>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Class="mt-2" Disabled="@_savingInfo" OnClick="SaveInfoAsync">
+                @(_savingInfo ? "保存中..." : "保存")
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-2">添加 Protocol Mapper</MudText>
+        <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2" Class="mb-2">
+            <MudTextField @bind-Value="_mapperName" Label="名称" Variant="Variant.Outlined" Required="true" Style="width: 220px" />
+            <MudSelect T="string" @bind-Value="_mapperType" Label="Mapper 类型" Variant="Variant.Outlined" Style="width: 320px">
+                @foreach (var t in MapperPresets)
+                {
+                    <MudSelectItem Value="@(t)">@t</MudSelectItem>
+                }
+            </MudSelect>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@_creatingMapper" OnClick="CreateMapperAsync">
+                @(_creatingMapper ? "创建中..." : "创建")
+            </MudButton>
+        </MudStack>
+        <MudTextField @bind-Value="_mapperConfigJson" Label="Config（JSON，键值均按字符串处理）" Variant="Variant.Outlined" Lines="4"
+                      Placeholder='例：{ "user.attribute": "department", "claim.name": "department" }'
+                      Style="max-width: 640px" />
+    </MudPaper>
+
+    <MudText Typo="Typo.subtitle1" Class="mb-2">Protocol Mappers（@_mappers.Count）</MudText>
+    <MudTable T="IdentityProtocolMapper" Items="_mappers" Dense="true" Hover="true" Loading="_loadingMappers">
+        <HeaderContent>
+            <MudTh>名称</MudTh>
+            <MudTh>类型</MudTh>
+            <MudTh>Config</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Name</MudTd>
+            <MudTd><MudText Typo="Typo.caption">@context.ProtocolMapper</MudText></MudTd>
+            <MudTd>
+                @if (context.Config.Count == 0)
+                {
+                    <MudText Typo="Typo.body2">—</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption">@string.Join("; ", context.Config.Take(4).Select(kv => $"{kv.Key}={kv.Value}"))@(context.Config.Count > 4 ? $"…(+{context.Config.Count - 4})" : "")</MudText>
+                }
+            </MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick='() => ConfirmDeleteMapperAsync(context)' />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent><MudText Typo="Typo.body2">暂无 mapper。</MudText></NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    [Parameter] public string ScopeId { get; set; } = string.Empty;
+
+    private static readonly string[] MapperPresets =
+    {
+        "oidc-usermodel-attribute-mapper",
+        "oidc-usermodel-property-mapper",
+        "oidc-group-membership-mapper",
+        "oidc-role-mapper",
+        "oidc-hardcoded-claim-mapper",
+        "oidc-hardcoded-role-mapper",
+        "oidc-audience-mapper",
+        "oidc-script-based-protocol-mapper"
+    };
+
+    private IdentityClientScope? _scope;
+    private bool _notFound;
+    private IReadOnlyList<IdentityProtocolMapper> _mappers = [];
+    private bool _loadingMappers;
+
+    private string _editName = string.Empty;
+    private string? _editDescription;
+    private bool _savingInfo;
+
+    private string _mapperName = string.Empty;
+    private string _mapperType = "oidc-usermodel-attribute-mapper";
+    private string? _mapperConfigJson;
+    private bool _creatingMapper;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _scope = await ScopesService.GetAsync(ScopeId);
+        if (_scope is null)
+        {
+            _notFound = true;
+            return;
+        }
+        _editName = _scope.Name;
+        _editDescription = _scope.Description;
+        await LoadMappersAsync();
+    }
+
+    private async Task SaveInfoAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_editName))
+        {
+            Snackbar.Add("名称不能为空", Severity.Warning);
+            return;
+        }
+        _savingInfo = true;
+        try
+        {
+            var result = await ScopesService.UpdateAsync(
+                ActorAccessor.GetRequiredActor(), ScopeId,
+                new SaveClientScopeRequest(_editName.Trim(), _editDescription, _scope!.Protocol ?? "openid-connect"));
+            if (result.Success)
+            {
+                Snackbar.Add("已保存", Severity.Success);
+                _scope = await ScopesService.GetAsync(ScopeId);
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "保存失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"保存失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _savingInfo = false;
+        }
+    }
+
+    private async Task LoadMappersAsync()
+    {
+        _loadingMappers = true;
+        try
+        {
+            _mappers = await ScopesService.ListMappersAsync(ScopeId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载 mapper 失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingMappers = false;
+        }
+    }
+
+    private static IReadOnlyDictionary<string, string> ParseConfig(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return new Dictionary<string, string>();
+        var node = JsonNode.Parse(json);
+        if (node is not JsonObject obj)
+            return new Dictionary<string, string>();
+        return obj.ToDictionary(p => p.Key, p => p.Value?.ToString() ?? string.Empty);
+    }
+
+    private async Task CreateMapperAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_mapperName))
+        {
+            Snackbar.Add("请填写名称", Severity.Warning);
+            return;
+        }
+        IReadOnlyDictionary<string, string> config;
+        try
+        {
+            config = ParseConfig(_mapperConfigJson);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Config JSON 解析失败：{ex.Message}", Severity.Error);
+            return;
+        }
+
+        _creatingMapper = true;
+        try
+        {
+            var result = await ScopesService.CreateMapperAsync(
+                ActorAccessor.GetRequiredActor(), ScopeId,
+                new SaveProtocolMapperRequest(_mapperName.Trim(), _mapperType, Config: config));
+            if (result.Success)
+            {
+                Snackbar.Add("Mapper 已创建", Severity.Success);
+                _mapperName = string.Empty;
+                _mapperConfigJson = null;
+                await LoadMappersAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "创建失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"创建失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _creatingMapper = false;
+        }
+    }
+
+    private async Task ConfirmDeleteMapperAsync(IdentityProtocolMapper mapper)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除 mapper「{mapper.Name}」？",
+            yesText: "删除", cancelText: "取消");
+        if (confirmed != true) return;
+
+        var result = await ScopesService.DeleteMapperAsync(ActorAccessor.GetRequiredActor(), ScopeId, mapper.Id);
+        if (result.Success)
+        {
+            Snackbar.Add("Mapper 已删除", Severity.Success);
+            await LoadMappersAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.Error ?? "删除失败", Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,97 @@
+@page "/admin"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IDashboardAdminService DashboardService
+
+<PageTitle>身份概览</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">身份概览</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_summary is null)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">
+        无法读取 Keycloak 概览数据，请检查 Keycloak 运行状态与管理客户端配置。
+    </MudAlert>
+}
+else
+{
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.caption">用户总数</MudText>
+                <MudText Typo="Typo.h5">@_summary.UserCount</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.caption">活跃会话</MudText>
+                <MudText Typo="Typo.h5">@_summary.ActiveSessionCount</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.caption">客户端</MudText>
+                <MudText Typo="Typo.h5">@_summary.ClientCount</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.caption">Keycloak 版本</MudText>
+                <MudText Typo="Typo.h5">@(_summary.KeycloakVersion ?? "未知")</MudText>
+                @if (!_summary.KeycloakHealthy)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Warning">版本与期望值不一致</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudText Typo="Typo.h6" Class="mb-2">最近管理操作</MudText>
+    <MudTable Items="_summary.RecentAudit" Dense="true" Hover="true">
+        <HeaderContent>
+            <MudTh>时间</MudTh>
+            <MudTh>操作者</MudTh>
+            <MudTh>动作</MudTh>
+            <MudTh>对象</MudTh>
+            <MudTh>结果</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.OccurredAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+            <MudTd>@(context.ActorName ?? context.ActorSub)</MudTd>
+            <MudTd>@context.Action</MudTd>
+            <MudTd>@($"{context.TargetType}:{context.TargetId}")</MudTd>
+            <MudTd>@context.Result</MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2">暂无审计记录。</MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private bool _loading = true;
+    private DashboardSummary? _summary;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _summary = await DashboardService.GetSummaryAsync();
+        }
+        catch (Exception)
+        {
+            _summary = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

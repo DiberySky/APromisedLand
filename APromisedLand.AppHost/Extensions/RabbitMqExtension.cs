@@ -6,8 +6,9 @@ public static class RabbitMqExtension
         this IDistributedApplicationBuilder builder,
         AppHostResourceContext resourceContext)
     {
-        // RabbitMQ
+        // 本机离线验证使用已有镜像，避免 Aspire 17 默认版本触发联网拉取。
         resourceContext.RabbitMq = builder.AddRabbitMQ("RabbitMQ")
+            .WithImageTag("4.3-management")
             .WithDataVolume("rabbitmq-data")
             .WithManagementPlugin(port: 15672);
 

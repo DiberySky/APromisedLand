@@ -1,8 +1,11 @@
 using TreeGraph.MafWfApi.Agents;
 using TreeGraph.MafWfApi.Infrastructure;
 using TreeGraph.MafWfApi.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
+using TreeGraph.Shared.Identity;
 
 #pragma warning disable EXTEXP0001
 
@@ -22,6 +25,59 @@ builder.Services.AddMemoryCache();
 // 3. Redis 分布式缓存
 // ---------------------------------------------------------------------------
 builder.AddRedisDistributedCache("Redis");
+
+// ---------------------------------------------------------------------------
+// 3.1 身份与访问管理：JwtBearer + ICurrentUser（/mcp 仍由 McpApiKeyMiddleware 保护）
+// ---------------------------------------------------------------------------
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = builder.Configuration["Keycloak:Authority"];
+        options.TokenValidationParameters.ValidAudiences = new[] { builder.Configuration["Keycloak:Audience"] }
+            .Concat(builder.Configuration.GetSection("Keycloak:AdditionalAudiences").Get<string[]>() ?? [])
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        options.RequireHttpsMetadata = builder.Configuration.GetValue<bool>("Keycloak:RequireHttpsMetadata");
+        options.TokenValidationParameters.RoleClaimType = IdentityClaimTypes.Roles;
+        options.TokenValidationParameters.NameClaimType = IdentityClaimTypes.PreferredUsername;
+        // 关闭 inbound claim 类型映射：Keycloak 的 sub/roles 短名会被默认映射为 WS-Federation 长名，
+        // 导致 FindFirst("sub") 与 RoleClaimType="roles" 失效（401/403）。保持短名以匹配 IdentityClaimTypes。
+        options.MapInboundClaims = false;
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var sub = context.Principal?.FindFirst(IdentityClaimTypes.Subject)?.Value;
+                if (string.IsNullOrWhiteSpace(sub))
+                    return;
+
+                try
+                {
+                    var cache = context.HttpContext.RequestServices.GetRequiredService<IDistributedCache>();
+                    var revoked = await cache.GetStringAsync(IdentityConstants.RevocationKeyPrefix + sub);
+                    if (!string.IsNullOrEmpty(revoked))
+                        context.Fail("账号已被禁用");
+                }
+                catch (Exception)
+                {
+                    // 撤销存储不可达时不阻断请求，等待下次校验。
+                }
+            }
+        };
+    });
+builder.Services.AddAuthorization();
+var wasmOrigins = builder.Configuration.GetSection("Cors:WasmOrigins").Get<string[]>() ?? [];
+builder.Services.AddCors(options => options.AddPolicy("TreeGraphWasm", policy =>
+    policy.WithOrigins(wasmOrigins)
+        .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+        .WithHeaders("Authorization", "Content-Type")
+        .WithExposedHeaders("Content-Length", "Content-Disposition")
+        .SetPreflightMaxAge(TimeSpan.FromMinutes(10))));
 
 // ---------------------------------------------------------------------------
 // 4. 全局 HttpClient 配置
@@ -112,9 +168,14 @@ else
     app.UseExceptionHandler();
 }
 
+app.UseCors("TreeGraphWasm");
 app.UseMiddleware<McpApiKeyMiddleware>();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseRouting();
-app.MapControllers();
+var controllers = app.MapControllers();
+if (app.Configuration.GetValue<bool>("Identity:RequireAuthenticatedApi"))
+    controllers.RequireAuthorization();
 app.MapDefaultEndpoints();
 app.MapMcp("/mcp");
 

@@ -1,0 +1,71 @@
+@using Microsoft.AspNetCore.Components
+@using MudBlazor
+@using TreeGraph.Shared.Identity.Admin
+@inject IFederationAdminService FederationService
+@inject IAdminActorAccessor ActorAccessor
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent><MudText Typo="Typo.h6">新建 LDAP/AD 联邦</MudText></TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_name" Label="名称" Variant="Variant.Outlined" Class="mb-3" Required="true" />
+        <MudSelect T="string" @bind-Value="_vendor" Label="厂商（Vendor）" Variant="Variant.Outlined" Class="mb-3">
+            @foreach (var v in Vendors) { <MudSelectItem Value="@(v)">@v</MudSelectItem> }
+        </MudSelect>
+        <MudTextField @bind-Value="_connectionUrl" Label="Connection URL" Variant="Variant.Outlined" Class="mb-3" Required="true" Placeholder="ldap://ldap.example.com:389" />
+        <MudTextField @bind-Value="_usersDn" Label="Users DN" Variant="Variant.Outlined" Class="mb-3" Required="true" Placeholder="ou=users,dc=example,dc=com" />
+        <MudTextField @bind-Value="_bindDn" Label="Bind DN" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField @bind-Value="_bindCredential" Label="Bind Credential" Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-3" />
+        <MudCheckBox @bind-Value="_enabled" Label="启用" Color="Color.Primary" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@_submitting" OnClick="CreateAsync">
+            @(_submitting ? "创建中..." : "创建")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private static readonly string[] Vendors = { "other", "ad", "rhds", "tivoli", "apacheds", "oracle", "novell", "netwise" };
+
+    private string _name = string.Empty;
+    private string _vendor = "other";
+    private string _connectionUrl = string.Empty;
+    private string _usersDn = string.Empty;
+    private string? _bindDn;
+    private string? _bindCredential;
+    private bool _enabled = true;
+    private bool _submitting;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_connectionUrl) || string.IsNullOrWhiteSpace(_usersDn))
+        {
+            Snackbar.Add("请填写名称、Connection URL、Users DN", Severity.Warning);
+            return;
+        }
+        _submitting = true;
+        try
+        {
+            var result = await FederationService.CreateAsync(
+                ActorAccessor.GetRequiredActor(),
+                new SaveLdapFederationRequest(
+                    _name.Trim(), _enabled, ImportEnabled: true, EditMode: false, SyncRegistrations: false,
+                    _vendor, _connectionUrl.Trim(), _usersDn.Trim(), _bindDn, _bindCredential,
+                    null, null, null, null, null));
+            if (result.Success)
+            {
+                Snackbar.Add($"联邦已创建：{_name}", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result.Value));
+            }
+            else Snackbar.Add(result.Error ?? "创建失败", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"创建失败：{ex.Message}", Severity.Error); }
+        finally { _submitting = false; }
+    }
+}

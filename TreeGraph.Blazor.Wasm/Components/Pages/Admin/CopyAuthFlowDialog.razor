@@ -1,0 +1,63 @@
+@using Microsoft.AspNetCore.Components
+@using MudBlazor
+@using TreeGraph.Shared.Identity.Admin
+@inject IAuthFlowsAdminService AuthFlowsService
+@inject IAdminActorAccessor ActorAccessor
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent><MudText Typo="Typo.h6">复制认证流</MudText></TitleContent>
+    <DialogContent>
+        <MudSelect T="string" @bind-Value="_sourceAlias" Label="源流别名" Variant="Variant.Outlined" Class="mb-3">
+            @if (_aliases is not null) { foreach (var a in _aliases) { <MudSelectItem Value="@(a)">@a</MudSelectItem> } }
+        </MudSelect>
+        <MudTextField @bind-Value="_newAlias" Label="新流别名" Variant="Variant.Outlined" Required="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@_submitting" OnClick="CopyAsync">
+            @(_submitting ? "复制中..." : "复制")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public List<string>? FlowAliases { get; set; }
+
+    private List<string>? _aliases;
+    private string? _sourceAlias;
+    private string _newAlias = string.Empty;
+    private bool _submitting;
+
+    protected override void OnInitialized()
+    {
+        _aliases = FlowAliases ?? [];
+        _sourceAlias = _aliases.FirstOrDefault();
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task CopyAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_sourceAlias) || string.IsNullOrWhiteSpace(_newAlias))
+        {
+            Snackbar.Add("请选择源流并填写新别名", Severity.Warning);
+            return;
+        }
+        _submitting = true;
+        try
+        {
+            var result = await AuthFlowsService.CopyAsync(ActorAccessor.GetRequiredActor(),
+                new CopyAuthenticationFlowRequest(_sourceAlias, _newAlias.Trim()));
+            if (result.Success)
+            {
+                Snackbar.Add($"已复制为「{_newAlias}」", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result.Value));
+            }
+            else Snackbar.Add(result.Error ?? "复制失败", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"复制失败：{ex.Message}", Severity.Error); }
+        finally { _submitting = false; }
+    }
+}

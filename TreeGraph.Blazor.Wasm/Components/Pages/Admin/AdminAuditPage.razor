@@ -1,0 +1,129 @@
+@page "/admin/audit"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IAdminAuditQueryService AuditService
+@inject ISnackbar Snackbar
+
+<PageTitle>管理审计</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">管理审计</MudText>
+
+<MudTable T="AdminAuditEntry"
+          ServerData="LoadAudit"
+          @ref="_table"
+          RowsPerPage="50"
+          Hover="true"
+          Dense="true"
+          Loading="_loading"
+          LoadingProgressColor="Color.Primary">
+    <ToolBarContent>
+        <MudTextField @bind-Value="_action"
+                      Placeholder="动作（如 user.disable）"
+                      Variant="Variant.Outlined"
+                      Class="mr-3"
+                      Style="width:200px" />
+        <MudTextField @bind-Value="_actor"
+                      Placeholder="操作者"
+                      Variant="Variant.Outlined"
+                      Class="mr-3"
+                      Style="width:180px" />
+        <MudSelect T="string"
+                   @bind-Value="_result"
+                   @bind-Value:after="ReloadAsync"
+                   Label="结果"
+                   Variant="Variant.Outlined"
+                   Class="mr-3"
+                   Style="width:140px">
+            <MudSelectItem T="string" Value="@("")">全部</MudSelectItem>
+            <MudSelectItem T="string" Value="@("success")">成功</MudSelectItem>
+            <MudSelectItem T="string" Value="@("partial")">部分成功</MudSelectItem>
+            <MudSelectItem T="string" Value="@("failed")">失败</MudSelectItem>
+            <MudSelectItem T="string" Value="@("pending")">待处理</MudSelectItem>
+        </MudSelect>
+        <MudDatePicker @bind-Date="_from" Label="起" Variant="Variant.Outlined" Class="mr-3" Style="width:160px" />
+        <MudDatePicker @bind-Date="_to" Label="止" Variant="Variant.Outlined" Class="mr-3" Style="width:160px" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.FilterAlt" OnClick="ReloadAsync">查询</MudButton>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>时间</MudTh>
+        <MudTh>操作者</MudTh>
+        <MudTh>动作</MudTh>
+        <MudTh>对象</MudTh>
+        <MudTh>结果</MudTh>
+        <MudTh>Keycloak</MudTh>
+        <MudTh>错误</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>@context.OccurredAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+        <MudTd>@(context.ActorName ?? context.ActorSub)</MudTd>
+        <MudTd>@context.Action</MudTd>
+        <MudTd>@(context.TargetType is null ? "—" : $"{context.TargetType}:{context.TargetId}")</MudTd>
+        <MudTd>
+            <MudChip T="string" Size="Size.Small" Color="@ResultColor(context.Result)" Variant="Variant.Filled">@context.Result</MudChip>
+        </MudTd>
+        <MudTd>@(context.KeycloakStatus?.ToString() ?? "—")</MudTd>
+        <MudTd>@(context.Error ?? "—")</MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Typo="Typo.body2">暂无审计记录。</MudText>
+    </NoRecordsContent>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<AdminAuditEntry> _table = default!;
+    private bool _loading;
+    private string? _action;
+    private string? _actor;
+    private string _result = string.Empty;
+    private DateTime? _from;
+    private DateTime? _to;
+
+    private async Task<TableData<AdminAuditEntry>> LoadAudit(TableState state, CancellationToken ct)
+    {
+        _loading = true;
+        try
+        {
+            var query = new AdminAuditQuery(
+                ActorSub: string.IsNullOrWhiteSpace(_actor) ? null : _actor.Trim(),
+                Action: string.IsNullOrWhiteSpace(_action) ? null : _action.Trim(),
+                Result: string.IsNullOrWhiteSpace(_result) ? null : _result,
+                From: _from.HasValue ? new DateTimeOffset(_from.Value.Date) : null,
+                To: _to.HasValue ? new DateTimeOffset(_to.Value.Date.AddDays(1).AddTicks(-1)) : null,
+                Page: state.Page + 1,
+                PageSize: state.PageSize);
+
+            var result = await AuditService.QueryAsync(query, ct);
+            return new TableData<AdminAuditEntry>
+            {
+                Items = result.Items,
+                TotalItems = result.Total
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载审计失败：{ex.Message}", Severity.Error);
+            return new TableData<AdminAuditEntry> { Items = [], TotalItems = 0 };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task ReloadAsync() => _table!.ReloadServerData();
+
+    private static Color ResultColor(string result) => result switch
+    {
+        "success" => Color.Success,
+        "partial" => Color.Warning,
+        "failed" => Color.Error,
+        "pending" => Color.Info,
+        _ => Color.Default
+    };
+}

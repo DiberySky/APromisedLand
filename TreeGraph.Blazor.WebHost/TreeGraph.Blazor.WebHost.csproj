@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- 控制是否在 build 后自动 publish WASM 子项目静态资产。默认开启，可设为 false 跳过。 -->
+    <PublishBlazorWasmAssets Condition="'$(PublishBlazorWasmAssets)' == ''">true</PublishBlazorWasmAssets>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="11.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TreeGraph.Blazor.Wasm\TreeGraph.Blazor.Wasm.csproj" />
+  </ItemGroup>
+
+  <!--
+    WASM 静态资产自动发布：
+    Aspire 默认用 build 模式启动，build 只编译 .NET 代码，
+    不会为 hosted Blazor WASM 子项目生成 hash 化的 .wasm 静态资产。
+    这个 target 在 WebHost build 完成后，对 TreeGraph.Blazor.Wasm 执行 publish，
+    把生成的 wwwroot/_framework 复制到 WebHost bin/{config}/wwwroot/，
+    保证浏览器能加载 dotnet.native.*.wasm、所有 hash 化 wasm、blazor.webassembly.js 等资源。
+    设置 PublishBlazorWasmAssets=false 可跳过（例如只编译后端）。
+  -->
+  <Target Name="PublishBlazorWasmAssets" AfterTargets="Build"
+          Condition="$(PublishBlazorWasmAssets) == 'true'">
+    <PropertyGroup>
+      <_WasmProjectPath>$(MSBuildThisFileDirectory)..\TreeGraph.Blazor.Wasm\TreeGraph.Blazor.Wasm.csproj</_WasmProjectPath>
+      <_WasmPublishDir>$(MSBuildThisFileDirectory)obj\$(Configuration)\wasm-publish\</_WasmPublishDir>
+      <_WebHostWwwroot>$(MSBuildThisFileDirectory)bin\$(Configuration)\$(TargetFramework)\wwwroot\</_WebHostWwwroot>
+      <_WasmFrameworkDir>$(_WasmPublishDir)wwwroot\_framework\</_WasmFrameworkDir>
+      <_DestFrameworkDir>$(_WebHostWwwroot)_framework\</_DestFrameworkDir>
+    </PropertyGroup>
+
+    <!-- 先 Publish WASM 子项目（会生成 hash 化 wasm + blazor.webassembly.js 等 400+ 文件） -->
+    <MSBuild Projects="$(_WasmProjectPath)"
+             Targets="Publish"
+             Properties="PublishDir=$(_WasmPublishDir);Configuration=$(Configuration);RestorePackagesConfig=true"
+             BuildInParallel="false"
+             ContinueOnError="false" />
+
+    <!-- 清理旧的 _framework，避免残留过期文件 -->
+    <RemoveDir Directories="$(_DestFrameworkDir)" Condition="Exists('$(_DestFrameworkDir)')" />
+
+    <!-- 先确保目标目录存在（Copy task 会自动创建子目录，但根目录可能需要手动创建） -->
+    <MakeDir Directories="$(_DestFrameworkDir)" />
+
+    <!-- 把 publish 产物里的 wwwroot/_framework 完整复制到 WebHost bin -->
+    <ItemGroup>
+      <_WasmFrameworkFiles Include="$(_WasmFrameworkDir)**\*" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_WasmFrameworkFiles)"
+          DestinationFiles="@(_WasmFrameworkFiles->'$(_DestFrameworkDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          Condition="Exists('$(_WasmFrameworkDir)')" />
+
+    <Message Importance="normal"
+             Text="[WASM Assets] Published and copied $([System.IO.Directory]::GetFiles('$(_DestFrameworkDir)', '*', System.IO.SearchOption.AllDirectories).Length) files to $(_DestFrameworkDir)" />
+  </Target>
+</Project>

@@ -21,7 +21,8 @@ public static class MafWfSkyServiceCollectionExtensions
     public static IServiceCollection AddMafWfSky(
         this IServiceCollection services,
         string serviceName = "TreeGraphMafWfApi",
-        Action<MafWfSkyOptions>? configure = null)
+        Action<MafWfSkyOptions>? configure = null,
+        Action<IHttpClientBuilder>? configureClientBuilder = null)
     {
         var options = new MafWfSkyOptions();
         configure?.Invoke(options);
@@ -31,11 +32,13 @@ public static class MafWfSkyServiceCollectionExtensions
             ? serviceName.TrimEnd('/') + "/"
             : $"https+http://{serviceName.ToLowerInvariant()}/";
 
-        services.AddHttpClient<MafWfApiClient>(client =>
+        var apiClient = services.AddHttpClient<MafWfApiClient>(client =>
         {
             client.BaseAddress = new Uri(baseAddress);
             client.Timeout = TimeSpan.FromMinutes(10);
-        })
+        });
+        configureClientBuilder?.Invoke(apiClient);
+        apiClient
         // ★ 先移除宿主 AddServiceDefaults 挂的全局默认弹性（10s 超时 + 3 次重试），
         //   否则与本客户端策略叠加，默认 10s 先触发，对话/工作流一律超时。
         .RemoveAllResilienceHandlers()
@@ -51,11 +54,13 @@ public static class MafWfSkyServiceCollectionExtensions
         });
 
         // SSE 长连接：专用策略（禁重试/禁超时，仅宽熔断），见 SseResilience。
-        services.AddHttpClient<MafWfSseReader>(client =>
+        var sseClient = services.AddHttpClient<MafWfSseReader>(client =>
         {
             client.BaseAddress = new Uri(baseAddress);
             client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
-        })
+        });
+        configureClientBuilder?.Invoke(sseClient);
+        sseClient
         // 同样先移除全局默认弹性，再挂 SSE 专用策略。
         .RemoveAllResilienceHandlers()
         .AddStandardResilienceHandler(SseResilience.Configure);

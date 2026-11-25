@@ -1,0 +1,116 @@
+@using Microsoft.AspNetCore.Components
+@using MudBlazor
+@using TreeGraph.Shared.Identity.Admin
+@inject IUsersAdminService UsersService
+@inject IAdminActorAccessor ActorAccessor
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">新建用户</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_username"
+                      Label="用户名"
+                      Variant="Variant.Outlined"
+                      Class="mb-3"
+                      Required="true" />
+        <MudTextField @bind-Value="_email"
+                      Label="邮箱"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudGrid>
+            <MudItem xs="6">
+                <MudTextField @bind-Value="_firstName"
+                              Label="名"
+                              Variant="Variant.Outlined"
+                              Class="mb-3" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudTextField @bind-Value="_lastName"
+                              Label="姓"
+                              Variant="Variant.Outlined"
+                              Class="mb-3" />
+            </MudItem>
+        </MudGrid>
+        <MudTextField @bind-Value="_temporaryPassword"
+                      Label="临时密码（留空则不设置密码）"
+                      Variant="Variant.Outlined"
+                      Class="mb-3"
+                      InputType="InputType.Password" />
+        <MudCheckBox @bind-Value="_requirePasswordChange"
+                     Label="首次登录强制修改密码"
+                     Color="Color.Primary"
+                     Class="mb-3" />
+        <MudCheckBox @bind-Value="_emailVerified"
+                     Label="邮箱已验证"
+                     Color="Color.Primary" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@_submitting"
+                   OnClick="CreateAsync">
+            @(_submitting ? "创建中..." : "创建")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _username = string.Empty;
+    private string? _email;
+    private string? _firstName;
+    private string? _lastName;
+    private string? _temporaryPassword;
+    private bool _requirePasswordChange = true;
+    private bool _emailVerified;
+    private bool _submitting;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_username))
+        {
+            Snackbar.Add("请填写用户名", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var actor = ActorAccessor.GetRequiredActor();
+            var request = new CreateUserRequest(
+                Username: _username.Trim(),
+                Email: string.IsNullOrWhiteSpace(_email) ? null : _email,
+                FirstName: string.IsNullOrWhiteSpace(_firstName) ? null : _firstName,
+                LastName: string.IsNullOrWhiteSpace(_lastName) ? null : _lastName,
+                Enabled: true,
+                EmailVerified: _emailVerified,
+                TemporaryPassword: string.IsNullOrWhiteSpace(_temporaryPassword) ? null : _temporaryPassword,
+                RequirePasswordChange: _requirePasswordChange);
+
+            var result = await UsersService.CreateAsync(actor, request);
+            if (result.Success)
+            {
+                Snackbar.Add($"用户已创建：{_username}", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result.Value));
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "创建失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"创建失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

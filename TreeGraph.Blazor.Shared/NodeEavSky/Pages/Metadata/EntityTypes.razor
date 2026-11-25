@@ -11,9 +11,9 @@
 
 @if (!IsDialogMode)
 {
-    <PageTitle>属性定义管理</PageTitle>
+    <PageTitle>实体类型定义管理</PageTitle>
 
-    <PageHeaderSky Title="属性定义管理">
+    <PageHeaderSky Title="实体类型定义管理">
         <Actions>
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        Size="Size.Small"
@@ -26,7 +26,7 @@
                        OnClick="OpenCreateAsync"
                        StartIcon="@Icons.Material.Outlined.Add"
                        Class="ml-2">
-                新建属性定义
+                新建实体类型
             </MudButton>
         </Actions>
     </PageHeaderSky>
@@ -54,7 +54,7 @@ else
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="OpenCreateAsync"
-                               title="新建属性" />
+                               title="新建实体类型" />
             }
             else
             {

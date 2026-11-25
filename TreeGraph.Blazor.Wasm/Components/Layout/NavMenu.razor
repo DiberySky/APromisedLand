@@ -1,0 +1,70 @@
+@using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@inject IDialogService DialogService
+<MudNavMenu>
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Home">首页</MudNavLink>
+
+    <AuthorizeView Policy="@IdentityConstants.AdminOnlyPolicy">
+        <Authorized>
+            <MudNavGroup Title="身份管理" Icon="@Icons.Material.Outlined.AdminPanelSettings">
+                <MudNavLink Href="/admin" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Dashboard">身份概览</MudNavLink>
+                <MudNavLink Href="/admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Outlined.People">用户</MudNavLink>
+                <MudNavLink Href="/admin/roles" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Badge">角色</MudNavLink>
+                <MudNavLink Href="/admin/groups" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.AccountTree">组</MudNavLink>
+                <MudNavLink Href="/admin/spaces" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Lan">空间</MudNavLink>
+                <MudNavLink Href="/admin/clients" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Outlined.Apps">客户端</MudNavLink>
+                <MudNavLink Href="/admin/client-scopes" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Outlined.Tune">客户端作用域</MudNavLink>
+                <MudNavLink Href="/admin/identity-providers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Outlined.Shield">身份提供方</MudNavLink>
+                <MudNavLink Href="/admin/user-federation" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Outlined.AccountTree">用户联邦</MudNavLink>
+                <MudNavLink Href="/admin/auth-flows" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Outlined.Route">认证流</MudNavLink>
+                <MudNavLink Href="/admin/realm" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Settings">Realm 设置</MudNavLink>
+                <MudNavLink Href="/admin/realm-keys" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Key">Realm 密钥</MudNavLink>
+                <MudNavLink Href="/admin/organizations" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Outlined.Business">组织</MudNavLink>
+                <MudNavLink Href="/admin/events" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.BugReport">事件</MudNavLink>
+                <MudNavLink Href="/admin/export" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Download">导出</MudNavLink>
+                <MudNavLink Href="/admin/audit" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.ReceiptLong">审计</MudNavLink>
+            </MudNavGroup>
+        </Authorized>
+    </AuthorizeView>
+
+    <MudNavGroup Title="树" Icon="@Icons.Material.Outlined.Forest">
+        <MudNavLink Href="/unit-tree" Icon="@Icons.Material.Outlined.Straighten" Match="NavLinkMatch.All">单位树</MudNavLink>
+        <MudNavLink Href="/category-tree" Icon="@Icons.Material.Outlined.Category" Match="NavLinkMatch.All">分类树</MudNavLink>
+        <MudNavLink Href="/knowledge-tree" Icon="@Icons.Material.Outlined.MenuBook" Match="NavLinkMatch.All">知识树</MudNavLink>
+        <MudNavLink Href="/space-tree" Icon="@Icons.Material.Outlined.MeetingRoom" Match="NavLinkMatch.All">空间树</MudNavLink>
+        <MudNavLink Href="/eav-tree" Icon="@Icons.Material.Outlined.AccountTree" Match="NavLinkMatch.All">EAV 树</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavLink Href="/spaces" Icon="@Icons.Material.Outlined.Workspaces" Match="NavLinkMatch.All">空间</MudNavLink>
+    <MudNavGroup Title="元数据管理" Icon="@Icons.Material.Outlined.Settings">
+        <MudNavLink Href="/metadata/entity-types" Icon="@Icons.Material.Outlined.Category" Match="NavLinkMatch.Prefix">实体类型</MudNavLink>
+        <MudNavLink Icon="@Icons.Material.Outlined.EditAttributes" OnClick="OpenAttributesManage">属性定义</MudNavLink>
+        <MudNavLink Href="/metadata/composite-types" Icon="@Icons.Material.Outlined.AccountTree" Match="NavLinkMatch.Prefix">组合类型</MudNavLink>
+        <MudNavLink Href="/metadata/custom-tables" Icon="@Icons.Material.Outlined.TableChart" Match="NavLinkMatch.Prefix">自定义表</MudNavLink>
+        <MudNavLink Href="/metadata/option-sets" Icon="@Icons.Material.Outlined.Checklist" Match="NavLinkMatch.Prefix">选项集</MudNavLink>
+        <MudNavLink Href="/metadata/edge-types" Icon="@Icons.Material.Outlined.Hub" Match="NavLinkMatch.Prefix">边类型</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="智能体工作流" Icon="@Icons.Material.Outlined.AutoAwesome">
+        <MudNavLink Href="/maf-wf/graph-agent" Icon="@Icons.Material.Outlined.Forum" Match="NavLinkMatch.All">Graph Agent 对话</MudNavLink>
+        <MudNavLink Href="/search" Icon="@Icons.Material.Outlined.ManageSearch" Match="NavLinkMatch.All">语义搜索</MudNavLink>
+        <MudNavLink Href="/semantic-search-direct" Icon="@Icons.Material.Outlined.TravelExplore" Match="NavLinkMatch.All">语义搜索（直连）</MudNavLink>
+        <MudNavLink Href="/node-semantic-search" Icon="@Icons.Material.Outlined.Search" Match="NavLinkMatch.All">节点语义搜索</MudNavLink>
+        <MudNavLink Href="/maf-wf/writer-critic" Icon="@Icons.Material.Outlined.EditNote" Match="NavLinkMatch.All">Writer-Critic</MudNavLink>
+    </MudNavGroup>
+    <MudNavLink Href="/number-field-demo" Icon="@Icons.Material.Outlined.Pin" Match="NavLinkMatch.All">数字控件 Demo</MudNavLink>
+</MudNavMenu>
+
+@code {
+    private async Task OpenAttributesManage()
+    {
+        var options = new DialogOptionsEx
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            MaximizeButton = true,
+            BackdropClick = false
+        };
+        await DialogService.ShowExAsync<AttributesManageDialog>(
+            string.Empty, new DialogParameters<AttributesManageDialog>(), options);
+    }
+}

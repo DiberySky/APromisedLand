@@ -52,12 +52,14 @@ else
             <MudTooltip Text="重命名绑定">
                 <MudIconButton Icon="@Icons.Material.Outlined.DriveFileRenameOutline"
                                Size="Size.Small" Color="Color.Info"
-                               OnClick="RenameAsync" Disabled="@_saving" />
+                               OnClick="RenameAsync" Disabled="@_saving"
+                               title="重命名绑定" />
             </MudTooltip>
             <MudTooltip Text="删除绑定及其属性数据">
                 <MudIconButton Icon="@Icons.Material.Outlined.DeleteForever"
                                Size="Size.Small" Color="Color.Error"
-                               OnClick="DeleteAsync" Disabled="@_saving" />
+                               OnClick="DeleteAsync" Disabled="@_saving"
+                               title="删除绑定" />
             </MudTooltip>
         </MudStack>
     </MudPaper>

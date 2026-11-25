@@ -21,6 +21,7 @@ public static class PostgresExtension
         resourceContext.HangfireDb    = resourceContext.Postgres.AddDatabase("HangfireDb");
         resourceContext.FileMetadataDb= resourceContext.Postgres.AddDatabase("FileMetadataDb");
         resourceContext.VectorAdminDb = resourceContext.Postgres.AddDatabase("vectorAdminDb");
+        resourceContext.IdentityAdminDb = resourceContext.Postgres.AddDatabase("IdentityAdminDb");
 
         // 注：FileStorageDb 已移除。
         // FileStorageApi 的 DbContext 连接名统一为 FileMetadataDb（见 Program.cs）。

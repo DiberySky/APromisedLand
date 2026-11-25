@@ -1,0 +1,73 @@
+@page "/admin/auth-flows"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IAuthFlowsAdminService AuthFlowsService
+@inject IAdminActorAccessor ActorAccessor
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>认证流</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">认证流（Authentication Flows）</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Outlined.ContentCopy" OnClick="OpenCopyAsync">复制流</MudButton>
+</MudStack>
+
+<MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3">修改认证流绑定前服务端会自动生成 realm 备份；该操作属高危，请确认后再提交。</MudAlert>
+
+<MudTable T="AuthenticationFlowSummary" Items="_flows" Dense="true" Hover="true">
+    <HeaderContent>
+        <MudTh>别名</MudTh><MudTh>描述</MudTh><MudTh>Provider</MudTh><MudTh>类型</MudTh><MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd><a href="/admin/auth-flows/@context.Alias" class="text-primary">@context.Alias</a></MudTd>
+        <MudTd>@context.Description</MudTd>
+        <MudTd>@context.ProviderId</MudTd>
+        <MudTd>
+            <MudStack Row="true" Spacing="1">
+                @if (context.BuiltIn) { <MudChip T="string" Color="Color.Default" Size="Size.Small">内置</MudChip> }
+                @if (context.TopLevel) { <MudChip T="string" Color="Color.Info" Size="Size.Small">顶层</MudChip> }
+            </MudStack>
+        </MudTd>
+        <MudTd>
+            @if (!context.BuiltIn)
+            {
+                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick='() => ConfirmDeleteAsync(context)' />
+            }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText Typo="Typo.body2">暂无认证流。</MudText></NoRecordsContent>
+</MudTable>
+
+@code {
+    private IReadOnlyList<AuthenticationFlowSummary> _flows = [];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try { _flows = await AuthFlowsService.ListAsync(); }
+        catch (Exception ex) { Snackbar.Add($"加载失败：{ex.Message}", Severity.Error); }
+    }
+
+    private async Task OpenCopyAsync()
+    {
+        var parameters = new DialogParameters { ["FlowAliases"] = _flows.Select(f => f.Alias).ToList() };
+        var dialog = await DialogService.ShowAsync<CopyAuthFlowDialog>("复制认证流", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled) await LoadAsync();
+    }
+
+    private async Task ConfirmDeleteAsync(AuthenticationFlowSummary f)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync("确认删除", $"删除认证流「{f.Alias}」？内置流不可删除。",
+            yesText: "删除", cancelText: "取消");
+        if (confirmed != true) return;
+        var result = await AuthFlowsService.DeleteAsync(ActorAccessor.GetRequiredActor(), f.Alias);
+        if (result.Success) { Snackbar.Add("已删除", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(result.Error ?? "删除失败", Severity.Error);
+    }
+}

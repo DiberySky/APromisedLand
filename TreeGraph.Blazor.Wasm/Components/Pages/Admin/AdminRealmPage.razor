@@ -1,0 +1,187 @@
+@page "/admin/realm"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IRealmSettingsAdminService RealmService
+@inject IAdminActorAccessor ActorAccessor
+@inject StepUpGuard StepUp
+@inject ISnackbar Snackbar
+
+<PageTitle>Realm 设置</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Realm 设置</MudText>
+
+@if (_settings is null)
+{
+    <MudText>加载中...</MudText>
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">通用</MudText>
+        <MudGrid Style="max-width: 820px">
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_displayName" Label="显示名称" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_passwordPolicy" Label="密码策略" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12"><MudTextField @bind-Value="_defaultGroups" Label="默认组（逗号分隔）" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12"><MudCheckBox @bind-Value="_registrationAllowed" Label="允许注册（Registration Allowed）" Color="Color.Primary" /></MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">会话与令牌</MudText>
+        <MudGrid Style="max-width: 820px">
+            <MudItem xs="12" sm="4"><MudNumericField T="int" @bind-Value="_accessTokenLifespan" Label="Access Token Lifespan (秒)" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="4"><MudNumericField T="int" @bind-Value="_ssoIdle" Label="SSO Idle Timeout (秒)" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="4"><MudNumericField T="int" @bind-Value="_ssoMax" Label="SSO Max Lifespan (秒)" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">暴力破解防护</MudText>
+        <MudGrid Style="max-width: 820px">
+            <MudItem xs="12"><MudCheckBox @bind-Value="_bruteForceProtected" Label="启用 Brute Force Protection" Color="Color.Primary" /></MudItem>
+            <MudItem xs="12" sm="4"><MudNumericField T="int" @bind-Value="_failedLoginAttempts" Label="失败次数阈值" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="4"><MudNumericField T="int" @bind-Value="_waitIncrement" Label="等待递增 (秒)" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="4"><MudNumericField T="int" @bind-Value="_lockoutDuration" Label="锁定时长 (秒)" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">主题</MudText>
+        <MudGrid Style="max-width: 820px">
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="_loginTheme" Label="Login Theme" Variant="Variant.Outlined" Class="mb-2">
+                    @foreach (var t in _themes.Login) { <MudSelectItem Value="@(t)">@t</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="_accountTheme" Label="Account Theme" Variant="Variant.Outlined" Class="mb-2">
+                    @foreach (var t in _themes.Account) { <MudSelectItem Value="@(t)">@t</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="_adminTheme" Label="Admin Theme" Variant="Variant.Outlined" Class="mb-2">
+                    @foreach (var t in _themes.Admin) { <MudSelectItem Value="@(t)">@t</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="_emailTheme" Label="Email Theme" Variant="Variant.Outlined" Class="mb-2">
+                    @foreach (var t in _themes.Email) { <MudSelectItem Value="@(t)">@t</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudButton Color="Color.Primary" Variant="Variant.Filled" Class="mb-4" Disabled="@_saving" OnClick="SaveGeneralAsync">
+        @(_saving ? "保存中..." : "保存通用设置")
+    </MudButton>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">SMTP@(_settings.SmtpConfigured ? "（已配置）" : "（未配置）")</MudText>
+        <MudGrid Style="max-width: 820px">
+            <MudItem xs="12" sm="8"><MudTextField @bind-Value="_smtpHost" Label="Host" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="4"><MudNumericField T="int" @bind-Value="_smtpPort" Label="Port" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_smtpFrom" Label="From" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_smtpFromDisplayName" Label="From 显示名" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_smtpUser" Label="用户" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_smtpPassword" Label="密码（留空不修改）" Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-2" /></MudItem>
+            <MudItem xs="12"><MudCheckBox @bind-Value="_smtpStartTls" Label="StartTLS" Color="Color.Primary" /><MudCheckBox @bind-Value="_smtpSsl" Label="SSL" Color="Color.Primary" Class="ml-4" /></MudItem>
+        </MudGrid>
+        <MudButton Color="Color.Primary" Variant="Variant.Outlined" Class="mt-2" Disabled="@_savingSmtp" OnClick="SaveSmtpAsync">
+            @(_savingSmtp ? "保存中..." : "保存 SMTP")
+        </MudButton>
+    </MudPaper>
+}
+
+@code {
+    private RealmSettings? _settings;
+    private AvailableThemes _themes = new([], [], [], []);
+
+    private string? _displayName, _passwordPolicy, _defaultGroups;
+    private bool _registrationAllowed, _bruteForceProtected;
+    private int _accessTokenLifespan, _ssoIdle, _ssoMax, _failedLoginAttempts, _waitIncrement, _lockoutDuration;
+    private string? _loginTheme, _accountTheme, _adminTheme, _emailTheme;
+    private bool _saving;
+
+    private string _smtpHost = string.Empty;
+    private int _smtpPort = 587;
+    private string? _smtpFrom, _smtpFromDisplayName, _smtpUser, _smtpPassword;
+    private bool _smtpStartTls = true, _smtpSsl, _savingSmtp;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _settings = await RealmService.GetAsync();
+        if (_settings is null) { Snackbar.Add("加载 realm 设置失败", Severity.Error); return; }
+        _displayName = _settings.DisplayName;
+        _passwordPolicy = _settings.PasswordPolicy;
+        _defaultGroups = string.Join(',', _settings.DefaultGroups);
+        _registrationAllowed = _settings.RegistrationAllowed;
+        _bruteForceProtected = _settings.BruteForceProtected;
+        _accessTokenLifespan = _settings.AccessTokenLifespan;
+        _ssoIdle = _settings.SsoSessionIdleTimeout;
+        _ssoMax = _settings.SsoSessionMaxLifespan;
+        _failedLoginAttempts = _settings.FailedLoginAttempts;
+        _waitIncrement = _settings.WaitIncrementSeconds;
+        _lockoutDuration = _settings.LockoutDurationSeconds;
+        _loginTheme = _settings.LoginTheme;
+        _accountTheme = _settings.AccountTheme;
+        _adminTheme = _settings.AdminTheme;
+        _emailTheme = _settings.EmailTheme;
+        _smtpHost = _settings.SmtpHost ?? string.Empty;
+        _smtpFrom = _settings.SmtpFrom;
+
+        try { _themes = await RealmService.GetAvailableThemesAsync(); } catch { /* 主题列表可选 */ }
+    }
+
+    private static IReadOnlyList<string> Split(string? input) =>
+        (input ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private async Task SaveGeneralAsync()
+    {
+        _saving = true;
+        try
+        {
+            var result = await RealmService.UpdateAsync(ActorAccessor.GetRequiredActor(),
+                new UpdateRealmSettingsRequest(
+                    DisplayName: _displayName,
+                    RegistrationAllowed: _registrationAllowed,
+                    BruteForceProtected: _bruteForceProtected,
+                    PasswordPolicy: _passwordPolicy,
+                    AccessTokenLifespan: _accessTokenLifespan,
+                    SsoSessionIdleTimeout: _ssoIdle,
+                    SsoSessionMaxLifespan: _ssoMax,
+                    FailedLoginAttempts: _failedLoginAttempts,
+                    WaitIncrementSeconds: _waitIncrement,
+                    LockoutDurationSeconds: _lockoutDuration,
+                    LoginTheme: _loginTheme,
+                    AccountTheme: _accountTheme,
+                    AdminTheme: _adminTheme,
+                    EmailTheme: _emailTheme,
+                    DefaultGroups: Split(_defaultGroups)));
+            if (result.Success) Snackbar.Add("通用设置已保存", Severity.Success);
+            else Snackbar.Add(result.Error ?? "保存失败", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"保存失败：{ex.Message}", Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    private async Task SaveSmtpAsync()
+    {
+        if (!await StepUp.EnsureFreshAsync("realm.update-smtp", "/admin/realm")) return;
+
+        if (string.IsNullOrWhiteSpace(_smtpHost)) { Snackbar.Add("请填写 Host", Severity.Warning); return; }
+        _savingSmtp = true;
+        try
+        {
+            var result = await RealmService.UpdateSmtpAsync(ActorAccessor.GetRequiredActor(),
+                new SmtpSettingsRequest(_smtpHost.Trim(), _smtpPort, _smtpFrom, _smtpFromDisplayName,
+                    _smtpStartTls, _smtpSsl, _smtpUser, string.IsNullOrEmpty(_smtpPassword) ? null : _smtpPassword));
+            if (result.Success) { Snackbar.Add("SMTP 已保存", Severity.Success); _smtpPassword = null; }
+            else Snackbar.Add(result.Error ?? "保存失败", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"保存失败：{ex.Message}", Severity.Error); }
+        finally { _savingSmtp = false; }
+    }
+}

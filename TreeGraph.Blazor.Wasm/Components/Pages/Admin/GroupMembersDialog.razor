@@ -1,0 +1,62 @@
+@using Microsoft.AspNetCore.Components
+@using MudBlazor
+@using TreeGraph.Shared.Identity.Admin
+@inject IGroupsAdminService GroupsService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@GroupTitle 的成员</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-2">共 @_members.Count 人</MudText>
+        <MudSimpleTable Dense="true" Hover="true">
+            <thead>
+                <tr>
+                    <th>用户名</th>
+                    <th>邮箱</th>
+                    <th>姓名</th>
+                    <th>状态</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (_members.Count == 0)
+                {
+                    <tr><td colspan="4"><MudText Typo="Typo.body2">暂无成员。</MudText></td></tr>
+                }
+                @foreach (var m in _members)
+                {
+                    <tr>
+                        <td>@m.Username</td>
+                        <td>@(m.Email ?? "—")</td>
+                        <td>@(string.IsNullOrWhiteSpace($"{m.FirstName} {m.LastName}".Trim()) ? "—" : $"{m.FirstName} {m.LastName}".Trim())</td>
+                        <td>
+                            <MudChip T="string" Size="Size.Small" Color="@(m.Enabled ? Color.Success : Color.Error)" Variant="Variant.Filled">
+                                @(m.Enabled ? "启用" : "禁用")
+                            </MudChip>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">关闭</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string GroupId { get; set; } = string.Empty;
+    [Parameter] public string GroupTitle { get; set; } = string.Empty;
+
+    private IReadOnlyList<IdentityUserSummary> _members = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(GroupId))
+            _members = await GroupsService.ListMembersAsync(GroupId);
+    }
+
+    private void Close() => MudDialog.Close();
+}

@@ -1,0 +1,100 @@
+@using Microsoft.AspNetCore.Components
+@using MudBlazor
+@using TreeGraph.Shared.Identity.Admin
+@inject IClientsAdminService ClientsService
+@inject IAdminActorAccessor ActorAccessor
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">新建客户端</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_clientId" Label="Client ID" Variant="Variant.Outlined" Class="mb-3" Required="true" />
+        <MudTextField @bind-Value="_name" Label="名称" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField @bind-Value="_description" Label="描述" Variant="Variant.Outlined" Class="mb-3" />
+        <MudCheckBox @bind-Value="_publicClient" Label="公开客户端（confidential 取消勾选）" Color="Color.Primary" Class="mb-2" />
+        <MudTextField @bind-Value="_rootUrl" Label="Root URL" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField @bind-Value="_baseUrl" Label="Base URL" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField @bind-Value="_redirectUris" Label="Redirect URI（每行一个）" Variant="Variant.Outlined" Lines="3" Class="mb-3" />
+        <MudTextField @bind-Value="_webOrigins" Label="Web Origin（每行一个）" Variant="Variant.Outlined" Lines="2" Class="mb-3" />
+        <MudCheckBox @bind-Value="_standardFlow" Label="启用授权码流程（Standard Flow）" Color="Color.Primary" Class="mb-2" />
+        <MudCheckBox @bind-Value="_directAccess" Label="启用直接访问（Direct Access Grants）" Color="Color.Primary" Class="mb-2" />
+        <MudCheckBox @bind-Value="_serviceAccount" Label="启用 Service Account" Color="Color.Primary" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@_submitting" OnClick="CreateAsync">
+            @(_submitting ? "创建中..." : "创建")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _clientId = string.Empty;
+    private string? _name;
+    private string? _description;
+    private bool _publicClient = true;
+    private string? _rootUrl;
+    private string? _baseUrl;
+    private string? _redirectUris;
+    private string? _webOrigins;
+    private bool _standardFlow = true;
+    private bool _directAccess;
+    private bool _serviceAccount;
+    private bool _submitting;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private static IReadOnlyList<string> Split(string? input) =>
+        (input ?? string.Empty)
+            .Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToArray();
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_clientId))
+        {
+            Snackbar.Add("请填写 Client ID", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var result = await ClientsService.CreateAsync(
+                ActorAccessor.GetRequiredActor(),
+                new CreateClientRequest(
+                    _clientId.Trim(),
+                    _name,
+                    _description,
+                    _publicClient,
+                    _rootUrl,
+                    _baseUrl,
+                    Split(_redirectUris),
+                    Split(_webOrigins),
+                    _standardFlow,
+                    _directAccess,
+                    _serviceAccount));
+            if (result.Success)
+            {
+                Snackbar.Add($"客户端已创建：{_clientId}", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result.Value));
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "创建失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"创建失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

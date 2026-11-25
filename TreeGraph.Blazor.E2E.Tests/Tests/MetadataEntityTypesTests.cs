@@ -21,7 +21,7 @@ public class MetadataEntityTypesTests : E2ETestBase
     {
         await BlazorHelpers.GoToAsync(Page, "/metadata/entity-types");
 
-        await Page.WaitForSelectorAsync("h5:has-text('实体类型管理')");
+        await Page.WaitForSelectorAsync("h5:has-text('实体类型定义管理')");
         await Page.WaitForSelectorAsync("button:has-text('新建实体类型')");
 
         // 至少 EavSeeder 的 Product 在
@@ -51,9 +51,13 @@ public class MetadataEntityTypesTests : E2ETestBase
 
             var dlg = await BlazorHelpers.WaitForDialogAsync(Page);
 
-            // 只填名称，不填内部标识（新方案已隐藏）
+            // 显示名 + 内部标识：新建时内部标识必填，中文显示名不会自动生成
             var nameField = dlg.Locator(".mud-input-control:has-text('实体类型名称')").First;
             await BlazorHelpers.FillMudTextFieldAsync(nameField, displayName);
+
+            var codeField = dlg.Locator(".mud-input-control:has-text('内部标识')").First;
+            await BlazorHelpers.FillMudTextFieldAsync(
+                codeField, "E2E" + Guid.NewGuid().ToString("N")[..8]);
 
             // 点"保存"
             var saveBtn = dlg.Locator("button:has-text('保存')").Last;

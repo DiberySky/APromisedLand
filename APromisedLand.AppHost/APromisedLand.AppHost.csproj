@@ -57,14 +57,17 @@
         <ProjectReference Include="..\TreeGraph.Api\TreeGraph.Api.csproj" />
         <ProjectReference Include="..\TreeGraph.MafWfApi\TreeGraph.MafWfApi.csproj" />
         <ProjectReference Include="..\TreeGraph.SyncServices\TreeGraph.SyncServices.csproj" />
-        <ProjectReference Include="..\TreeGraph.Blazor\TreeGraph.Blazor.csproj" />
+        <ProjectReference Include="..\TreeGraph.Blazor.WebHost\TreeGraph.Blazor.WebHost.csproj" />
+        <ProjectReference Include="..\TreeGraph.IdentityAdmin.Api\TreeGraph.IdentityAdmin.Api.csproj" />
         <ProjectReference Include="..\TreeGraph.FileStorageApi\TreeGraph.FileStorageApi.csproj" />
         <ProjectReference Include="..\MafRagApiService\MafRagApiService.csproj" />
         <ProjectReference Include="..\WeatherApi\WeatherApi.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <None Remove="KeycloakRealmpart.json" />
+        <Content Include="KeycloakRealmpart.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
         <None Update="Notes\Dockerfile">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>

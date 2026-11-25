@@ -1,0 +1,199 @@
+@page "/admin/user-federation/{ComponentId}"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IFederationAdminService FederationService
+@inject IAdminActorAccessor ActorAccessor
+@inject StepUpGuard StepUp
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>联邦详情</PageTitle>
+
+@if (_notFound)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">未找到联邦提供方。</MudAlert>
+    <MudButton Variant="Variant.Outlined" OnClick='() => Nav.NavigateTo("/admin/user-federation")'>返回列表</MudButton>
+}
+else if (_detail is null)
+{
+    <MudText>加载中...</MudText>
+}
+else
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+        <MudText Typo="Typo.h4">@_detail.Name</MudText>
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.ArrowBack" OnClick='() => Nav.NavigateTo("/admin/user-federation")'>返回列表</MudButton>
+    </MudStack>
+
+    <MudText Typo="Typo.body2" Class="mb-3">Provider：<b>@_detail.ProviderName</b></MudText>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">连接设置</MudText>
+        <MudStack Style="max-width: 760px">
+            <MudGrid>
+                <MudItem xs="12" sm="6"><MudTextField @bind-Value="_name" Label="名称" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" @bind-Value="_vendor" Label="厂商" Variant="Variant.Outlined" Class="mb-2">
+                        @foreach (var v in Vendors) { <MudSelectItem Value="@(v)">@v</MudSelectItem> }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12"><MudTextField @bind-Value="_connectionUrl" Label="Connection URL" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12"><MudTextField @bind-Value="_usersDn" Label="Users DN" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="6"><MudTextField @bind-Value="_bindDn" Label="Bind DN" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="6"><MudTextField @bind-Value="_bindCredential" Label="Bind Credential（留空不修改）" Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-2" /></MudItem>
+            </MudGrid>
+            <MudStack Row="true" Spacing="3" Class="mt-1">
+                <MudCheckBox @bind-Value="_enabled" Label="启用" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_importEnabled" Label="Import Enabled" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_editMode" Label="Edit Mode" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_syncRegistrations" Label="Sync Registrations" Color="Color.Primary" />
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">LDAP 映射</MudText>
+        <MudGrid Style="max-width: 760px">
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_usernameLdapAttribute" Label="Username LDAP Attribute" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_rdnLdapAttribute" Label="RDN LDAP Attribute" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_uuidLdapAttribute" Label="UUID LDAP Attribute" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_userObjectClasses" Label="User Object Classes" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+            <MudItem xs="12"><MudTextField @bind-Value="_customUserSearchFilter" Label="Custom User Search Filter" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudStack Row="true" Spacing="2" Class="mb-4">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@_saving" OnClick="SaveAsync">@(_saving ? "保存中..." : "保存")</MudButton>
+        <MudButton Color="Color.Info" Variant="Variant.Outlined" Disabled="@_testing" OnClick="TestConnectionAsync">@(_testing ? "测试中..." : "测试连接")</MudButton>
+        <MudButton Color="Color.Secondary" Variant="Variant.Outlined" Disabled="@_syncing" OnClick="SyncAsync">@(_syncing ? "同步中..." : "同步用户")</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="ConfirmDeleteAsync">删除</MudButton>
+    </MudStack>
+
+    @if (_testResult is not null)
+    {
+        <MudAlert Severity="@(_testResult.Success ? Severity.Success : Severity.Error)" Variant="Variant.Outlined" Class="mb-3">
+            连接测试：@(_testResult.Success ? "成功" : "失败")@(string.IsNullOrEmpty(_testResult.Message) ? "" : $" — {_testResult.Message}")
+            @if (_testResult.StatusCode.HasValue) { <span>（HTTP @_testResult.StatusCode）</span> }
+        </MudAlert>
+    }
+    @if (_syncResult is not null)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+            同步完成：新增 @_syncResult.Added，更新 @_syncResult.Updated，移除 @_syncResult.Removed，失败 @_syncResult.Failed
+        </MudAlert>
+    }
+}
+
+@code {
+    [Parameter] public string ComponentId { get; set; } = string.Empty;
+
+    private static readonly string[] Vendors = { "other", "ad", "rhds", "tivoli", "apacheds", "oracle", "novell", "netwise" };
+
+    private UserFederationProviderDetail? _detail;
+    private bool _notFound;
+    private bool _saving, _testing, _syncing;
+
+    private string _name = string.Empty;
+    private string _vendor = "other";
+    private string _connectionUrl = string.Empty;
+    private string _usersDn = string.Empty;
+    private string? _bindDn, _bindCredential;
+    private bool _enabled, _importEnabled, _editMode, _syncRegistrations;
+    private string? _usernameLdapAttribute, _rdnLdapAttribute, _uuidLdapAttribute, _userObjectClasses, _customUserSearchFilter;
+
+    private FederationTestResult? _testResult;
+    private FederationSyncResult? _syncResult;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _detail = await FederationService.GetAsync(ComponentId);
+        if (_detail is null) { _notFound = true; return; }
+        _name = _detail.Name;
+        _vendor = _detail.Vendor ?? "other";
+        _connectionUrl = _detail.ConnectionUrl ?? string.Empty;
+        _usersDn = _detail.UsersDn ?? string.Empty;
+        _bindDn = _detail.BindDn;
+        _enabled = _detail.Enabled;
+        _importEnabled = _detail.ImportEnabled;
+        _editMode = _detail.EditMode;
+        _syncRegistrations = _detail.SyncRegistrations;
+        _usernameLdapAttribute = _detail.UsernameLdapAttribute;
+        _rdnLdapAttribute = _detail.RdnLdapAttribute;
+        _uuidLdapAttribute = _detail.UuidLdapAttribute;
+        _userObjectClasses = _detail.UserObjectClasses;
+        _customUserSearchFilter = _detail.CustomUserSearchFilter;
+    }
+
+    private SaveLdapFederationRequest BuildRequest(bool includeCredential) =>
+        new(
+            _name, _enabled, _importEnabled, _editMode, _syncRegistrations, _vendor,
+            _connectionUrl, _usersDn, _bindDn,
+            includeCredential ? _bindCredential : null,
+            _usernameLdapAttribute, _rdnLdapAttribute, _uuidLdapAttribute,
+            _userObjectClasses, _customUserSearchFilter);
+
+    private async Task SaveAsync()
+    {
+        if (!await StepUp.EnsureFreshAsync("federation.update", $"/admin/user-federation/{ComponentId}")) return;
+
+        if (string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_connectionUrl) || string.IsNullOrWhiteSpace(_usersDn))
+        {
+            Snackbar.Add("名称、Connection URL、Users DN 不能为空", Severity.Warning);
+            return;
+        }
+        _saving = true;
+        try
+        {
+            var result = await FederationService.UpdateAsync(ActorAccessor.GetRequiredActor(), ComponentId, BuildRequest(includeCredential: true));
+            if (result.Success) { Snackbar.Add("已保存", Severity.Success); _bindCredential = null; }
+            else Snackbar.Add(result.Error ?? "保存失败", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"保存失败：{ex.Message}", Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    private async Task TestConnectionAsync()
+    {
+        _testing = true;
+        _testResult = null;
+        try
+        {
+            _testResult = await FederationService.TestConnectionAsync(BuildRequest(includeCredential: true));
+        }
+        catch (Exception ex) { _testResult = new FederationTestResult(false, ex.Message, null); }
+        finally { _testing = false; }
+    }
+
+    private async Task SyncAsync()
+    {
+        _syncing = true;
+        try
+        {
+            var result = await FederationService.SyncAsync(ActorAccessor.GetRequiredActor(), ComponentId);
+            if (result.Success && result.Value is not null)
+            {
+                _syncResult = result.Value;
+                Snackbar.Add("同步完成", Severity.Success);
+            }
+            else Snackbar.Add(result.Error ?? "同步失败", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"同步失败：{ex.Message}", Severity.Error); }
+        finally { _syncing = false; }
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (!await StepUp.EnsureFreshAsync("federation.delete", $"/admin/user-federation/{ComponentId}")) return;
+
+        var confirmed = await DialogService.ShowMessageBoxAsync("确认删除", $"删除联邦「{_name}」？",
+            yesText: "删除", cancelText: "取消");
+        if (confirmed != true) return;
+        var result = await FederationService.DeleteAsync(ActorAccessor.GetRequiredActor(), ComponentId);
+        if (result.Success) { Snackbar.Add("已删除", Severity.Success); Nav.NavigateTo("/admin/user-federation"); }
+        else Snackbar.Add(result.Error ?? "删除失败", Severity.Error);
+    }
+}

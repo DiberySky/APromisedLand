@@ -1,0 +1,120 @@
+@page "/admin/events"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IEventsAdminService EventsService
+@inject ISnackbar Snackbar
+
+<PageTitle>事件</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">事件</MudText>
+
+<MudTabs Elevation="0">
+    <MudTabPanel Text="管理事件">
+        <MudPaper Class="pa-3 mb-3">
+            <MudGrid>
+                <MudItem xs="12" sm="3"><MudTextField @bind-Value="_adminOp" Label="操作类型" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="3"><MudTextField @bind-Value="_adminResourceType" Label="资源类型" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="3"><MudTextField @bind-Value="_adminClientId" Label="ClientId" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="3"><MudTextField @bind-Value="_adminUserId" Label="UserId" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="3"><MudDatePicker @bind-Date="_adminFrom" Label="开始日期" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="3"><MudDatePicker @bind-Date="_adminTo" Label="结束日期" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="2"><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@_adminLoading" OnClick="LoadAdminAsync">查询</MudButton></MudItem>
+            </MudGrid>
+        </MudPaper>
+        <MudTable T="AdminEventEntry" Items="_adminEvents" Dense="true" Hover="true" Loading="_adminLoading">
+            <HeaderContent>
+                <MudTh>时间</MudTh><MudTh>操作</MudTh><MudTh>资源路径</MudTh><MudTh>资源类型</MudTh><MudTh>ClientId</MudTh><MudTh>UserId</MudTh><MudTh>结果</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Time</MudTd>
+                <MudTd>@context.OperationType</MudTd>
+                <MudTd>@context.ResourcePath</MudTd>
+                <MudTd>@context.ResourceType</MudTd>
+                <MudTd>@context.ClientId</MudTd>
+                <MudTd>@context.UserId</MudTd>
+                <MudTd>
+                    @if (!string.IsNullOrEmpty(context.Error)) { <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled">@context.Error</MudChip> }
+                    else { <MudChip T="string" Color="Color.Success" Size="Size.Small">成功</MudChip> }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent><MudText Typo="Typo.body2">暂无记录。</MudText></NoRecordsContent>
+        </MudTable>
+    </MudTabPanel>
+
+    <MudTabPanel Text="登录事件">
+        <MudPaper Class="pa-3 mb-3">
+            <MudGrid>
+                <MudItem xs="12" sm="3"><MudTextField @bind-Value="_loginType" Label="事件类型" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="3"><MudTextField @bind-Value="_loginClientId" Label="ClientId" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="3"><MudTextField @bind-Value="_loginUserId" Label="UserId" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="3"><MudDatePicker @bind-Date="_loginFrom" Label="开始日期" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="3"><MudDatePicker @bind-Date="_loginTo" Label="结束日期" Variant="Variant.Outlined" Class="mb-2" /></MudItem>
+                <MudItem xs="12" sm="2"><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@_loginLoading" OnClick="LoadLoginAsync">查询</MudButton></MudItem>
+            </MudGrid>
+        </MudPaper>
+        <MudTable T="LoginEventEntry" Items="_loginEvents" Dense="true" Hover="true" Loading="_loginLoading">
+            <HeaderContent>
+                <MudTh>时间</MudTh><MudTh>类型</MudTh><MudTh>ClientId</MudTh><MudTh>UserId</MudTh><MudTh>SessionId</MudTh><MudTh>IP</MudTh><MudTh>结果</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Time</MudTd>
+                <MudTd>@context.Type</MudTd>
+                <MudTd>@context.ClientId</MudTd>
+                <MudTd>@context.UserId</MudTd>
+                <MudTd>@context.SessionId</MudTd>
+                <MudTd>@context.IpAddress</MudTd>
+                <MudTd>
+                    @if (!string.IsNullOrEmpty(context.Error)) { <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled">@context.Error</MudChip> }
+                    else { <MudChip T="string" Color="Color.Success" Size="Size.Small">成功</MudChip> }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent><MudText Typo="Typo.body2">暂无记录。</MudText></NoRecordsContent>
+        </MudTable>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private IReadOnlyList<AdminEventEntry> _adminEvents = [];
+    private IReadOnlyList<LoginEventEntry> _loginEvents = [];
+    private bool _adminLoading, _loginLoading;
+
+    private string? _adminOp, _adminResourceType, _adminClientId, _adminUserId;
+    private DateTime? _adminFrom, _adminTo;
+    private string? _loginType, _loginClientId, _loginUserId;
+    private DateTime? _loginFrom, _loginTo;
+
+    private static string? Iso(DateTime? d) => d?.ToString("yyyy-MM-dd");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAdminAsync();
+        await LoadLoginAsync();
+    }
+
+    private async Task LoadAdminAsync()
+    {
+        _adminLoading = true;
+        try
+        {
+            _adminEvents = await EventsService.QueryAdminEventsAsync(
+                new AdminEventQuery(_adminOp, _adminResourceType, _adminUserId, _adminClientId, Iso(_adminFrom), Iso(_adminTo), 0, 50));
+        }
+        catch (Exception ex) { Snackbar.Add($"查询失败：{ex.Message}", Severity.Error); }
+        finally { _adminLoading = false; }
+    }
+
+    private async Task LoadLoginAsync()
+    {
+        _loginLoading = true;
+        try
+        {
+            _loginEvents = await EventsService.QueryLoginEventsAsync(
+                new LoginEventQuery(_loginType, _loginUserId, _loginClientId, Iso(_loginFrom), Iso(_loginTo), 0, 50));
+        }
+        catch (Exception ex) { Snackbar.Add($"查询失败：{ex.Message}", Severity.Error); }
+        finally { _loginLoading = false; }
+    }
+}

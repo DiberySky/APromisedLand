@@ -1,0 +1,96 @@
+@page "/admin/clients"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IClientsAdminService ClientsService
+@inject IAdminActorAccessor ActorAccessor
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>客户端管理</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">客户端管理</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenCreateAsync">新建客户端</MudButton>
+</MudStack>
+
+<MudStack Row="true" AlignItems="AlignItems.End" Class="mb-3" Spacing="2">
+    <MudTextField @bind-Value="_search" Label="搜索 Client ID / 名称" Variant="Variant.Outlined" Style="width: 360px" />
+    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Search" OnClick="ApplySearchAsync">搜索</MudButton>
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Refresh" OnClick="ReloadAsync">刷新</MudButton>
+</MudStack>
+
+<MudTable T="IdentityClientSummary" ServerData="LoadClients" @ref="_table" Dense="true" Hover="true">
+    <HeaderContent>
+        <MudTh>Client ID</MudTh>
+        <MudTh>名称</MudTh>
+        <MudTh>状态</MudTh>
+        <MudTh>类型</MudTh>
+        <MudTh>协议</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd><a href="/admin/clients/@context.Id" class="text-primary">@context.ClientId</a></MudTd>
+        <MudTd>@(context.Name ?? "—")</MudTd>
+        <MudTd>
+            <MudChip T="string" Size="Size.Small" Color="@(context.Enabled ? Color.Success : Color.Error)" Variant="Variant.Filled">
+                @(context.Enabled ? "启用" : "禁用")
+            </MudChip>
+        </MudTd>
+        <MudTd>
+            <MudChip T="string" Size="Size.Small" Color="@(context.PublicClient ? Color.Default : Color.Warning)" Variant="Variant.Filled">
+                @(context.PublicClient ? "公开" : "机密")
+            </MudChip>
+        </MudTd>
+        <MudTd>@(context.Protocol ?? "—")</MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText Typo="Typo.body2">暂无客户端。</MudText></NoRecordsContent>
+    <PagerContent><MudTablePager /></PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<IdentityClientSummary>? _table;
+    private string _search = string.Empty;
+    private string _appliedSearch = string.Empty;
+
+    private async Task ApplySearchAsync()
+    {
+        _appliedSearch = _search;
+        if (_table is not null) await _table.ReloadServerData();
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (_table is not null) await _table.ReloadServerData();
+    }
+
+    private async Task<TableData<IdentityClientSummary>> LoadClients(TableState state, CancellationToken ct)
+    {
+        try
+        {
+            var result = await ClientsService.SearchAsync(
+                new AdminPageRequest(_appliedSearch, state.Page + 1, state.PageSize),
+                ct);
+            return new TableData<IdentityClientSummary>
+            {
+                Items = result.Items,
+                TotalItems = result.Total
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载客户端失败：{ex.Message}", Severity.Error);
+            return new TableData<IdentityClientSummary>();
+        }
+    }
+
+    private async Task OpenCreateAsync()
+    {
+        var dialog = await DialogService.ShowAsync<CreateClientDialog>("新建客户端");
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+            await ReloadAsync();
+    }
+}

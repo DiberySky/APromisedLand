@@ -1,0 +1,91 @@
+@page "/admin/organizations"
+@attribute [Authorize(Policy = IdentityConstants.AdminOnlyPolicy)]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IOrganizationsAdminService OrganizationsService
+@inject IAdminActorAccessor ActorAccessor
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>组织</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">组织（Organizations）</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenCreateAsync">新建组织</MudButton>
+</MudStack>
+
+<MudPaper Class="pa-3 mb-3">
+    <MudStack Row="true" Spacing="2">
+        <MudTextField @bind-Value="_search" Label="搜索（名称/Alias/域名）" Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@_loading" OnClick="LoadAsync">查询</MudButton>
+    </MudStack>
+</MudPaper>
+
+<MudTable T="OrganizationSummary" Items="_items" Dense="true" Hover="true" Loading="_loading">
+    <HeaderContent>
+        <MudTh>名称</MudTh>
+        <MudTh>Alias</MudTh>
+        <MudTh>域名数</MudTh>
+        <MudTh>状态</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd><a href="/admin/organizations/@context.Id" class="text-primary">@context.Name</a></MudTd>
+        <MudTd>@context.Alias</MudTd>
+        <MudTd>@context.DomainCount</MudTd>
+        <MudTd>
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@(context.Enabled ? Color.Success : Color.Error)">
+                @(context.Enabled ? "启用" : "禁用")
+            </MudChip>
+        </MudTd>
+        <MudTd>
+            <MudTooltip Text="删除组织">
+                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick='() => ConfirmDeleteAsync(context)' />
+            </MudTooltip>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText Typo="Typo.body2">暂无组织。</MudText></NoRecordsContent>
+</MudTable>
+
+@code {
+    private IReadOnlyList<OrganizationSummary> _items = [];
+    private string? _search;
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var page = await OrganizationsService.SearchAsync(new AdminPageRequest(Search: _search, Page: 1, PageSize: 100));
+            _items = page.Items;
+        }
+        catch (Exception ex) { Snackbar.Add($"加载失败：{ex.Message}", Severity.Error); }
+        finally { _loading = false; }
+    }
+
+    private async Task OpenCreateAsync()
+    {
+        var dialog = await DialogService.ShowAsync<CreateOrganizationDialog>("新建组织");
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled) await LoadAsync();
+    }
+
+    private async Task ConfirmDeleteAsync(OrganizationSummary organization)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除组织",
+            $"删除组织「{organization.Name}」？成员关系将一并移除。",
+            yesText: "删除",
+            cancelText: "取消");
+        if (confirmed != true) return;
+
+        var result = await OrganizationsService.DeleteAsync(ActorAccessor.GetRequiredActor(), organization.Id);
+        if (result.Success) { Snackbar.Add("已删除", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(result.Error ?? "删除失败", Severity.Error);
+    }
+}
