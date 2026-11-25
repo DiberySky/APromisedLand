@@ -2,7 +2,11 @@
 @inject WasmOidcSession Session
 @inject NavigationManager Navigation
 <MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
-  @if (_error is null) { <MudText>正在完成登录…</MudText>; }
+  @if (_error is null)
+  {
+      <MudProgressLinear Indeterminate Color="Color.Primary" Class="mb-4" />
+      <MudText>正在完成登录…</MudText>
+  }
   else { <MudAlert Severity="Severity.Error">@_error</MudAlert>; }
 </MudContainer>
 @code {

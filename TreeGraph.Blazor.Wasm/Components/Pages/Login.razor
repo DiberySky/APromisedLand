@@ -1,0 +1,50 @@
+@page "/login"
+@inject WasmOidcSession Session
+@inject NavigationManager Navigation
+<PageTitle>登录</PageTitle>
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-12">
+    <MudCard>
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h5">TreeGraph 管理台</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">登录以继续</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth OnClick="LoginAsync">使用统一身份登录</MudButton>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+@code {
+    private string? _returnUrl;
+
+    protected override void OnInitialized()
+    {
+        _returnUrl = ParseReturnUrl(Navigation.Uri);
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // 已登录访问 /login：跳回原目标页（在首次渲染后导航，避免渲染期导航）
+        if (firstRender && Session.IsAuthenticated)
+        {
+            Navigation.NavigateTo(string.IsNullOrEmpty(_returnUrl) ? "/" : _returnUrl, replace: true);
+        }
+    }
+
+    private Task LoginAsync() => Session.BeginLoginAsync(_returnUrl);
+
+    private static string? ParseReturnUrl(string uri)
+    {
+        var question = uri.IndexOf('?');
+        if (question < 0) return null;
+        foreach (var pair in uri[(question + 1)..].Split('#')[0].Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = pair.IndexOf('=');
+            var key = Uri.UnescapeDataString((separator < 0 ? pair : pair[..separator]).Replace('+', ' '));
+            if (key == "returnUrl")
+                return Uri.UnescapeDataString((separator < 0 ? string.Empty : pair[(separator + 1)..]).Replace('+', ' '));
+        }
+        return null;
+    }
+}

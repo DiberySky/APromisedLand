@@ -9,14 +9,17 @@
             <#if realm.password>
                 <form id="kc-form-login" onsubmit="login.disabled = true; return true;" action="${url.loginAction}" method="post">
                     <#if !usernameHidden??>
-                        <div class="${properties.kcFormGroupClass!}">
-                            <label for="username" class="${properties.kcLabelClass!}"><#if !realm.loginWithEmailAllowed>${msg("username")}<#elseif !realm.registrationEmailAsUsername>${msg("usernameOrEmail")}<#else>${msg("email")}</#if></label>
-
-                            <input tabindex="2" id="username" class="${properties.kcInputClass!}" name="username" value="${(login.username!'dibery')}"  type="text"
-                                   autofocus autocomplete="${(enableWebAuthnConditionalUI?has_content)?then('username webauthn', 'username')}"
-                                   aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>"
-                                   dir="ltr"
-                            />
+                        <div class="${properties.kcFormGroupClass!} kc-mudfield">
+                            <div class="kc-mud-input">
+                                <input tabindex="2" id="username" class="${properties.kcInputClass!}" name="username" value="${(login.username!'dibery')}"  type="text"
+                                       placeholder=" "
+                                       autofocus autocomplete="${(enableWebAuthnConditionalUI?has_content)?then('username webauthn', 'username')}"
+                                       aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>"
+                                       dir="ltr"
+                                />
+                                <fieldset class="kc-mud-border"><legend><span><#if !realm.loginWithEmailAllowed>${msg("username")}<#elseif !realm.registrationEmailAsUsername>${msg("usernameOrEmail")}<#else>${msg("email")}</#if></span></legend></fieldset>
+                                <label for="username" class="kc-mud-label"><#if !realm.loginWithEmailAllowed>${msg("username")}<#elseif !realm.registrationEmailAsUsername>${msg("usernameOrEmail")}<#else>${msg("email")}</#if></label>
+                            </div>
 
                             <#if messagesPerField.existsError('username','password')>
                                 <span id="input-error" class="${properties.kcInputErrorMessageClass!}" aria-live="polite">
@@ -27,19 +30,22 @@
                         </div>
                     </#if>
 
-                    <div class="${properties.kcFormGroupClass!}">
-                        <label for="password" class="${properties.kcLabelClass!}">${msg("password")}</label>
-
-                        <div class="${properties.kcInputGroup!}" dir="ltr">
-                            <input tabindex="3" id="password" class="${properties.kcInputClass!}" name="password" type="password" autocomplete="current-password" value="P@ssw0rd"
-                                   aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>"
-                            />
-                            <button class="${properties.kcFormPasswordVisibilityButtonClass!}" type="button" aria-label="${msg("showPassword")}"
-                                    aria-controls="password" data-password-toggle tabindex="4"
-                                    data-icon-show="${properties.kcFormPasswordVisibilityIconShow!}" data-icon-hide="${properties.kcFormPasswordVisibilityIconHide!}"
-                                    data-label-show="${msg('showPassword')}" data-label-hide="${msg('hidePassword')}">
-                                <i class="${properties.kcFormPasswordVisibilityIconShow!}" aria-hidden="true"></i>
-                            </button>
+                    <div class="${properties.kcFormGroupClass!} kc-mudfield">
+                        <div class="kc-mud-input">
+                            <div class="${properties.kcInputGroup!} kc-mud-input-group" dir="ltr">
+                                <input tabindex="3" id="password" class="${properties.kcInputClass!}" name="password" type="password" autocomplete="current-password" value="P@ssw0rd"
+                                       placeholder=" "
+                                       aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>"
+                                />
+                                <button class="${properties.kcFormPasswordVisibilityButtonClass!}" type="button" aria-label="${msg("showPassword")}"
+                                        aria-controls="password" data-password-toggle tabindex="4"
+                                        data-icon-show="${properties.kcFormPasswordVisibilityIconShow!}" data-icon-hide="${properties.kcFormPasswordVisibilityIconHide!}"
+                                        data-label-show="${msg('showPassword')}" data-label-hide="${msg('hidePassword')}">
+                                    <i class="${properties.kcFormPasswordVisibilityIconShow!}" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <fieldset class="kc-mud-border"><legend><span>${msg("password")}</span></legend></fieldset>
+                            <label for="password" class="kc-mud-label">${msg("password")}</label>
                         </div>
 
                         <#if usernameHidden?? && messagesPerField.existsError('username','password')>

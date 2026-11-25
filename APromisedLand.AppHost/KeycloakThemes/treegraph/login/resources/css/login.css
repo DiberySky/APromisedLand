@@ -1,0 +1,196 @@
+/* Keycloak 登录页暗色主题 —— 对齐应用端 MudBlazor dark 配色（运行时实测值） */
+:root {
+    --kc-dark-bg: #32333D;                 /* mud-palette-background */
+    --kc-dark-surface: #373740;            /* mud-palette-surface */
+    --kc-dark-appbar: #27272F;             /* mud-palette-appbar-background */
+    --kc-dark-primary: #776BE7;            /* mud-palette-primary */
+    --kc-dark-primary-hover: #8B80F0;
+    --kc-dark-text: rgba(255, 255, 255, 0.7);     /* mud-palette-text-primary */
+    --kc-dark-text-strong: rgba(255, 255, 255, 0.9);
+    --kc-dark-input-bg: #26262E;
+    --kc-dark-border: rgba(255, 255, 255, 0.12);
+}
+
+/* 页面背景：覆盖 base 的 keycloak-bg.png 与白底 */
+html, body { background-color: var(--kc-dark-bg) !important; }
+.login-pf body { background: var(--kc-dark-bg) !important; background-image: none !important; }
+.login-pf { background: none !important; }
+
+/* 顶部标题（A promised land）：还原 base 默认样式（#ededed 大号大写、宽字间距、无背景条）。
+   注意：本主题提供了 login.css 后会替代 parent(keycloak) 的 login.css，base 标题规则不会自动继承，需在此显式声明。 */
+#kc-header {
+    color: #ededed;
+    overflow: visible;
+    white-space: nowrap;
+}
+#kc-header-wrapper {
+    font-size: 29px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    line-height: 1.2em;
+    padding: 62px 10px 20px;
+    white-space: normal;
+}
+
+/* 卡片：收窄并居中（base 默认 max-width:none 导致横跨全屏） */
+.card-pf {
+    max-width: 440px !important;
+    margin: 0 auto !important;
+    background-color: var(--kc-dark-surface) !important;
+    color: var(--kc-dark-text) !important;
+    border-top: 4px solid var(--kc-dark-primary) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45) !important;
+}
+/* base 在 .login-pf-page 下把卡片边框/阴影/宽度清零了，这里恢复并约束宽度 */
+.login-pf-page .card-pf {
+    max-width: 440px !important;
+    margin: 0 auto !important;
+    border-top: 4px solid var(--kc-dark-primary) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* 卡片标题 */
+#kc-page-title, .login-pf-header h1 { color: var(--kc-dark-text-strong) !important; }
+
+/* 表单 label */
+.pf-c-form__label, .form-group label { color: var(--kc-dark-text) !important; }
+
+/* ===== 输入框：MudBlazor Outlined 风格（参考 APromisedLand.Razor SignInSky.razor）=====
+   MudBlazor Outlined 用 <fieldset><legend> 实现浮动 label + 边框断开；login.ftl 已按此结构输出，
+   此处用 CSS 复刻其外观。实测值：边框 rgba(255,255,255,.3)、圆角 4px、label 70%白/16px、
+   input padding 18.5px 14px、focus 时边框与 label 变主色紫（#776BE7）。 */
+
+/* 包裹容器：相对定位，给浮动 label 和 fieldset 提供定位上下文 */
+.kc-mudfield { position: relative; margin-bottom: 1.5rem; }
+.kc-mud-input { position: relative; }
+
+/* input 本体：去掉边框与背景，改由 fieldset 画描边；对齐 MudBlazor 尺寸 */
+.kc-mudfield .pf-c-form-control {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: rgba(255, 255, 255, 0.7) !important;
+    font-size: 16px !important;
+    padding: 18.5px 14px !important;
+    height: 56px !important;
+    width: 100%;
+}
+.kc-mudfield .pf-c-form-control::placeholder { color: transparent !important; } /* 占位符为空格，不可见 */
+
+/* 密码组：去掉 pf-c-input-group 自带边框/背景；眼睛按钮定位到框内右侧 */
+.kc-mudfield .pf-c-input-group {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+.kc-mudfield .pf-c-input-group .pf-c-form-control { padding-right: 48px !important; }
+.kc-mudfield .pf-c-button.pf-m-control {
+    background: transparent !important;
+    border: none !important;
+    color: rgba(255, 255, 255, 0.5) !important;
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+}
+.kc-mudfield .pf-c-button.pf-m-control:hover { color: rgba(255, 255, 255, 0.9) !important; }
+/* PatternFly v4 的 .pf-c-button 用 ::after 伪元素画边框（非元素自身 border），
+   此处清零眼睛按钮 ::after 的边框，消除图标外的方框 */
+.kc-mudfield .pf-c-button.pf-m-control::after {
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+/* 描边：fieldset 画圆角边框，legend 仅用于断开边框（文本不可见，宽度自适应 label） */
+.kc-mud-border {
+    position: absolute;
+    inset: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-width: 0;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 4px !important;
+    pointer-events: none;
+    transition: border-color 0.2s ease;
+}
+.kc-mud-border legend {
+    padding: 0;
+    margin: 0;
+    width: auto;
+    line-height: 0;
+    font-size: 0;
+    color: transparent;
+}
+
+/* 浮动 label：默认居中在框内（占位态）；focus 或有值时上浮缩小到边框左上（shrink） */
+.kc-mud-label {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+    padding: 0 6px;
+    color: rgba(255, 255, 255, 0.7) !important;
+    font-size: 16px;
+    line-height: 1;
+    pointer-events: none;
+    background: var(--kc-dark-surface); /* 与卡片同色，盖住下方边框形成断开效果 */
+    transition: top 0.2s ease, transform 0.2s ease, color 0.2s ease, left 0.2s ease;
+}
+.kc-mud-input:focus-within > .kc-mud-label,
+.kc-mud-input:has(input:not(:placeholder-shown)) > .kc-mud-label {
+    top: 0;
+    left: 8px;
+    transform: translateY(-50%) scale(0.75);
+    transform-origin: left center;
+}
+.kc-mud-input:focus-within > .kc-mud-label { color: var(--kc-dark-primary) !important; }
+.kc-mud-input:focus-within > .kc-mud-border { border-color: var(--kc-dark-primary) !important; }
+
+/* 保留：非 MudBlazor 风格的输入框（若有）仍走暗色样式 */
+.pf-c-form-control {
+    background-color: var(--kc-dark-input-bg) !important;
+    color: var(--kc-dark-text-strong) !important;
+    border: 1px solid var(--kc-dark-border) !important;
+}
+.pf-c-form-control:focus {
+    border-color: var(--kc-dark-primary) !important;
+    outline: none !important;
+}
+/* 浏览器自动填充：覆盖 Chrome 默认黄底/红字；用卡片色 inset 阴影盖住黄底，视觉上等同透明 */
+.pf-c-form-control:-webkit-autofill,
+.pf-c-form-control:-webkit-autofill:hover,
+.pf-c-form-control:-webkit-autofill:focus {
+    -webkit-text-fill-color: rgba(255, 255, 255, 0.7) !important;
+    -webkit-box-shadow: 0 0 0 1000px var(--kc-dark-surface) inset !important;
+    caret-color: rgba(255, 255, 255, 0.7) !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+/* 主登录按钮 */
+.pf-c-button.pf-m-primary {
+    background-color: var(--kc-dark-primary) !important;
+    border-color: var(--kc-dark-primary) !important;
+    color: #ffffff !important;
+}
+.pf-c-button.pf-m-primary:hover,
+.pf-c-button.pf-m-primary:focus {
+    background-color: var(--kc-dark-primary-hover) !important;
+    border-color: var(--kc-dark-primary-hover) !important;
+}
+
+/* 链接 */
+.login-pf a, .login-pf-page a { color: var(--kc-dark-primary) !important; }
+.login-pf a:hover { color: var(--kc-dark-primary-hover) !important; }
+
+/* 反馈/错误文字 */
+.kc-feedback-text, .pf-c-alert, .alert { color: var(--kc-dark-text) !important; }
+
+/* 移动端：小屏下卡片占满宽度（两侧留 16px 边距） */
+@media (max-width: 480px) {
+    .card-pf,
+    .login-pf-page .card-pf {
+        max-width: calc(100% - 32px) !important;
+    }
+}

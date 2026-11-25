@@ -1,10 +1,10 @@
-@inject WasmOidcSession Session
 @inject NavigationManager Navigation
-<MudText Class="pa-4">正在跳转身份提供方…</MudText>
+<MudText Class="pa-4">正在跳转登录页…</MudText>
 @code {
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
-        await Session.BeginLoginAsync(string.IsNullOrEmpty(relative) ? "/" : "/" + relative);
+        var returnUrl = string.IsNullOrEmpty(relative) ? "/" : "/" + relative;
+        Navigation.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
     }
 }

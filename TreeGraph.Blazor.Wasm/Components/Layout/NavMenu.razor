@@ -51,6 +51,20 @@
         <MudNavLink Href="/node-semantic-search" Icon="@Icons.Material.Outlined.Search" Match="NavLinkMatch.All">节点语义搜索</MudNavLink>
         <MudNavLink Href="/maf-wf/writer-critic" Icon="@Icons.Material.Outlined.EditNote" Match="NavLinkMatch.All">Writer-Critic</MudNavLink>
     </MudNavGroup>
+
+    <AuthorizeView>
+        <Authorized>
+            <MudNavGroup Title="设置" Icon="@Icons.Material.Outlined.Settings">
+                <MudNavLink Href="/settings/change-password" Icon="@Icons.Material.Outlined.Key" Match="NavLinkMatch.Prefix">修改密码</MudNavLink>
+                <AuthorizeView Policy="@IdentityConstants.AdminOnlyPolicy">
+                    <Authorized Context="adminCtx">
+                        <MudNavLink Href="/admin/users" Icon="@Icons.Material.Outlined.LockReset" Match="NavLinkMatch.Prefix">用户管理</MudNavLink>
+                    </Authorized>
+                </AuthorizeView>
+            </MudNavGroup>
+        </Authorized>
+    </AuthorizeView>
+
     <MudNavLink Href="/number-field-demo" Icon="@Icons.Material.Outlined.Pin" Match="NavLinkMatch.All">数字控件 Demo</MudNavLink>
 </MudNavMenu>
 

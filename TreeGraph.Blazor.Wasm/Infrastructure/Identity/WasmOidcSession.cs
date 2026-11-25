@@ -43,9 +43,8 @@ public sealed class WasmOidcSession : IAsyncDisposable
         await module.InvokeVoidAsync("watchLogout", _selfReference);
         _ = RefreshLoopAsync(_disposeCts.Token);
 
-        var relative = _navigation.ToBaseRelativePath(_navigation.Uri);
-        if (relative.StartsWith("authentication/login-callback", StringComparison.OrdinalIgnoreCase)) return;
-        if (!IsAuthenticated) await BeginLoginAsync(LocalReturnUrl());
+        // 不再在此处自动跳转登录：未授权由 AuthorizeRouteView → RedirectToLogin → /login 页面处理，
+        // 避免未登录访问 /login 时被立刻甩到 Keycloak。
     }
 
     public async Task BeginLoginAsync(string? returnUrl = null, bool forceReauthentication = false)
@@ -56,7 +55,10 @@ public sealed class WasmOidcSession : IAsyncDisposable
         {
             if (_isSigningOut) return;
             var module = await GetModuleAsync();
-            if (!forceReauthentication && await module.InvokeAsync<bool>("hasPendingLogin")) return;
+            // 不再因 hasPendingLogin 直接 return：pending 仅在回调成功或登出时清除，
+            // 若跳转中断（Keycloak 重启、用户取消等）会残留在 sessionStorage，
+            // 导致后续每次点击登录都被静默忽略（卡死）。beginLogin 会覆盖旧 pending，
+            // 直接重发即可恢复；并发重复点击由 _loginLock 保护。
             var redirectUri = _navigation.BaseUri + "authentication/login-callback";
             await module.InvokeVoidAsync(
                 "beginLogin",

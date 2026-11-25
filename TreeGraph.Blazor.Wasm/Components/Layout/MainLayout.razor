@@ -3,6 +3,7 @@
 @inject IJSRuntime JS
 @inject WasmOidcSession Session
 @inject TreeGraph.Blazor.Shared.NodeEavSky.Services.EntityTypeDisplayService EntityTypeDisplay
+@inject NavigationManager Navigation
 <MudThemeProvider IsDarkMode DefaultScrollbar />
 <MudPopoverProvider />
 <MudDialogProvider />
@@ -16,9 +17,12 @@
     <AuthorizeView>
       <Authorized>
         <MudText Class="mr-3">@context.User.Identity?.Name</MudText>
+        <MudButton Color="Color.Inherit" @onclick="SignOutAsync">退出</MudButton>
       </Authorized>
+      <NotAuthorized>
+        <MudButton Color="Color.Inherit" @onclick="LoginAsync">登录</MudButton>
+      </NotAuthorized>
     </AuthorizeView>
-    <MudButton Color="Color.Inherit" @onclick="SignOutAsync">退出</MudButton>
   </MudAppBar>
   <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always">
     <NavMenu />
@@ -47,6 +51,12 @@
     [JSInvokable]
     public Task OnWindowResize() => Platform.RefreshAsync();
     private Task SignOutAsync() => Session.SignOutAsync();
+    private Task LoginAsync()
+    {
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var returnUrl = "/" + relative.TrimStart('/');
+        return Session.BeginLoginAsync(returnUrl);
+    }
     public async ValueTask DisposeAsync()
     {
         _dotNetRef?.Dispose();
