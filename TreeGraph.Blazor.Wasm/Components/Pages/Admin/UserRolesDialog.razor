@@ -1,0 +1,145 @@
+@* UserRolesDialog.razor — 用户角色管理（DialogSky 外壳） *@
+@using Microsoft.AspNetCore.Components
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IUsersAdminService UsersService
+@inject IRolesAdminService RolesService
+@inject IAdminActorAccessor ActorAccessor
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@($"角色 — {_user?.Username ?? Username}")"
+           FullWidth="true">
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_user is null)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">用户不存在或无法读取。</MudAlert>
+        }
+        else
+        {
+            <MudStack Row="true" Class="mb-3" AlignItems="AlignItems.End">
+                <MudSelect T="string"
+                           @bind-Value="_selectedRoleName"
+                           Label="选择角色"
+                           Variant="Variant.Outlined"
+                           Style="width: 260px">
+                    @foreach (var r in _availableRoles)
+                    {
+                        <MudSelectItem T="string" Value="@r.Name">@r.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="@string.IsNullOrEmpty(_selectedRoleName)"
+                           OnClick="AddRoleAsync"
+                           Class="ml-3">分配角色</MudButton>
+            </MudStack>
+
+            @if (_user.Roles.Count == 0)
+            {
+                <MudText Typo="Typo.body2">该用户未分配任何 realm 角色。</MudText>
+            }
+            else
+            {
+                @foreach (var role in _user.Roles)
+                {
+                    <MudChip T="string"
+                             Color="Color.Primary"
+                             Variant="Variant.Filled"
+                             Class="ma-1"
+                             OnClose="@(() => RemoveRoleAsync(role))">
+                        @role
+                    </MudChip>
+                }
+            }
+        }
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string UserId { get; set; } = string.Empty;
+    [Parameter] public string Username { get; set; } = string.Empty;
+
+    private bool _loading = true;
+    private IdentityUserDetail? _user;
+    private IReadOnlyList<IdentityRole> _allRoles = [];
+    private string? _selectedRoleName;
+
+    private IEnumerable<IdentityRole> _availableRoles
+        => _allRoles.Where(r => _user is not null && !_user.Roles.Contains(r.Name, StringComparer.Ordinal));
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _user = await UsersService.GetAsync(UserId);
+            if (_user is not null)
+            {
+                _allRoles = await RolesService.ListAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task AddRoleAsync()
+    {
+        if (string.IsNullOrEmpty(_selectedRoleName)) return;
+        try
+        {
+            var actor = ActorAccessor.GetRequiredActor();
+            var result = await RolesService.AddMemberAsync(actor, _selectedRoleName, UserId);
+            if (result.Success)
+            {
+                Snackbar.Add("已分配角色", Severity.Success);
+                _selectedRoleName = null;
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "分配失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"分配失败：{ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RemoveRoleAsync(string roleName)
+    {
+        try
+        {
+            var actor = ActorAccessor.GetRequiredActor();
+            var result = await RolesService.RemoveMemberAsync(actor, roleName, UserId);
+            if (result.Success)
+            {
+                Snackbar.Add("已移除角色", Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "移除失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"移除失败：{ex.Message}", Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,152 @@
+@* UserProfileDialog.razor — 用户资料编辑（DialogSky 外壳） *@
+@using Microsoft.AspNetCore.Components
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IUsersAdminService UsersService
+@inject IAdminActorAccessor ActorAccessor
+@inject StepUpGuard StepUp
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@($"用户资料 — {_user?.Username ?? Username}")"
+           FullWidth="true"
+           SubmitButtonVisible="true"
+           SubmitButtonColor="Color.Primary"
+           SubmitButtonText="@(_saving ? "保存中..." : "保存资料")"
+           SubmitButtonDisabled="@_saving"
+           OnSubmitClick="SaveProfileAsync">
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_user is null)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">用户不存在或无法读取。</MudAlert>
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_editEmail"
+                                  Label="邮箱"
+                                  Variant="Variant.Outlined"
+                                  Class="mb-3" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudCheckBox @bind-Value="_editEmailVerified"
+                                 Label="邮箱已验证"
+                                 Color="Color.Primary"
+                                 Class="mt-4" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="_editFirstName"
+                                  Label="名"
+                                  Variant="Variant.Outlined"
+                                  Class="mb-3" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="_editLastName"
+                                  Label="姓"
+                                  Variant="Variant.Outlined"
+                                  Class="mb-3" />
+                </MudItem>
+            </MudGrid>
+
+            <MudStack Row="true" Class="mt-2">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Warning"
+                           StartIcon="@Icons.Material.Outlined.Password"
+                           OnClick="OpenResetPasswordAsync">重置密码</MudButton>
+            </MudStack>
+        }
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string UserId { get; set; } = string.Empty;
+    [Parameter] public string Username { get; set; } = string.Empty;
+
+    private bool _loading = true;
+    private bool _saving;
+    private IdentityUserDetail? _user;
+
+    private string? _editEmail;
+    private bool _editEmailVerified;
+    private string? _editFirstName;
+    private string? _editLastName;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _user = await UsersService.GetAsync(UserId);
+            if (_user is not null)
+            {
+                _editEmail = _user.Email;
+                _editEmailVerified = _user.EmailVerified;
+                _editFirstName = _user.FirstName;
+                _editLastName = _user.LastName;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (_user is null) return;
+        _saving = true;
+        try
+        {
+            var actor = ActorAccessor.GetRequiredActor();
+            var result = await UsersService.UpdateAsync(actor, UserId, new UpdateUserRequest(
+                Email: _editEmail,
+                FirstName: _editFirstName,
+                LastName: _editLastName,
+                EmailVerified: _editEmailVerified));
+            if (result.Success)
+            {
+                Snackbar.Add("资料已保存", Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "保存失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"保存失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task OpenResetPasswordAsync()
+    {
+        if (!await StepUp.EnsureFreshAsync("user.reset-password", $"/admin/users/{UserId}")) return;
+
+        if (_user is null) return;
+        var parameters = new DialogParameters
+        {
+            { nameof(ResetPasswordDialog.UserId), UserId },
+            { nameof(ResetPasswordDialog.Username), _user.Username }
+        };
+        await DialogService.ShowAsync<ResetPasswordDialog>(string.Empty, parameters);
+    }
+}

@@ -1,0 +1,188 @@
+@* UserSessionsDialog.razor — 用户活跃会话管理（DialogSky 外壳） *@
+@using Microsoft.AspNetCore.Components
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IUsersAdminService UsersService
+@inject ISessionsAdminService SessionsService
+@inject IAdminActorAccessor ActorAccessor
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<DialogSky Title="@($"会话 — {Username}")"
+           MaxWidth="MaxWidth.Small"
+           FullWidth="true"
+           CancelButtonVisible="true"
+           CancelButtonText="关闭">
+    <ToolBarContent>
+        <MudText Typo="Typo.subtitle2" Class="ml-2">活跃会话（@_sessions.Count）</MudText>
+    </ToolBarContent>
+    <ToolBarRightContent>
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Error"
+                   StartIcon="@Icons.Material.Outlined.Logout"
+                   Disabled="@(_sessions.Count == 0)"
+                   OnClick="LogoutAllAsync">全部下线</MudButton>
+    </ToolBarRightContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else
+        {
+            <MudTable T="IdentitySession" Items="_sessions" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>客户端</MudTh>
+                    <MudTh>IP</MudTh>
+                    <MudTh>在线</MudTh>
+                    <MudTh Style="width: 1%; white-space: nowrap; text-align: right;"></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@string.Join(", ", context.Clients)</MudTd>
+                    <MudTd>@(context.IpAddress ?? "—")</MudTd>
+                    <MudTd>
+                        <MudIcon Icon="@Icons.Material.Filled.Circle"
+                                 Color="@(context.Offline ? Color.Default : Color.Success)"
+                                 Size="Size.Small"
+                                 title="@(context.Offline ? "Offline" : "Online")" />
+                    </MudTd>
+                    <MudTd Style="white-space: nowrap; text-align: right;">
+                        <MudIconButton Icon="@(_expandedIds.Contains(context.Id)
+                                                ? Icons.Material.Outlined.ExpandLess
+                                                : Icons.Material.Outlined.ExpandMore)"
+                                       Color="Color.Info"
+                                       Size="Size.Small"
+                                       OnClick="@(() => ToggleExpand(context.Id))"
+                                       title="开始时间、最后访问、下线" />
+                    </MudTd>
+                </RowTemplate>
+                <ChildRowContent>
+                    @if (_expandedIds.Contains(context.Id))
+                    {
+                        <MudTr>
+                            <td colspan="4" style="padding: 0 16px; background-color: #000;">
+                                <MudSimpleTable Dense="true" Style="background-color: #000;">
+                                    <tbody>
+                                        <tr>
+                                            <td>开始时间</td>
+                                            <td>@FormatTime(context.Start)</td>
+                                        </tr>
+                                        <tr>
+                                            <td>最后访问</td>
+                                            <td>@FormatTime(context.LastAccess)</td>
+                                        </tr>
+                                        <tr>
+                                            <td>操作</td>
+                                            <td style="white-space: nowrap; text-align: right;">
+                                                <MudIconButton Icon="@Icons.Material.Outlined.Logout"
+                                                               Color="Color.Error"
+                                                               Size="Size.Small"
+                                                               OnClick="@(() => LogoutSessionAsync(context.Id))"
+                                                               title="下线" />
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </MudSimpleTable>
+                            </td>
+                        </MudTr>
+                    }
+                </ChildRowContent>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.body2">无活跃会话。</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        }
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string UserId { get; set; } = string.Empty;
+    [Parameter] public string Username { get; set; } = string.Empty;
+
+    private bool _loading = true;
+    private IReadOnlyList<IdentitySession> _sessions = [];
+
+    /// <summary>已展开二级列表的会话 Id。</summary>
+    private readonly HashSet<string> _expandedIds = [];
+
+    private void ToggleExpand(string sessionId)
+    {
+        if (!_expandedIds.Remove(sessionId))
+            _expandedIds.Add(sessionId);
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _sessions = await SessionsService.ListUserSessionsAsync(UserId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载会话失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string FormatTime(long? ms)
+        => ms.HasValue
+            ? DateTimeOffset.FromUnixTimeMilliseconds(ms.Value).LocalDateTime.ToString("yyyy-MM-dd HH:mm")
+            : "—";
+
+    private async Task LogoutSessionAsync(string sessionId)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认下线",
+            $"确定让该会话下线？用户「{Username}」对应设备将被立即登出。",
+            yesText: "下线", cancelText: "取消");
+        if (confirmed != true) return;
+
+        try
+        {
+            var actor = ActorAccessor.GetRequiredActor();
+            var result = await SessionsService.LogoutSessionAsync(actor, sessionId);
+            if (result.Success)
+                Snackbar.Add("会话已下线", Severity.Success);
+            else
+                Snackbar.Add(result.Error ?? "下线失败", Severity.Error);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"下线失败：{ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LogoutAllAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认全部下线",
+            $"确定让用户「{Username}」的全部会话下线？该用户所有设备将被立即登出。",
+            yesText: "全部下线", cancelText: "取消");
+        if (confirmed != true) return;
+
+        try
+        {
+            var actor = ActorAccessor.GetRequiredActor();
+            var result = await SessionsService.LogoutAllUserSessionsAsync(actor, UserId);
+            if (result.Success)
+                Snackbar.Add("全部会话已下线", Severity.Success);
+            else
+                Snackbar.Add(result.Error ?? "下线失败", Severity.Error);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"下线失败：{ex.Message}", Severity.Error);
+        }
+    }
+}

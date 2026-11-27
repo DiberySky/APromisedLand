@@ -5,11 +5,12 @@
 @using MudBlazor
 @using TreeGraph.Shared.Identity
 @using TreeGraph.Shared.Identity.Admin
+@using TreeGraph.Blazor.Shared.Common
 @inject IUsersAdminService UsersService
 @inject IAdminActorAccessor ActorAccessor
+@inject StepUpGuard StepUp
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
-@inject NavigationManager Nav
 
 <PageTitle>用户管理</PageTitle>
 
@@ -47,11 +48,6 @@
                    Color="Color.Primary"
                    StartIcon="@Icons.Material.Outlined.Refresh"
                    OnClick="ReloadAsync">刷新</MudButton>
-        <div class="flex-grow-1"></div>
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Success"
-                   StartIcon="@Icons.Material.Outlined.PersonAdd"
-                   OnClick="OpenCreateAsync">新建用户</MudButton>
     </ToolBarContent>
     <HeaderContent>
         <MudTh>用户名</MudTh>
@@ -59,22 +55,31 @@
         <MudTh>姓名</MudTh>
         <MudTh>状态</MudTh>
         <MudTh>创建时间</MudTh>
+        <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
+            <MudButton Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Outlined.PersonAdd"
+                       Color="Color.Success"
+                       Size="Size.Small"
+                       OnClick="OpenCreateAsync">
+                新建用户
+            </MudButton>
+        </MudTh>
     </HeaderContent>
     <RowTemplate>
-        <MudTd @onclick="() => GoDetail(context.Id)" Class="cursor-pointer">
+        <MudTd>
             <MudText Typo="Typo.body2">@context.Username</MudText>
         </MudTd>
-        <MudTd @onclick="() => GoDetail(context.Id)" Class="cursor-pointer">
+        <MudTd>
             @(context.Email ?? "—")
             @if (context.EmailVerified)
             {
                 <MudIcon Icon="@Icons.Material.Outlined.VerifiedUser" Size="Size.Small" Color="Color.Success" Class="ml-1" />
             }
         </MudTd>
-        <MudTd @onclick="() => GoDetail(context.Id)" Class="cursor-pointer">
+        <MudTd>
             @($"{context.FirstName} {context.LastName}".Trim())
         </MudTd>
-        <MudTd @onclick="() => GoDetail(context.Id)" Class="cursor-pointer">
+        <MudTd>
             @if (context.Enabled)
             {
                 <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">启用</MudChip>
@@ -84,12 +89,106 @@
                 <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Filled">禁用</MudChip>
             }
         </MudTd>
-        <MudTd @onclick="() => GoDetail(context.Id)" Class="cursor-pointer">
+        <MudTd>
             @(context.CreatedTimestamp.HasValue
                 ? DateTimeOffset.FromUnixTimeMilliseconds(context.CreatedTimestamp.Value).LocalDateTime.ToString("yyyy-MM-dd HH:mm")
                 : "—")
         </MudTd>
+        <MudTd Style="white-space: nowrap; text-align: right;">
+            @* 展开/收起二级列表 *@
+            <MudIconButton Icon="@(_expandedIds.Contains(context.Id)
+                                    ? Icons.Material.Outlined.ExpandLess
+                                    : Icons.Material.Outlined.ExpandMore)"
+                           Color="Color.Info"
+                           Size="Size.Small"
+                           OnClick="@(() => ToggleExpand(context.Id))"
+                           title="资料、组、角色、会话、密码、状态" />
+        </MudTd>
     </RowTemplate>
+    <ChildRowContent>
+        @if (_expandedIds.Contains(context.Id))
+        {
+            <MudTr>
+                <td colspan="6" style="padding: 0 32px; background-color: #000;">
+                    <MudSimpleTable Dense="true" Hover="true" Style="background-color: #000;">
+                        <tbody>
+                            <tr>
+                                <td>资料</td>
+                                <td style="white-space: nowrap; text-align: right;">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Person"
+                                                   Color="Color.Info"
+                                                   Size="Size.Small"
+                                                   OnClick="@(async () => await OpenProfileAsync(context))"
+                                                   title="编辑资料" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>角色</td>
+                                <td style="white-space: nowrap; text-align: right;">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Badge"
+                                                   Color="Color.Primary"
+                                                   Size="Size.Small"
+                                                   OnClick="@(async () => await OpenRolesAsync(context))"
+                                                   title="角色分配" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>重置密码</td>
+                                <td style="white-space: nowrap; text-align: right;">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Password"
+                                                   Color="Color.Warning"
+                                                   Size="Size.Small"
+                                                   OnClick="@(async () => await OpenResetPasswordAsync(context))"
+                                                   title="重置密码" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>组</td>
+                                <td style="white-space: nowrap; text-align: right;">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Groups"
+                                                   Color="Color.Default"
+                                                   Size="Size.Small"
+                                                   OnClick="@(async () => await OpenGroupsAsync(context))"
+                                                   title="组管理" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>会话</td>
+                                <td style="white-space: nowrap; text-align: right;">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Devices"
+                                                   Color="Color.Warning"
+                                                   Size="Size.Small"
+                                                   OnClick="@(async () => await OpenSessionsAsync(context))"
+                                                   title="活跃会话" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>状态</td>
+                                <td style="white-space: nowrap; text-align: right;">
+                                    @if (context.Enabled)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Block"
+                                                       Color="Color.Error"
+                                                       Size="Size.Small"
+                                                       OnClick="@(async () => await ConfirmDisableAsync(context))"
+                                                       title="禁用用户" />
+                                    }
+                                    else
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Outlined.CheckCircle"
+                                                       Color="Color.Success"
+                                                       Size="Size.Small"
+                                                       OnClick="@(async () => await ConfirmEnableAsync(context))"
+                                                       title="启用用户" />
+                                    }
+                                </td>
+                            </tr>
+                        </tbody>
+                    </MudSimpleTable>
+                </td>
+            </MudTr>
+        }
+    </ChildRowContent>
     <NoRecordsContent>
         <MudText Typo="Typo.body2">暂无用户。</MudText>
     </NoRecordsContent>
@@ -103,6 +202,9 @@
     private bool _loading;
     private string? _search;
     private string _statusFilter = "all";
+
+    /// <summary>已展开二级列表的用户 Id。</summary>
+    private readonly HashSet<string> _expandedIds = [];
 
     private async Task<TableData<IdentityUserSummary>> LoadUsers(TableState state, CancellationToken ct)
     {
@@ -142,7 +244,11 @@
 
     private Task ReloadAsync() => _table!.ReloadServerData();
 
-    private void GoDetail(string id) => Nav.NavigateTo($"/admin/users/{id}");
+    private void ToggleExpand(string userId)
+    {
+        if (!_expandedIds.Remove(userId))
+            _expandedIds.Add(userId);
+    }
 
     private async Task OpenCreateAsync()
     {
@@ -152,5 +258,130 @@
         {
             await ReloadAsync();
         }
+    }
+
+    private async Task OpenResetPasswordAsync(IdentityUserSummary user)
+    {
+        if (!await StepUp.EnsureFreshAsync("user.reset-password", $"/admin/users")) return;
+
+        var parameters = new DialogParameters
+        {
+            { nameof(ResetPasswordDialog.UserId), user.Id },
+            { nameof(ResetPasswordDialog.Username), user.Username }
+        };
+        await DialogService.ShowAsync<ResetPasswordDialog>(string.Empty, parameters);
+    }
+
+    private async Task ConfirmDisableAsync(IdentityUserSummary user)
+    {
+        if (!await StepUp.EnsureFreshAsync("user.disable", $"/admin/users")) return;
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认禁用",
+            $"确定禁用用户「{user.Username}」？该用户将被立即登出，且无法再登录。",
+            yesText: "禁用", cancelText: "取消");
+        if (confirmed != true) return;
+
+        try
+        {
+            var actor = ActorAccessor.GetRequiredActor();
+            var result = await UsersService.DisableAsync(actor, user.Id);
+            if (result.Success && result.Value is { } v)
+            {
+                if (v.SessionsRevoked && v.RevocationMarked)
+                    Snackbar.Add("用户已禁用，会话已吊销", Severity.Success);
+                else
+                    Snackbar.Add("用户已禁用，但部分后续操作失败（可重试）", Severity.Warning);
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "禁用失败", Severity.Error);
+            }
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"禁用失败：{ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ConfirmEnableAsync(IdentityUserSummary user)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认启用",
+            $"确定启用用户「{user.Username}」？撤销标记将被清除，用户需重新登录。",
+            yesText: "启用", cancelText: "取消");
+        if (confirmed != true) return;
+
+        try
+        {
+            var actor = ActorAccessor.GetRequiredActor();
+            var result = await UsersService.EnableAsync(actor, user.Id);
+            if (result.Success)
+                Snackbar.Add("用户已启用", Severity.Success);
+            else
+                Snackbar.Add(result.Error ?? "启用失败", Severity.Error);
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"启用失败：{ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OpenProfileAsync(IdentityUserSummary user)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(UserProfileDialog.UserId), user.Id },
+            { nameof(UserProfileDialog.Username), user.Username }
+        };
+        var options = new DialogOptions
+        {
+            FullWidth = true
+        };
+        await DialogService.ShowAsync<UserProfileDialog>(string.Empty, parameters, options);
+    }
+
+    private async Task OpenGroupsAsync(IdentityUserSummary user)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(UserGroupsDialog.UserId), user.Id },
+            { nameof(UserGroupsDialog.Username), user.Username }
+        };
+        var options = new DialogOptions
+        {
+            FullWidth = true
+        };
+        await DialogService.ShowAsync<UserGroupsDialog>(string.Empty, parameters, options);
+    }
+
+    private async Task OpenRolesAsync(IdentityUserSummary user)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(UserRolesDialog.UserId), user.Id },
+            { nameof(UserRolesDialog.Username), user.Username }
+        };
+        var options = new DialogOptions
+        {
+            FullWidth = true
+        };
+        await DialogService.ShowAsync<UserRolesDialog>(string.Empty, parameters, options);
+    }
+
+    private async Task OpenSessionsAsync(IdentityUserSummary user)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(UserSessionsDialog.UserId), user.Id },
+            { nameof(UserSessionsDialog.Username), user.Username }
+        };
+        var options = new DialogOptions
+        {
+            FullWidth = true
+        };
+        await DialogService.ShowAsync<UserSessionsDialog>(string.Empty, parameters, options);
     }
 }

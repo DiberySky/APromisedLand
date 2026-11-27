@@ -93,6 +93,14 @@
     [Parameter] public required string Title { get; set; }
     [Parameter] public bool TitleDense { get; set; } = true;
 
+    /// <summary>对话框整体最大宽度（默认 Small，覆盖 MudBlazor 的 Medium 默认值）。
+    /// 子组件需要更宽时在 &lt;DialogSky&gt; 标签上覆盖此参数即可。</summary>
+    [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
+
+    /// <summary>是否占满可用宽度（受 MaxWidth 上限约束）。默认 false → 宽度自适应内容。
+    /// 设为 true 时对话框撑到 MaxWidth 上限，输入框等内容铺满。</summary>
+    [Parameter] public bool FullWidth { get; set; }
+
     /// <summary>操作区容器的最大宽度（默认 False 铺满全宽，按钮靠右对齐）。</summary>
     [Parameter] public MaxWidth ActionsMaxWidth { get; set; } = MaxWidth.False;
 
@@ -137,20 +145,29 @@
     private bool _closing;
 
     /// <summary>
-    /// 统一交互约定：DialogSky 对话框点击背景遮罩不关闭，避免误触丢失未保存内容。
-    /// MudBlazor 9 的 BackdropClick 为 init-only 且默认 true，无法原地修改，
-    /// 故克隆打开方传入的 DialogOptions（含 DialogOptionsEx 扩展属性）后重新注入。
+    /// 统一交互约定：DialogSky 对话框点击背景遮罩不关闭（避免误触丢失未保存内容），
+    /// 且默认整体宽度为 Small（覆盖 MudBlazor 的 Medium 默认值）。
+    /// MudBlazor 9 的 BackdropClick 为 init-only，故克隆打开方传入的
+    /// DialogOptions（含 DialogOptionsEx 扩展属性）后重新注入。
     /// </summary>
     protected override async Task OnInitializedAsync()
     {
-        if (MudDialog is null || MudDialog.Options.BackdropClick == false)
+        if (MudDialog is null)
             return;
 
-        await MudDialog.SetOptionsAsync(CloneWithBackdropClickDisabled(MudDialog.Options));
+        var clone = CloneOptions(MudDialog.Options);
+        // MudBlazor 9 中 BackdropClick / MaxWidth / FullWidth 均为 init-only，需反射赋值。
+        typeof(DialogOptions).GetProperty(nameof(DialogOptions.BackdropClick))!
+            .SetValue(clone, false);
+        typeof(DialogOptions).GetProperty(nameof(DialogOptions.MaxWidth))!
+            .SetValue(clone, MaxWidth);
+        typeof(DialogOptions).GetProperty(nameof(DialogOptions.FullWidth))!
+            .SetValue(clone, FullWidth);
+        await MudDialog.SetOptionsAsync(clone);
     }
 
-    /// <summary>反射复制全部可读写属性，仅将 BackdropClick 置为 false。</summary>
-    private static DialogOptions CloneWithBackdropClickDisabled(DialogOptions source)
+    /// <summary>反射复制 source 全部可读写属性，排除 BackdropClick（由调用方另行注入）。</summary>
+    private static DialogOptions CloneOptions(DialogOptions source)
     {
         var clone = (DialogOptions)Activator.CreateInstance(source.GetType())!;
         foreach (var prop in source.GetType()
@@ -159,9 +176,6 @@
             if (prop.Name != nameof(DialogOptions.BackdropClick) && prop.CanRead && prop.CanWrite)
                 prop.SetValue(clone, prop.GetValue(source));
         }
-
-        typeof(DialogOptions).GetProperty(nameof(DialogOptions.BackdropClick))!
-            .SetValue(clone, false);
         return clone;
     }
 

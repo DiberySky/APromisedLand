@@ -1,0 +1,167 @@
+@* UserGroupsDialog.razor — 用户组管理（DialogSky 外壳） *@
+@using Microsoft.AspNetCore.Components
+@using MudBlazor
+@using TreeGraph.Shared.Identity
+@using TreeGraph.Shared.Identity.Admin
+@inject IUsersAdminService UsersService
+@inject IGroupsAdminService GroupsService
+@inject IAdminActorAccessor ActorAccessor
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@($"组 — {_user?.Username ?? Username}")"
+           FullWidth="true">
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_user is null)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">用户不存在或无法读取。</MudAlert>
+        }
+        else
+        {
+            <MudStack Row="true" Class="mb-3" AlignItems="AlignItems.End">
+                <MudSelect T="string"
+                           @bind-Value="_selectedGroupId"
+                           Label="选择组"
+                           Variant="Variant.Outlined"
+                           Style="width: 340px">
+                    @foreach (var g in _availableGroups)
+                    {
+                        <MudSelectItem T="string" Value="@g.Id">@g.Path</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="@string.IsNullOrEmpty(_selectedGroupId)"
+                           OnClick="AddGroupAsync"
+                           Class="ml-3">加入组</MudButton>
+            </MudStack>
+
+            @if (_user.Groups.Count == 0)
+            {
+                <MudText Typo="Typo.body2">该用户未加入任何组。</MudText>
+            }
+            else
+            {
+                @foreach (var path in _user.Groups)
+                {
+                    <MudChip T="string"
+                             Color="Color.Info"
+                             Variant="Variant.Filled"
+                             Class="ma-1"
+                             OnClose="@(() => RemoveGroupAsync(path))">
+                        @path
+                    </MudChip>
+                }
+            }
+        }
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string UserId { get; set; } = string.Empty;
+    [Parameter] public string Username { get; set; } = string.Empty;
+
+    private bool _loading = true;
+    private IdentityUserDetail? _user;
+    private IReadOnlyList<IdentityGroup> _groupTree = [];
+    private Dictionary<string, string> _groupPathToId = new();
+    private string? _selectedGroupId;
+
+    private List<(string Id, string Path)> _allGroups => Flatten(_groupTree);
+
+    private IEnumerable<(string Id, string Path)> _availableGroups
+        => _allGroups.Where(g => _user is not null && !_user.Groups.Contains(g.Path, StringComparer.Ordinal));
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _user = await UsersService.GetAsync(UserId);
+            if (_user is not null)
+            {
+                _groupTree = await GroupsService.GetTreeAsync();
+                _groupPathToId = _allGroups.ToDictionary(g => g.Path, g => g.Id, StringComparer.Ordinal);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static List<(string Id, string Path)> Flatten(IEnumerable<IdentityGroup> groups,
+                                                          List<(string Id, string Path)>? acc = null)
+    {
+        acc ??= [];
+        foreach (var g in groups)
+        {
+            acc.Add((g.Id, g.Path));
+            if (g.Children.Count > 0)
+                Flatten(g.Children, acc);
+        }
+        return acc;
+    }
+
+    private async Task AddGroupAsync()
+    {
+        if (string.IsNullOrEmpty(_selectedGroupId)) return;
+        try
+        {
+            var actor = ActorAccessor.GetRequiredActor();
+            var result = await GroupsService.AddMemberAsync(actor, _selectedGroupId, UserId);
+            if (result.Success)
+            {
+                Snackbar.Add("已加入组", Severity.Success);
+                _selectedGroupId = null;
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "加入失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加入失败：{ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RemoveGroupAsync(string path)
+    {
+        if (!_groupPathToId.TryGetValue(path, out var groupId))
+        {
+            Snackbar.Add("无法定位该组", Severity.Warning);
+            return;
+        }
+        try
+        {
+            var actor = ActorAccessor.GetRequiredActor();
+            var result = await GroupsService.RemoveMemberAsync(actor, groupId, UserId);
+            if (result.Success)
+            {
+                Snackbar.Add("已移出组", Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "移出失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"移出失败：{ex.Message}", Severity.Error);
+        }
+    }
+}
