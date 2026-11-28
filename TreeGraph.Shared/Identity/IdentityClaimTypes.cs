@@ -21,8 +21,8 @@ public static class IdentityClaimTypes
     /// <summary>用户名。</summary>
     public const string PreferredUsername = "preferred_username";
 
-    /// <summary>邮箱。</summary>
-    public const string Email = "email";
+    /// <summary>令牌签发时间（Unix 秒），用于撤销旧令牌。</summary>
+    public const string IssuedAt = "iat";
 
     /// <summary>显示名。</summary>
     public const string Name = "name";

@@ -8,6 +8,11 @@
   "supportedLocales": ["zh-CN"],
   "enabled": true,
   "registrationAllowed": false,
+  "loginWithEmailAllowed": false,
+  "registrationEmailAsUsername": false,
+  "resetPasswordAllowed": false,
+  "verifyEmail": false,
+  "editUsernameAllowed": false,
   "sslRequired": "external",
   "bruteForceProtected": true,
   "passwordPolicy": "length(8) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1)",
@@ -18,24 +23,34 @@
   "roles": {
     "realm": [
       {
+        "id": "20000000-0000-4000-8000-000000000001",
+        "name": "app-superuser",
+        "description": "超级用户",
+        "composite": false
+      },
+      {
+        "id": "20000000-0000-4000-8000-000000000002",
         "name": "app-admin",
-        "description": "管理台入口与高危操作",
+        "description": "管理员",
         "composite": false
       },
       {
+        "id": "20000000-0000-4000-8000-000000000003",
         "name": "app-editor",
-        "description": "业务写权限",
+        "description": "编辑用户",
         "composite": false
       },
       {
+        "id": "20000000-0000-4000-8000-000000000004",
         "name": "app-viewer",
-        "description": "业务只读",
+        "description": "普通用户",
         "composite": false
       }
     ]
   },
   "clients": [
     {
+      "id": "10000000-0000-4000-8000-000000000001",
       "clientId": "treegraph-web",
       "name": "TreeGraph Web",
       "description": "Blazor Server 管理台登录客户端",
@@ -102,6 +117,7 @@
       ]
     },
     {
+      "id": "10000000-0000-4000-8000-000000000002",
       "clientId": "treegraph-maui",
       "name": "TreeGraph MAUI",
       "description": "MAUI 客户端登录（公共客户端 + PKCE）",
@@ -149,6 +165,7 @@
       ]
     },
     {
+      "id": "10000000-0000-4000-8000-000000000003",
       "clientId": "treegraph-wasm",
       "name": "TreeGraph WebAssembly",
       "description": "纯 WASM 管理台公共客户端（Authorization Code + PKCE S256）",
@@ -214,6 +231,7 @@
       ]
     },
     {
+      "id": "10000000-0000-4000-8000-000000000004",
       "clientId": "treegraph-admin",
       "name": "TreeGraph Admin API",
       "description": "管理调用 service account（client_credentials）",
@@ -234,6 +252,7 @@
   ],
   "groups": [
     {
+      "id": "30000000-0000-4000-8000-000000000001",
       "name": "Admin",
       "path": "/Admin",
       "attributes": {
@@ -244,6 +263,7 @@
       "subGroups": []
     },
     {
+      "id": "30000000-0000-4000-8000-000000000002",
       "name": "diberysky",
       "path": "/diberysky",
       "attributes": {
@@ -254,6 +274,7 @@
       "subGroups": []
     },
     {
+      "id": "30000000-0000-4000-8000-000000000003",
       "name": "spaces",
       "path": "/spaces",
       "attributes": {

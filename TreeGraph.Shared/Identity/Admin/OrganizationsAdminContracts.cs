@@ -43,9 +43,8 @@ public sealed record UpdateOrganizationRequest(
 public sealed record OrganizationMember(
     string UserId,
     string? Username,
-    string? Email,
-    string? FirstName,
-    string? LastName);
+    string? RealName,
+    string? PhoneNumber);
 
 /// <summary>组织管理服务（Keycloak 26 Organizations）。</summary>
 public interface IOrganizationsAdminService

@@ -1,7 +1,7 @@
 namespace TreeGraph.Shared.Identity.Admin;
 
 /// <summary>
-/// 用户禁用后的撤销标记。命中即拒绝该 sub 的既有 Cookie / 令牌。
+/// 用户撤销时间戳。禁用、重置密码或全部下线时写入；只拒绝时间不晚于该时间戳的旧令牌。
 /// </summary>
 public interface IIdentityRevocationStore
 {

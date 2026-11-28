@@ -43,12 +43,13 @@ public static partial class AdminApiEndpointExtensions
                 CancellationToken ct) =>
             Results.Ok(await service.ListUserSessionsAsync(userId, ct)));
 
-        admin.MapDelete("/sessions/{sessionId}", async (
+        admin.MapDelete("/users/{userId}/sessions/{sessionId}", async (
+                string userId,
                 string sessionId,
                 ISessionsAdminService service,
                 IAdminActorAccessor actorAccessor,
                 CancellationToken ct) =>
-            ToHttpResult(await service.LogoutSessionAsync(actorAccessor.GetRequiredActor(), sessionId, ct)));
+            ToHttpResult(await service.LogoutSessionAsync(actorAccessor.GetRequiredActor(), userId, sessionId, ct)));
 
         admin.MapDelete("/users/{userId}/sessions", async (
                 string userId,

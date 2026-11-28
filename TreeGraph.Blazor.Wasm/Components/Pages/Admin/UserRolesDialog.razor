@@ -29,7 +29,7 @@
                            Style="width: 260px">
                     @foreach (var r in _availableRoles)
                     {
-                        <MudSelectItem T="string" Value="@r.Name">@r.Name</MudSelectItem>
+                        <MudSelectItem T="string" Value="@r.Name">@IdentityRoles.GetDisplayName(r.Name)</MudSelectItem>
                     }
                 </MudSelect>
                 <MudButton Variant="Variant.Filled"
@@ -52,7 +52,7 @@
                              Variant="Variant.Filled"
                              Class="ma-1"
                              OnClose="@(() => RemoveRoleAsync(role))">
-                        @role
+                        @IdentityRoles.GetDisplayName(role)
                     </MudChip>
                 }
             }
@@ -72,7 +72,11 @@
     private string? _selectedRoleName;
 
     private IEnumerable<IdentityRole> _availableRoles
-        => _allRoles.Where(r => _user is not null && !_user.Roles.Contains(r.Name, StringComparer.Ordinal));
+        => _allRoles.Where(r => _user is not null
+                                && r.Name != IdentityRoles.Superuser
+                                && !_user.Roles.Contains(r.Name, StringComparer.Ordinal)
+                                && (ActorAccessor.GetRequiredActor().IsSuperuser
+                                    || r.Name is not (IdentityRoles.Admin or "app_admin")));
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 

@@ -1,81 +1,73 @@
 @using Microsoft.AspNetCore.Components
 @using MudBlazor
+@using TreeGraph.Shared.Identity
 @using TreeGraph.Shared.Identity.Admin
 @inject IUsersAdminService UsersService
 @inject IAdminActorAccessor ActorAccessor
 @inject ISnackbar Snackbar
 
-<MudDialog>
-    <TitleContent>
-        <MudText Typo="Typo.h6">新建用户</MudText>
-    </TitleContent>
+<DialogSky Title="新建用户"
+           MaxWidth="MaxWidth.Small"
+           FullWidth="true"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
+           SubmitButtonColor="Color.Primary"
+           SubmitButtonDisabled="@_submitting"
+           OnSubmitClick="CreateAsync">
     <DialogContent>
+        @if (_isSuperuser)
+        {
+            <MudSelect T="string"
+                       @bind-Value="_accountRole"
+                       Label="账号类型"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                <MudSelectItem T="string" Value="@IdentityRoles.Viewer">普通用户</MudSelectItem>
+                <MudSelectItem T="string" Value="@IdentityRoles.Admin">管理员</MudSelectItem>
+            </MudSelect>
+        }
         <MudTextField @bind-Value="_username"
-                      Label="用户名"
+                      Label="@(_accountRole == IdentityRoles.Admin ? "用户名" : "手机号")"
+                      HelperText="@(_accountRole == IdentityRoles.Admin ? "3-64 位字母、数字、点、下划线或短横线，以字母开头" : "中国大陆 11 位手机号，同时作为登录名")"
                       Variant="Variant.Outlined"
                       Class="mb-3"
                       Required="true" />
-        <MudTextField @bind-Value="_email"
-                      Label="邮箱"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
-        <MudGrid>
-            <MudItem xs="6">
-                <MudTextField @bind-Value="_firstName"
-                              Label="名"
-                              Variant="Variant.Outlined"
-                              Class="mb-3" />
-            </MudItem>
-            <MudItem xs="6">
-                <MudTextField @bind-Value="_lastName"
-                              Label="姓"
-                              Variant="Variant.Outlined"
-                              Class="mb-3" />
-            </MudItem>
-        </MudGrid>
-        <MudTextField @bind-Value="_temporaryPassword"
-                      Label="临时密码（留空则不设置密码）"
+        <MudTextField @bind-Value="_realName"
+                      Label="真实姓名"
                       Variant="Variant.Outlined"
                       Class="mb-3"
-                      InputType="InputType.Password" />
-        <MudCheckBox @bind-Value="_requirePasswordChange"
-                     Label="首次登录强制修改密码"
-                     Color="Color.Primary"
-                     Class="mb-3" />
-        <MudCheckBox @bind-Value="_emailVerified"
-                     Label="邮箱已验证"
-                     Color="Color.Primary" />
+                      Required="true" />
+        <MudTextField @bind-Value="_temporaryPassword"
+                      Label="初始密码"
+                      Variant="Variant.Outlined"
+                      Class="mb-3"
+                      InputType="InputType.Password"
+                      Required="true" />
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+            首次登录必须修改密码。普通用户默认授予「普通用户」角色；管理员同时具有业务写权限。
+        </MudAlert>
     </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="Cancel">取消</MudButton>
-        <MudButton Color="Color.Primary"
-                   Variant="Variant.Filled"
-                   Disabled="@_submitting"
-                   OnClick="CreateAsync">
-            @(_submitting ? "创建中..." : "创建")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+</DialogSky>
 
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
 
     private string _username = string.Empty;
-    private string? _email;
-    private string? _firstName;
-    private string? _lastName;
-    private string? _temporaryPassword;
-    private bool _requirePasswordChange = true;
-    private bool _emailVerified;
+    private string _realName = string.Empty;
+    private string _temporaryPassword = string.Empty;
+    private string _accountRole = IdentityRoles.Viewer;
+    private bool _isSuperuser;
     private bool _submitting;
 
-    private void Cancel() => MudDialog.Cancel();
+    protected override void OnInitialized()
+        => _isSuperuser = ActorAccessor.GetRequiredActor().IsSuperuser;
 
     private async Task CreateAsync()
     {
-        if (string.IsNullOrWhiteSpace(_username))
+        if (string.IsNullOrWhiteSpace(_username) || string.IsNullOrWhiteSpace(_realName)
+            || string.IsNullOrWhiteSpace(_temporaryPassword))
         {
-            Snackbar.Add("请填写用户名", Severity.Warning);
+            Snackbar.Add("请填写登录名、真实姓名和初始密码", Severity.Warning);
             return;
         }
 
@@ -83,15 +75,15 @@
         try
         {
             var actor = ActorAccessor.GetRequiredActor();
+            var isAdmin = _isSuperuser && _accountRole == IdentityRoles.Admin;
             var request = new CreateUserRequest(
                 Username: _username.Trim(),
-                Email: string.IsNullOrWhiteSpace(_email) ? null : _email,
-                FirstName: string.IsNullOrWhiteSpace(_firstName) ? null : _firstName,
-                LastName: string.IsNullOrWhiteSpace(_lastName) ? null : _lastName,
-                Enabled: true,
-                EmailVerified: _emailVerified,
-                TemporaryPassword: string.IsNullOrWhiteSpace(_temporaryPassword) ? null : _temporaryPassword,
-                RequirePasswordChange: _requirePasswordChange);
+                RealName: _realName.Trim(),
+                TemporaryPassword: _temporaryPassword,
+                RealmRoles: isAdmin
+                    ? [IdentityRoles.Admin, IdentityRoles.Editor]
+                    : [IdentityRoles.Viewer],
+                RequirePasswordChange: true);
 
             var result = await UsersService.CreateAsync(actor, request);
             if (result.Success)

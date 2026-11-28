@@ -38,7 +38,7 @@ builder.Services.AddScoped<AuthenticationStateProvider, WasmAuthenticationStateP
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorizationCore(options =>
     options.AddPolicy(IdentityConstants.AdminOnlyPolicy, policy =>
-        policy.RequireRole(IdentityRoles.Admin, "app_admin")));
+        policy.RequireRole(IdentityRoles.Superuser, IdentityRoles.Admin, "app_admin")));
 builder.Services.AddTransient<BearerAuthenticationHandler>();
 
 builder.Services.AddMudServices();

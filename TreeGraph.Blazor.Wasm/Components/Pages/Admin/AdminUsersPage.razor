@@ -26,7 +26,7 @@
           LoadingProgressColor="Color.Primary">
     <ToolBarContent>
         <MudTextField @bind-Value="_search"
-                      Placeholder="搜索用户名/邮箱"
+                      Placeholder="搜索手机号/用户名"
                       Variant="Variant.Outlined"
                       Adornment="Adornment.Start"
                       AdornmentIcon="@Icons.Material.Outlined.Search"
@@ -50,9 +50,9 @@
                    OnClick="ReloadAsync">刷新</MudButton>
     </ToolBarContent>
     <HeaderContent>
-        <MudTh>用户名</MudTh>
-        <MudTh>邮箱</MudTh>
-        <MudTh>姓名</MudTh>
+        <MudTh>登录名</MudTh>
+        <MudTh>真实姓名</MudTh>
+        <MudTh>手机号</MudTh>
         <MudTh>状态</MudTh>
         <MudTh>创建时间</MudTh>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
@@ -69,16 +69,8 @@
         <MudTd>
             <MudText Typo="Typo.body2">@context.Username</MudText>
         </MudTd>
-        <MudTd>
-            @(context.Email ?? "—")
-            @if (context.EmailVerified)
-            {
-                <MudIcon Icon="@Icons.Material.Outlined.VerifiedUser" Size="Size.Small" Color="Color.Success" Class="ml-1" />
-            }
-        </MudTd>
-        <MudTd>
-            @($"{context.FirstName} {context.LastName}".Trim())
-        </MudTd>
+        <MudTd>@(context.RealName ?? "—")</MudTd>
+        <MudTd>@(context.PhoneNumber ?? "—")</MudTd>
         <MudTd>
             @if (context.Enabled)
             {
@@ -162,27 +154,30 @@
                                                    title="活跃会话" />
                                 </td>
                             </tr>
-                            <tr>
-                                <td>状态</td>
-                                <td style="white-space: nowrap; text-align: right;">
-                                    @if (context.Enabled)
-                                    {
-                                        <MudIconButton Icon="@Icons.Material.Outlined.Block"
-                                                       Color="Color.Error"
-                                                       Size="Size.Small"
-                                                       OnClick="@(async () => await ConfirmDisableAsync(context))"
-                                                       title="禁用用户" />
-                                    }
-                                    else
-                                    {
-                                        <MudIconButton Icon="@Icons.Material.Outlined.CheckCircle"
-                                                       Color="Color.Success"
-                                                       Size="Size.Small"
-                                                       OnClick="@(async () => await ConfirmEnableAsync(context))"
-                                                       title="启用用户" />
-                                    }
-                                </td>
-                            </tr>
+                            @if (context.Username != IdentityConstants.SuperuserUsername)
+                            {
+                                <tr>
+                                    <td>状态</td>
+                                    <td style="white-space: nowrap; text-align: right;">
+                                        @if (context.Enabled)
+                                        {
+                                            <MudIconButton Icon="@Icons.Material.Outlined.Block"
+                                                           Color="Color.Error"
+                                                           Size="Size.Small"
+                                                           OnClick="@(async () => await ConfirmDisableAsync(context))"
+                                                           title="禁用用户" />
+                                        }
+                                        else
+                                        {
+                                            <MudIconButton Icon="@Icons.Material.Outlined.CheckCircle"
+                                                           Color="Color.Success"
+                                                           Size="Size.Small"
+                                                           OnClick="@(async () => await ConfirmEnableAsync(context))"
+                                                           title="启用用户" />
+                                        }
+                                    </td>
+                                </tr>
+                            }
                         </tbody>
                     </MudSimpleTable>
                 </td>
@@ -340,7 +335,10 @@
         {
             FullWidth = true
         };
-        await DialogService.ShowAsync<UserProfileDialog>(string.Empty, parameters, options);
+        var dialog = await DialogService.ShowAsync<UserProfileDialog>(string.Empty, parameters, options);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+            await ReloadAsync();
     }
 
     private async Task OpenGroupsAsync(IdentityUserSummary user)

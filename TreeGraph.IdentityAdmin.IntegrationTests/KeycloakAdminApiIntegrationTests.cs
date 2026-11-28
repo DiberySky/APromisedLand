@@ -1,6 +1,10 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using Microsoft.Extensions.Logging.Abstractions;
+using TreeGraph.IdentityAdmin.Bootstrap;
+using TreeGraph.IdentityAdmin.Options;
+using TreeGraph.Shared.Identity;
 using Xunit;
 
 namespace TreeGraph.IdentityAdmin.IntegrationTests;
@@ -59,9 +63,8 @@ public class KeycloakAdminApiIntegrationTests
         var created = await _fixture.Client.SendAsync(HttpMethod.Post, "users", new
         {
             username,
-            email = $"{username}@example.com",
             enabled = true,
-            emailVerified = false
+            attributes = new Dictionary<string, string[]> { ["realName"] = ["Integration Test"] }
         });
         Assert.True(created.IsSuccess);
 
@@ -73,9 +76,7 @@ public class KeycloakAdminApiIntegrationTests
 
         var updated = await _fixture.Client.SendAsync(HttpMethod.Put, $"users/{userId}", new
         {
-            firstName = "Integration",
-            lastName = "Test",
-            email = $"{username}@example.com",
+            attributes = new Dictionary<string, string[]> { ["realName"] = ["Integration Updated"] },
             enabled = true
         });
         Assert.True(updated.IsSuccess);
@@ -88,6 +89,86 @@ public class KeycloakAdminApiIntegrationTests
 
         var missing = await _fixture.Client.GetAsync($"users/{userId}");
         Assert.Equal((int)HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Fact]
+    public async Task Bootstrap_SeedsFixedUsersAndDoesNotOverwriteChangedPassword()
+    {
+        var options = new KeycloakAdminOptions
+        {
+            AdminBaseUrl = _fixture.BaseUrl,
+            Realm = _fixture.Client.Realm,
+            AdminClientId = "treegraph-admin",
+            AdminClientSecret = "BootstrapClientSecret1!",
+            WebClientSecret = "WebClientSecret1!",
+            SeedSuperuserPassword = "SeedSuperPassword1!",
+            SeedDevelopmentUsers = true,
+            SeedAdminPassword = "SeedAdminPassword1!",
+            SeedUserPassword = "SeedUserPassword1!"
+        };
+        var bootstrap = new KeycloakBootstrapService(
+            _fixture.Client,
+            new StaticOptionsMonitor<KeycloakAdminOptions>(options),
+            TimeProvider.System,
+            NullLogger<KeycloakBootstrapService>.Instance);
+
+        await bootstrap.RunAsync();
+
+        async Task<JsonElement> FindUser(string username)
+        {
+            var response = await _fixture.Client.GetAsync(
+                $"users?username={Uri.EscapeDataString(username)}&exact=true&briefRepresentation=false");
+            Assert.True(response.IsSuccess, response.Body);
+            using var document = JsonDocument.Parse(response.Body);
+            return document.RootElement.EnumerateArray().Single().Clone();
+        }
+
+        var superuser = await FindUser(IdentityConstants.SuperuserUsername);
+        Assert.Equal(IdentityConstants.SuperuserId, superuser.GetProperty("id").GetString());
+        Assert.Contains("UPDATE_PASSWORD", superuser.GetProperty("requiredActions").EnumerateArray().Select(x => x.GetString()));
+        Assert.Equal(IdentityConstants.DevelopmentAdminId,
+            (await FindUser(IdentityConstants.DevelopmentAdminUsername)).GetProperty("id").GetString());
+        var ordinary = await FindUser(IdentityConstants.DevelopmentUserUsername);
+        Assert.Equal(IdentityConstants.DevelopmentUserId, ordinary.GetProperty("id").GetString());
+        Assert.Equal(IdentityConstants.DevelopmentUserUsername,
+            ordinary.GetProperty("attributes").GetProperty("phoneNumber")[0].GetString());
+
+        var reset = await _fixture.Client.SendAsync(
+            HttpMethod.Put,
+            $"users/{IdentityConstants.SuperuserId}/reset-password",
+            new { type = "password", value = "ChangedPassword1!", temporary = false });
+        Assert.True(reset.IsSuccess, reset.Body);
+        var clearRequiredAction = await _fixture.Client.SendAsync(
+            HttpMethod.Put,
+            $"users/{IdentityConstants.SuperuserId}",
+            new
+            {
+                username = IdentityConstants.SuperuserUsername,
+                enabled = true,
+                requiredActions = Array.Empty<string>(),
+                attributes = new Dictionary<string, string[]> { ["realName"] = ["已修改姓名"] }
+            });
+        Assert.True(clearRequiredAction.IsSuccess, clearRequiredAction.Body);
+
+        await bootstrap.RunAsync();
+
+        var preserved = await FindUser(IdentityConstants.SuperuserUsername);
+        Assert.Empty(preserved.GetProperty("requiredActions").EnumerateArray());
+        Assert.Equal("已修改姓名", preserved.GetProperty("attributes").GetProperty("realName")[0].GetString());
+
+        using var http = new HttpClient();
+        using var tokenResponse = await http.PostAsync(
+            $"{_fixture.BaseUrl}/realms/{_fixture.Client.Realm}/protocol/openid-connect/token",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["grant_type"] = "password",
+                ["client_id"] = "admin-cli",
+                ["username"] = IdentityConstants.SuperuserUsername,
+                ["password"] = "ChangedPassword1!"
+            }));
+        Assert.True(tokenResponse.IsSuccessStatusCode, await tokenResponse.Content.ReadAsStringAsync());
+        using var token = JsonDocument.Parse(await tokenResponse.Content.ReadAsStringAsync());
+        Assert.False(string.IsNullOrWhiteSpace(token.RootElement.GetProperty("access_token").GetString()));
     }
 
     [Fact]

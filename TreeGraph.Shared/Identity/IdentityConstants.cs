@@ -5,6 +5,21 @@ namespace TreeGraph.Shared.Identity;
 /// </summary>
 public static class IdentityConstants
 {
+    public const string Realm = "apromisedland";
+    public const string WasmClientId = "treegraph-wasm";
+
+    /// <summary>唯一超级用户的固定登录名和重建 ID。</summary>
+    public const string SuperuserUsername = "DiberySky";
+    public const string SuperuserId = "40000000-0000-4000-8000-000000000001";
+
+    /// <summary>开发环境管理员测试账号。</summary>
+    public const string DevelopmentAdminUsername = "admin";
+    public const string DevelopmentAdminId = "40000000-0000-4000-8000-000000000002";
+
+    /// <summary>开发环境手机号普通用户测试账号。</summary>
+    public const string DevelopmentUserUsername = "13908639757";
+    public const string DevelopmentUserId = "40000000-0000-4000-8000-000000000003";
+
     /// <summary>空间组成员组名前缀，形如 <c>space-{spaceId}</c>。</summary>
     public const string SpaceGroupPrefix = "space-";
 

@@ -66,8 +66,8 @@ public sealed partial class IdentityAdminApiClient(
     public Task<IReadOnlyList<IdentitySession>> ListUserSessionsAsync(string userId, CancellationToken ct = default)
         => GetRequiredAsync<IReadOnlyList<IdentitySession>>("users/" + Id(userId) + "/sessions", ct);
 
-    public Task<AdminResult> LogoutSessionAsync(AdminActor actor, string sessionId, CancellationToken ct = default)
-        => SendResultAsync(HttpMethod.Delete, "sessions/" + Id(sessionId), null, ct);
+    public Task<AdminResult> LogoutSessionAsync(AdminActor actor, string userId, string sessionId, CancellationToken ct = default)
+        => SendResultAsync(HttpMethod.Delete, "users/" + Id(userId) + "/sessions/" + Id(sessionId), null, ct);
 
     public Task<AdminResult> LogoutAllUserSessionsAsync(AdminActor actor, string userId, CancellationToken ct = default)
         => SendResultAsync(HttpMethod.Delete, "users/" + Id(userId) + "/sessions", null, ct);

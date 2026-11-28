@@ -46,6 +46,14 @@ public sealed class AdminUsersApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Users_Superuser_ReturnsResults()
+    {
+        var response = await SendAsync("/api/admin/users", role: IdentityRoles.Superuser);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, _factory.Users.SearchCount);
+    }
+
+    [Fact]
     public async Task Disable_StaleAuthentication_Returns428WithoutCallingService()
     {
         var response = await SendAsync(
@@ -176,12 +184,12 @@ public sealed class FakeUsersAdminService : IUsersAdminService
         SearchCount++;
         LastSearch = request;
         return Task.FromResult(new PagedResult<IdentityUserSummary>(
-            [new IdentityUserSummary("user-1", "alice", null, null, null, true, true, null)], 1, request.Page, request.PageSize));
+            [new IdentityUserSummary("user-1", "alice", null, null, true, null)], 1, request.Page, request.PageSize));
     }
 
     public Task<IdentityUserDetail?> GetAsync(string userId, CancellationToken ct = default)
         => Task.FromResult<IdentityUserDetail?>(new IdentityUserDetail(
-            userId, "alice", null, null, null, true, true, null, [], [], [],
+            userId, "alice", null, null, true, null, [], [], [],
             new Dictionary<string, IReadOnlyList<string>>()));
 
     public Task<AdminResult<DisableUserResult>> DisableAsync(AdminActor actor, string userId, CancellationToken ct = default)

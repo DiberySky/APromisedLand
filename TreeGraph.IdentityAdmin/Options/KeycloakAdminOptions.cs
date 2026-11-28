@@ -52,6 +52,18 @@ public sealed class KeycloakAdminOptions
     /// <summary>期望的 Keycloak 版本（用于健康检查门禁）。</summary>
     public string ExpectedVersion { get; set; } = "26.6.3";
 
+    /// <summary>唯一超级用户初始密码；必须由秘密存储注入，仅首次创建使用。</summary>
+    public string SeedSuperuserPassword { get; set; } = string.Empty;
+
+    /// <summary>是否预置开发测试账号。</summary>
+    public bool SeedDevelopmentUsers { get; set; }
+
+    /// <summary>开发管理员初始密码；仅首次创建使用。</summary>
+    public string SeedAdminPassword { get; set; } = string.Empty;
+
+    /// <summary>开发普通用户初始密码；仅首次创建使用。</summary>
+    public string SeedUserPassword { get; set; } = string.Empty;
+
     /// <summary>审计库连接字符串名称。</summary>
     public string ConnectionStringName { get; set; } = "IdentityAdminDb";
 }

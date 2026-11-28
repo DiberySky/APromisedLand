@@ -12,9 +12,9 @@
         <MudSimpleTable Dense="true" Hover="true">
             <thead>
                 <tr>
-                    <th>用户名</th>
-                    <th>邮箱</th>
-                    <th>姓名</th>
+                    <th>登录名</th>
+                    <th>真实姓名</th>
+                    <th>手机号</th>
                     <th>状态</th>
                 </tr>
             </thead>
@@ -27,8 +27,8 @@
                 {
                     <tr>
                         <td>@m.Username</td>
-                        <td>@(m.Email ?? "—")</td>
-                        <td>@(string.IsNullOrWhiteSpace($"{m.FirstName} {m.LastName}".Trim()) ? "—" : $"{m.FirstName} {m.LastName}".Trim())</td>
+                        <td>@(m.RealName ?? "—")</td>
+                        <td>@(m.PhoneNumber ?? "—")</td>
                         <td>
                             <MudChip T="string" Size="Size.Small" Color="@(m.Enabled ? Color.Success : Color.Error)" Variant="Variant.Filled">
                                 @(m.Enabled ? "启用" : "禁用")

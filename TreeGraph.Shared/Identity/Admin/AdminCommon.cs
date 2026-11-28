@@ -6,8 +6,11 @@ namespace TreeGraph.Shared.Identity.Admin;
 /// </summary>
 public sealed record AdminActor(string Sub, string Username, IReadOnlyList<string> Roles)
 {
-    /// <summary>是否具备 admin 角色（接受 app-admin 和 app_admin 两种拼写）。</summary>
-    public bool IsAdmin => IdentityRoles.HasAdminRole(Roles);
+    /// <summary>是否具备超级用户角色。</summary>
+    public bool IsSuperuser => IdentityRoles.HasSuperuserRole(Roles);
+
+    /// <summary>是否可进入管理台；超级用户包含管理员权限。</summary>
+    public bool IsAdmin => IsSuperuser || IdentityRoles.HasAdminRole(Roles);
 }
 
 /// <summary>无返回值的操作结果。</summary>

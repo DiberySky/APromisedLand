@@ -11,7 +11,7 @@
                     <#if !usernameHidden??>
                         <div class="${properties.kcFormGroupClass!} kc-mudfield">
                             <div class="kc-mud-input">
-                                <input tabindex="2" id="username" class="${properties.kcInputClass!}" name="username" value="${(login.username!'dibery')}"  type="text"
+                                <input tabindex="2" id="username" class="${properties.kcInputClass!}" name="username" value="${(login.username!'')}"  type="text"
                                        placeholder=" "
                                        autofocus autocomplete="${(enableWebAuthnConditionalUI?has_content)?then('username webauthn', 'username')}"
                                        aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>"
@@ -33,7 +33,7 @@
                     <div class="${properties.kcFormGroupClass!} kc-mudfield">
                         <div class="kc-mud-input">
                             <div class="${properties.kcInputGroup!} kc-mud-input-group" dir="ltr">
-                                <input tabindex="3" id="password" class="${properties.kcInputClass!}" name="password" type="password" autocomplete="current-password" value="P@ssw0rd"
+                                <input tabindex="3" id="password" class="${properties.kcInputClass!}" name="password" type="password" autocomplete="current-password"
                                        placeholder=" "
                                        aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>"
                                 />

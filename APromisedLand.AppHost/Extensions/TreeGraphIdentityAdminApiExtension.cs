@@ -9,6 +9,7 @@ public static class TreeGraphIdentityAdminApiExtension
         if (context.Keycloak is null || context.Redis is null || context.IdentityAdminDb is null)
             throw new InvalidOperationException("IdentityAdmin.Api 需要 Keycloak、Redis 与 IdentityAdminDb。");
 
+        var keycloakEndpoint = context.Keycloak.GetEndpoint("http");
         var api = builder.AddProject<Projects.TreeGraph_IdentityAdmin_Api>("treegraphidentityadminapi")
             .WithHttpEndpoint(port: 5785, name: "http")
             .WithExternalHttpEndpoints()
@@ -20,8 +21,8 @@ public static class TreeGraphIdentityAdminApiExtension
             .WaitFor(context.Redis)
             .WithReference(context.IdentityAdminDb)
             .WaitFor(context.IdentityAdminDb)
-            .WithEnvironment("Keycloak__Authority", "https://localhost:8323/realms/apromisedland")
-            .WithEnvironment("Keycloak__AdminBaseUrl", "https://localhost:8323")
+            .WithEnvironment("Keycloak__Authority", ReferenceExpression.Create($"{keycloakEndpoint}/realms/apromisedland"))
+            .WithEnvironment("Keycloak__AdminBaseUrl", ReferenceExpression.Create($"{keycloakEndpoint}"))
             .WithEnvironment("Keycloak__Realm", "apromisedland")
             .WithEnvironment("Keycloak__Audience", "treegraph-wasm")
             .WithEnvironment("Keycloak__WebClientId", "treegraph-web")
@@ -32,14 +33,22 @@ public static class TreeGraphIdentityAdminApiExtension
             .WithEnvironment("Keycloak__WasmBaseUrl", "https://localhost:5787")
             .WithEnvironment("Cors__WasmOrigins__0", "https://localhost:5787")
             .WithEnvironment("IdentityAdmin__EnableBootstrap", "true")
-            .WithEnvironment("IdentityAdmin__EnableDatabaseMigration", "true");
+            .WithEnvironment("IdentityAdmin__EnableDatabaseMigration", "true")
+            .WithEnvironment("Keycloak__SeedDevelopmentUsers", builder.Environment.EnvironmentName == "Development" ? "true" : "false");
 
+        if (context.SeedSuperuserPassword is not null)
+            api.WithEnvironment("Keycloak__SeedSuperuserPassword", context.SeedSuperuserPassword);
+        if (context.SeedAdminPassword is not null)
+            api.WithEnvironment("Keycloak__SeedAdminPassword", context.SeedAdminPassword);
+        if (context.SeedUserPassword is not null)
+            api.WithEnvironment("Keycloak__SeedUserPassword", context.SeedUserPassword);
         if (context.KeycloakWebClientSecret is not null)
             api.WithEnvironment("Keycloak__WebClientSecret", context.KeycloakWebClientSecret);
         if (context.KeycloakAdminClientSecret is not null)
             api.WithEnvironment("Keycloak__AdminClientSecret", context.KeycloakAdminClientSecret);
 
         context.TreeGraphIdentityAdminApi = api;
+        api.WithHttpHealthCheck(path: "/health", statusCode: 200, endpointName: "http");
         api.WithOtlpExporter();
         return builder;
     }

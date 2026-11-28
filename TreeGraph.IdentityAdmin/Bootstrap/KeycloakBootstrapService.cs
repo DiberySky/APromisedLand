@@ -18,11 +18,12 @@ public sealed class KeycloakBootstrapService : IHostedService
 {
     private const string Module = "bootstrap";
 
-    private static readonly (string Name, string Description)[] RealmRoles =
+    private static readonly (string Id, string Name, string Description)[] RealmRoles =
     [
-        (IdentityRoles.Admin, "管理台入口与高危操作"),
-        (IdentityRoles.Editor, "业务写权限"),
-        (IdentityRoles.Viewer, "业务只读")
+        ("20000000-0000-4000-8000-000000000001", IdentityRoles.Superuser, "超级用户"),
+        ("20000000-0000-4000-8000-000000000002", IdentityRoles.Admin, "管理员"),
+        ("20000000-0000-4000-8000-000000000003", IdentityRoles.Editor, "编辑用户"),
+        ("20000000-0000-4000-8000-000000000004", IdentityRoles.Viewer, "普通用户")
     ];
 
     private static readonly string[] RealmManagementRoles =
@@ -49,17 +50,9 @@ public sealed class KeycloakBootstrapService : IHostedService
         _logger = logger;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await RunAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Keycloak 引导配置失败；管理功能可能不可用");
-        }
-    }
+    public Task StartAsync(CancellationToken cancellationToken)
+        // 初始化失败时让 API 不就绪，阻止 WASM 在身份体系不完整时启动。
+        => RunAsync(cancellationToken);
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -68,9 +61,11 @@ public sealed class KeycloakBootstrapService : IHostedService
         var options = _options.CurrentValue;
         _logger.LogInformation("开始应用 Keycloak realm 引导配置：realm={Realm}", _client.Realm);
 
-        await EnsureRealmSettingsAsync(options, ct).ConfigureAwait(false);
-        await EnsureRolesAsync(ct).ConfigureAwait(false);
+        // 默认组必须先存在，否则空 realm 更新 defaultGroups 会返回 500。
         await EnsureGroupsAsync(ct).ConfigureAwait(false);
+        await EnsureRealmSettingsAsync(options, ct).ConfigureAwait(false);
+        await EnsureUserProfileAsync(ct).ConfigureAwait(false);
+        await EnsureRolesAsync(ct).ConfigureAwait(false);
 
         var webClientId = await EnsureClientAsync(
                 options.WebClientId,
@@ -131,6 +126,7 @@ public sealed class KeycloakBootstrapService : IHostedService
 
         await AssignRealmManagementRolesAsync(adminClientId, ct).ConfigureAwait(false);
         await EnsureKcAdminApiScopeAsync(adminClientId, ct).ConfigureAwait(false);
+        await EnsureSeedUsersAsync(options, ct).ConfigureAwait(false);
 
         _logger.LogInformation("Keycloak realm 引导配置完成：realm={Realm}", _client.Realm);
     }
@@ -150,9 +146,13 @@ public sealed class KeycloakBootstrapService : IHostedService
             return;
 
         node["registrationAllowed"] = false;
+        node["loginWithEmailAllowed"] = false;
+        node["registrationEmailAsUsername"] = false;
+        node["resetPasswordAllowed"] = false;
+        node["verifyEmail"] = false;
         node["bruteForceProtected"] = true;
         node["passwordPolicy"] =
-            "length(12) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1)";
+            "length(8) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1)";
         node["accessTokenLifespan"] = 600;
         node["ssoSessionIdleTimeout"] = 1800;
         node["ssoSessionMaxLifespan"] = 28800;
@@ -167,12 +167,45 @@ public sealed class KeycloakBootstrapService : IHostedService
 
         ThrowIfUnauthorized(response, "更新 realm 设置");
         if (!response.IsSuccess)
-            _logger.LogWarning("更新 realm 设置失败：HTTP {Status}", response.StatusCode);
+            throw new InvalidOperationException(
+                $"更新 realm 设置失败：HTTP {response.StatusCode} {response.Body}");
+    }
+
+    private async Task EnsureUserProfileAsync(CancellationToken ct)
+    {
+        var current = await _client.GetAsync("users/profile", Module, ct).ConfigureAwait(false);
+        ThrowIfUnauthorized(current, "读取 User Profile");
+        if (!current.IsSuccess)
+            throw new InvalidOperationException(
+                $"读取 User Profile 失败：HTTP {current.StatusCode} {current.Body}");
+
+        var config = JsonNode.Parse(current.Body)?.AsObject();
+        if (config is null)
+            throw new InvalidOperationException("User Profile 配置解析失败");
+
+        config["unmanagedAttributePolicy"] = "ENABLED";
+        if (config["attributes"] is JsonArray attributes)
+        {
+            foreach (var attribute in attributes.OfType<JsonObject>())
+            {
+                var name = (string?)attribute["name"];
+                if (name is "email" or "firstName" or "lastName")
+                    attribute.Remove("required");
+            }
+        }
+
+        var response = await _client
+            .SendAsync(HttpMethod.Put, "users/profile", config, Module, ct)
+            .ConfigureAwait(false);
+        ThrowIfUnauthorized(response, "启用未托管用户属性");
+        if (!response.IsSuccess)
+            throw new InvalidOperationException(
+                $"启用未托管用户属性失败：HTTP {response.StatusCode} {response.Body}");
     }
 
     private async Task EnsureRolesAsync(CancellationToken ct)
     {
-        foreach (var (name, description) in RealmRoles)
+        foreach (var (id, name, description) in RealmRoles)
         {
             var existing = await _client
                 .GetAsync($"roles/{Uri.EscapeDataString(name)}", Module, ct)
@@ -186,7 +219,7 @@ public sealed class KeycloakBootstrapService : IHostedService
                 .SendAsync(
                     HttpMethod.Post,
                     "roles",
-                    new { name, description, composite = false },
+                    new { id, name, description, composite = false },
                     Module,
                     ct)
                 .ConfigureAwait(false);
@@ -222,16 +255,15 @@ public sealed class KeycloakBootstrapService : IHostedService
                 return existing.Id;
         }
 
+        // 固定 UUID 由空库时的声明式 realm 导入保证；Admin REST 创建组不接受 id。
         var response = await _client
             .SendAsync(HttpMethod.Post, "groups", new { name }, Module, ct)
             .ConfigureAwait(false);
 
         ThrowIfUnauthorized(response, $"创建组 {name}");
         if (!response.IsSuccess)
-        {
-            _logger.LogWarning("创建组失败：{Group} HTTP {Status}", name, response.StatusCode);
-            return null;
-        }
+            throw new InvalidOperationException(
+                $"创建组 {name} 失败：HTTP {response.StatusCode} {response.Body}");
 
         return response.ExtractCreatedId();
     }
@@ -255,8 +287,18 @@ public sealed class KeycloakBootstrapService : IHostedService
         if (!string.IsNullOrWhiteSpace(postLogoutRedirectUri))
             attributes["post.logout.redirect.uris"] = postLogoutRedirectUri;
 
+        var existing = await FindClientUuidAsync(clientId, ct).ConfigureAwait(false);
+        var id = existing ?? clientId switch
+        {
+            "treegraph-web" => "10000000-0000-4000-8000-000000000001",
+            "treegraph-maui" => "10000000-0000-4000-8000-000000000002",
+            "treegraph-wasm" => "10000000-0000-4000-8000-000000000003",
+            "treegraph-admin" => "10000000-0000-4000-8000-000000000004",
+            _ => null
+        };
         var body = new
         {
+            id,
             clientId,
             name = clientId,
             enabled = true,
@@ -274,8 +316,6 @@ public sealed class KeycloakBootstrapService : IHostedService
             fullScopeAllowed,
             attributes
         };
-
-        var existing = await FindClientUuidAsync(clientId, ct).ConfigureAwait(false);
         if (existing is not null)
         {
             if (!updateExisting) return existing;
@@ -542,6 +582,202 @@ public sealed class KeycloakBootstrapService : IHostedService
         if (!response.IsSuccess)
             _logger.LogWarning("分配 kc-admin-api scope 失败：HTTP {Status}", response.StatusCode);
     }
+
+    private async Task EnsureSeedUsersAsync(KeycloakAdminOptions options, CancellationToken ct)
+    {
+        var seeds = new List<SeedUser>
+        {
+            new(
+                IdentityConstants.SuperuserId,
+                IdentityConstants.SuperuserUsername,
+                "超级用户",
+                options.SeedSuperuserPassword,
+                [IdentityRoles.Superuser, IdentityRoles.Admin, IdentityRoles.Editor],
+                IsPhoneUser: false)
+        };
+
+        if (options.SeedDevelopmentUsers)
+        {
+            seeds.Add(new SeedUser(
+                IdentityConstants.DevelopmentAdminId,
+                IdentityConstants.DevelopmentAdminUsername,
+                "管理员",
+                options.SeedAdminPassword,
+                [IdentityRoles.Admin, IdentityRoles.Editor],
+                IsPhoneUser: false));
+            seeds.Add(new SeedUser(
+                IdentityConstants.DevelopmentUserId,
+                IdentityConstants.DevelopmentUserUsername,
+                "测试用户",
+                options.SeedUserPassword,
+                [IdentityRoles.Viewer],
+                IsPhoneUser: true));
+        }
+
+        foreach (var seed in seeds)
+            await EnsureSeedUserAsync(seed, ct).ConfigureAwait(false);
+    }
+
+    private async Task EnsureSeedUserAsync(SeedUser seed, CancellationToken ct)
+    {
+        var existing = await FindUserByUsernameAsync(seed.Username, ct).ConfigureAwait(false);
+        string userId;
+        if (existing is not null)
+        {
+            // 已存在账号不更新凭据、requiredActions、启用状态或资料，避免重启覆盖用户修改。
+            userId = existing.Id
+                ?? throw new InvalidOperationException($"预置账号 {seed.Username} 缺少用户 ID");
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(seed.Password))
+            {
+                throw new InvalidOperationException(
+                    $"缺少预置账号 {seed.Username} 的初始密码；请通过用户机密或环境变量注入");
+            }
+
+            var attributes = new Dictionary<string, string[]>
+            {
+                ["realName"] = [seed.RealName]
+            };
+            if (seed.IsPhoneUser)
+                attributes["phoneNumber"] = [seed.Username];
+
+            // 普通 POST /users 会忽略 id；partialImport 才能按固定 UUID 重建账号。
+            var response = await _client.SendAsync(
+                HttpMethod.Post,
+                "partialImport",
+                new
+                {
+                    ifResourceExists = "SKIP",
+                    users = new[]
+                    {
+                        new
+                        {
+                            id = seed.Id,
+                            username = seed.Username,
+                            enabled = true,
+                            attributes,
+                            groups = new[] { IdentityConstants.DefaultGroupPath },
+                            requiredActions = new[] { "UPDATE_PASSWORD" },
+                            credentials = new[]
+                            {
+                                new { type = "password", value = seed.Password, temporary = true }
+                            }
+                        }
+                    }
+                },
+                Module,
+                ct).ConfigureAwait(false);
+
+            if (!response.IsSuccess)
+            {
+                // 并发启动时另一实例可能已创建；只在确认账号确实存在后接受 409。
+                var raced = response.StatusCode == 409
+                    ? await FindUserByUsernameAsync(seed.Username, ct).ConfigureAwait(false)
+                    : null;
+                if (raced?.Id is null)
+                    throw new InvalidOperationException(
+                        $"创建预置账号 {seed.Username} 失败：HTTP {response.StatusCode} {response.Body}");
+                userId = raced.Id;
+            }
+            else
+            {
+                var createdResponse = await _client
+                    .GetAsync($"users/{seed.Id}", Module, ct)
+                    .ConfigureAwait(false);
+                var created = createdResponse.IsSuccess ? createdResponse.Deserialize<KcUser>() : null;
+                if (created?.Id is null)
+                    throw new InvalidOperationException(
+                        $"创建预置账号 {seed.Username} 后未能按固定 ID 回查：HTTP {createdResponse.StatusCode} {response.Body}");
+                if (!string.Equals(created.Username, seed.Username, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException(
+                        $"预置账号 {seed.Username} 的固定 ID 已被其他账号占用：{created.Username}");
+                if (!string.Equals(created.Username, seed.Username, StringComparison.Ordinal))
+                {
+                    // Keycloak 26.6 的 partialImport 会把用户名转为小写，新建后恢复约定的大小写。
+                    var rename = await _client.SendAsync(
+                        HttpMethod.Put,
+                        $"users/{seed.Id}",
+                        new { username = seed.Username },
+                        Module,
+                        ct).ConfigureAwait(false);
+                    if (!rename.IsSuccess)
+                        throw new InvalidOperationException(
+                            $"校正预置账号 {seed.Username} 登录名失败：HTTP {rename.StatusCode} {rename.Body}");
+                }
+                userId = created.Id;
+                _logger.LogInformation("已创建预置账号：{Username}", seed.Username);
+            }
+        }
+
+        await EnsureUserRealmRolesAsync(userId, seed.Roles, ct).ConfigureAwait(false);
+    }
+
+    private async Task<KcUser?> FindUserByUsernameAsync(string username, CancellationToken ct)
+    {
+        var query = KeycloakAdminClient.BuildQuery(
+            ("username", username),
+            ("exact", "true"),
+            ("briefRepresentation", "false"));
+        var response = await _client.GetAsync("users" + query, Module, ct).ConfigureAwait(false);
+        if (!response.IsSuccess)
+            throw new InvalidOperationException($"查询预置账号 {username} 失败：HTTP {response.StatusCode}");
+
+        return (response.Deserialize<List<KcUser>>() ?? [])
+            .FirstOrDefault(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task EnsureUserRealmRolesAsync(
+        string userId,
+        IReadOnlyList<string> desiredRoleNames,
+        CancellationToken ct)
+    {
+        var currentResponse = await _client
+            .GetAsync($"users/{userId}/role-mappings/realm", Module, ct)
+            .ConfigureAwait(false);
+        if (!currentResponse.IsSuccess)
+            throw new InvalidOperationException($"读取预置账号角色失败：HTTP {currentResponse.StatusCode}");
+
+        var currentNames = (currentResponse.Deserialize<List<KcRole>>() ?? [])
+            .Select(r => r.Name)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToHashSet(StringComparer.Ordinal);
+        var missing = new List<object>();
+        foreach (var roleName in desiredRoleNames.Where(n => !currentNames.Contains(n)))
+        {
+            var roleResponse = await _client
+                .GetAsync($"roles/{Uri.EscapeDataString(roleName)}", Module, ct)
+                .ConfigureAwait(false);
+            if (!roleResponse.IsSuccess)
+                throw new InvalidOperationException($"读取预置角色 {roleName} 失败：HTTP {roleResponse.StatusCode}");
+
+            var role = roleResponse.Deserialize<KcRole>();
+            if (role?.Id is null)
+                throw new InvalidOperationException($"预置角色 {roleName} 缺少角色 ID");
+            missing.Add(new { id = role.Id, name = role.Name });
+        }
+
+        if (missing.Count == 0)
+            return;
+
+        var assign = await _client.SendAsync(
+            HttpMethod.Post,
+            $"users/{userId}/role-mappings/realm",
+            missing,
+            Module,
+            ct).ConfigureAwait(false);
+        if (!assign.IsSuccess)
+            throw new InvalidOperationException($"分配预置账号角色失败：HTTP {assign.StatusCode}");
+    }
+
+    private sealed record SeedUser(
+        string Id,
+        string Username,
+        string RealName,
+        string Password,
+        IReadOnlyList<string> Roles,
+        bool IsPhoneUser);
 
     /// <summary>
     /// 401/403 说明服务账号缺少 realm-management 权限。bootstrap 自身无法提权，

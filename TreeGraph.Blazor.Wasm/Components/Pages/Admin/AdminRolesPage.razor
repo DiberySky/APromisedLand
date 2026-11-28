@@ -24,7 +24,7 @@
         <MudTh></MudTh>
     </HeaderContent>
     <RowTemplate>
-        <MudTd>@context.Name</MudTd>
+        <MudTd>@IdentityRoles.GetDisplayName(context.Name)</MudTd>
         <MudTd>@(context.Description ?? "—")</MudTd>
         <MudTd>
             @if (context.BuiltIn)
@@ -37,7 +37,11 @@
             }
         </MudTd>
         <MudTd>
-            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick='() => ConfirmDeleteAsync(context.Name)' />
+            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                           Color="Color.Error"
+                           Size="Size.Small"
+                           Disabled="@IsSystemRole(context.Name)"
+                           OnClick='() => ConfirmDeleteAsync(context.Name)' />
         </MudTd>
     </RowTemplate>
     <NoRecordsContent>
@@ -48,6 +52,10 @@
 @code {
     private IReadOnlyList<IdentityRole> _roles = [];
     private bool _loading;
+
+    private static bool IsSystemRole(string name)
+        => name is IdentityRoles.Superuser or IdentityRoles.Admin or "app_admin"
+            or IdentityRoles.Editor or IdentityRoles.Viewer;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 

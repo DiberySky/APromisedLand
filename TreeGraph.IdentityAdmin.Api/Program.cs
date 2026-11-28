@@ -56,7 +56,13 @@ builder.Services
                     var cache = context.HttpContext.RequestServices.GetRequiredService<IDistributedCache>();
                     var revoked = await cache.GetStringAsync(IdentityConstants.RevocationKeyPrefix + sub);
                     if (!string.IsNullOrEmpty(revoked))
-                        context.Fail("账号已被禁用");
+                    {
+                        var issuedAtValue = context.Principal?.FindFirst(IdentityClaimTypes.IssuedAt)?.Value;
+                        if (!long.TryParse(revoked, out var revokedAt)
+                            || !long.TryParse(issuedAtValue, out var issuedAt)
+                            || issuedAt <= revokedAt)
+                            context.Fail("令牌已在密码重置、下线或禁用操作时失效");
+                    }
                 }
                 catch (Exception)
                 {
@@ -67,7 +73,7 @@ builder.Services
     });
 builder.Services.AddAuthorization(options =>
     options.AddPolicy(IdentityConstants.AdminOnlyPolicy, policy =>
-        policy.RequireRole(IdentityRoles.Admin, "app_admin")));
+        policy.RequireRole(IdentityRoles.Superuser, IdentityRoles.Admin, "app_admin")));
 
 var wasmOrigins = builder.Configuration.GetSection("Cors:WasmOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy("TreeGraphWasm", policy =>

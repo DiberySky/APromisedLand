@@ -4,47 +4,34 @@ namespace TreeGraph.Shared.Identity.Admin;
 public sealed record IdentityUserSummary(
     string Id,
     string Username,
-    string? Email,
-    string? FirstName,
-    string? LastName,
+    string? RealName,
+    string? PhoneNumber,
     bool Enabled,
-    bool EmailVerified,
     long? CreatedTimestamp);
 
 /// <summary>用户详情。</summary>
 public sealed record IdentityUserDetail(
     string Id,
     string Username,
-    string? Email,
-    string? FirstName,
-    string? LastName,
+    string? RealName,
+    string? PhoneNumber,
     bool Enabled,
-    bool EmailVerified,
     long? CreatedTimestamp,
     IReadOnlyList<string> Groups,
     IReadOnlyList<string> Roles,
     IReadOnlyList<string> RequiredActions,
     IReadOnlyDictionary<string, IReadOnlyList<string>> Attributes);
 
-/// <summary>创建用户请求。</summary>
+/// <summary>创建用户请求。普通用户使用大陆手机号，管理员使用自定义用户名。</summary>
 public sealed record CreateUserRequest(
     string Username,
-    string? Email = null,
-    string? FirstName = null,
-    string? LastName = null,
-    bool Enabled = true,
-    bool EmailVerified = false,
-    string? TemporaryPassword = null,
-    bool RequirePasswordChange = true,
-    IReadOnlyList<string>? GroupPaths = null,
-    IReadOnlyList<string>? RealmRoles = null);
+    string RealName,
+    string TemporaryPassword,
+    IReadOnlyList<string>? RealmRoles = null,
+    bool RequirePasswordChange = true);
 
-/// <summary>更新用户基础资料请求。null 表示不修改。</summary>
-public sealed record UpdateUserRequest(
-    string? Email = null,
-    string? FirstName = null,
-    string? LastName = null,
-    bool? EmailVerified = null);
+/// <summary>更新用户基础资料请求。登录名和手机号由受控开户流程确定。</summary>
+public sealed record UpdateUserRequest(string? RealName = null);
 
 /// <summary>重置密码请求。</summary>
 public sealed record ResetPasswordRequest(string Password, bool Temporary);

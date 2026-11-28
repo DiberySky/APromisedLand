@@ -173,9 +173,12 @@ public sealed class OrganizationsAdminService : IOrganizationsAdminService
         return users.Select(u => new OrganizationMember(
             u.Id ?? string.Empty,
             u.Username,
-            u.Email,
-            u.FirstName,
-            u.LastName)).ToArray();
+            u.Attributes is not null && u.Attributes.TryGetValue("realName", out var realName) && realName.Count > 0
+                ? realName[0]
+                : null,
+            u.Attributes is not null && u.Attributes.TryGetValue("phoneNumber", out var phone) && phone.Count > 0
+                ? phone[0]
+                : null)).ToArray();
     }
 
     public Task<AdminResult> AddMemberAsync(

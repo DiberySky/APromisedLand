@@ -21,6 +21,10 @@ public class AppHostResourceContext
     /// <summary>管理调用客户端 treegraph-admin 的密钥参数（secret）。</summary>
     public IResourceBuilder<ParameterResource>? KeycloakAdminClientSecret { get; set; }
 
+    public IResourceBuilder<ParameterResource>? SeedSuperuserPassword { get; set; }
+    public IResourceBuilder<ParameterResource>? SeedAdminPassword { get; set; }
+    public IResourceBuilder<ParameterResource>? SeedUserPassword { get; set; }
+
     // ── 基础设施 ──
     public IResourceBuilder<PostgresServerResource>? Postgres { get; set; }
 

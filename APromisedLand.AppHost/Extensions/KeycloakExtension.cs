@@ -17,14 +17,20 @@ public static class KeycloakExtension
         var adminPassword = builder.AddParameter("Keycloak-password", secret: true);
         var webClientSecret = builder.AddParameter("Keycloak-web-secret", secret: true);
         var adminClientSecret = builder.AddParameter("Keycloak-admin-secret", secret: true);
+        var seedSuperuserPassword = builder.AddParameter("Identity-superuser-password", secret: true);
+        var seedAdminPassword = builder.AddParameter("Identity-admin-password", secret: true);
+        var seedUserPassword = builder.AddParameter("Identity-user-password", secret: true);
 
         resourceContext.KeycloakUsername = adminUser;
         resourceContext.KeycloakPassword = adminPassword;
         resourceContext.KeycloakWebClientSecret = webClientSecret;
         resourceContext.KeycloakAdminClientSecret = adminClientSecret;
+        resourceContext.SeedSuperuserPassword = seedSuperuserPassword;
+        resourceContext.SeedAdminPassword = seedAdminPassword;
+        resourceContext.SeedUserPassword = seedUserPassword;
 
         var realmJsonPath = Path.Combine(AppContext.BaseDirectory, RealmJsonFileName);
-        // 开发调试主题：预填测试账号密码，仅在本地调试期挂载。
+        // 登录主题仅以只读方式挂载，账号与密码由用户输入。
         var themePath = Path.Combine(AppContext.BaseDirectory, "KeycloakThemes", "treegraph");
 
         resourceContext.Keycloak = builder
@@ -40,6 +46,8 @@ public static class KeycloakExtension
             // HTTP/2 另有独立的头列表上限（实测 SETTINGS 通告 8192 字节），上面的配置管不到，
             // 浏览器由此收到 431/协议错误。关闭 h2 让浏览器回落 HTTP/1.1，统一走 256KB 上限。
             .WithEnvironment("QUARKUS_HTTP_HTTP2", "false")
+            // 等待真实业务 realm 可访问，而不是仅等待容器进程启动。
+            .WithHttpHealthCheck(path: "/realms/apromisedland", statusCode: 200, endpointName: "http")
             .WithRealmImport(realmJsonPath)
             .WithOtlpExporter();
 

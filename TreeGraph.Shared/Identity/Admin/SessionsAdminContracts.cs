@@ -16,7 +16,7 @@ public interface ISessionsAdminService
 {
     Task<IReadOnlyList<IdentitySession>> ListUserSessionsAsync(string userId, CancellationToken ct = default);
 
-    Task<AdminResult> LogoutSessionAsync(AdminActor actor, string sessionId, CancellationToken ct = default);
+    Task<AdminResult> LogoutSessionAsync(AdminActor actor, string userId, string sessionId, CancellationToken ct = default);
 
     Task<AdminResult> LogoutAllUserSessionsAsync(AdminActor actor, string userId, CancellationToken ct = default);
 }

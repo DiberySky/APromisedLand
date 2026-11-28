@@ -149,7 +149,7 @@
         try
         {
             var actor = ActorAccessor.GetRequiredActor();
-            var result = await SessionsService.LogoutSessionAsync(actor, sessionId);
+            var result = await SessionsService.LogoutSessionAsync(actor, UserId, sessionId);
             if (result.Success)
                 Snackbar.Add("会话已下线", Severity.Success);
             else
